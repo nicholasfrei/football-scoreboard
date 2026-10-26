@@ -26,15 +26,24 @@ does not preserve the previous game data.
 - The header follows your selected team. Midfield and both end zones use the
   designated home team's logo, primary color, location, and mascot. If the home
   primary color is green (including dark green/green-teal), end zones use its
-  alternate color to stand out from the turf, with contrasting lettering. Neutral-site
+  alternate color to stand out from the turf. White Graduate lettering leaves
+  clear margins on all sides. Both end-zone
+  names share a uniform scale without stretching the font, with a dark
+  outline for bright backgrounds. Neutral-site
   games explicitly identify the designated home team.
 - Opponents are resolved dynamically by ESPN team ID, including NFL and college
   FBS/FCS teams. No opponent-specific code change is needed. Team metadata is
-  cached for 24 hours, with available schedule/cached fallbacks during outages.
+  cached for 24 hours for college teams and one minute for NFL teams (whose metadata
+  includes current division standings), with schedule/cached fallbacks during outages.
   Team and conference cache keys include the league to keep overlapping IDs separate.
-- Overall records appear when supplied; conference records and conference names
-  appear only when available. Historical matchup records take precedence over
-  current records. NFL records can include ties.
+- W–L records appear without the word “Overall.” College teams retain conference
+  records when supplied, for example `3-5 (1-4 SEC)`. NFL teams show the provider's
+  current division standing, for example `2-4 · 2nd in NFC East`, instead of a
+  conference record. When team metadata only reports a conference position, the
+  app uses ESPN's published division-table order for that season, cached for one
+  minute. Missing/incomplete division standings are omitted, never inferred from wins.
+  The NFL record tooltip identifies the standing as current; historical matchup
+  records still take precedence over current W–L records. NFL records can include ties.
 - College matchup rankings from 1–25 appear before team names when ESPN supplies
   them. These are event rankings, not a separately selected AP/CFP poll. NFL
   teams, missing/unranked values, and ESPN's `99` sentinel have no rank badge.
@@ -53,14 +62,24 @@ A **yellow line** marks the line to gain when the feed supplies a valid down
 and distance. It resets after a first down and stops at the goal line for
 goal-to-go situations. Both markers are hidden when the feed is stale or offline.
 The 11px caption under the score shows possession, down/distance, and the
-yard-line spot (for example, `Arkansas · 4th & 4 · VAN 28`); fourth-down text is red. A football beside the
-possessing team's score appears between its score and team name. Possession
-indicators are hidden when possession is unknown, the game is not live, or the
+yard-line spot (for example, `Arkansas · 4th & 4 · VAN 28`). Only the possessing
+team's name has a team-colored background box; fourth-down text stays red on the
+plain caption background. A football beside the
+possessing team's score appears between its score and team name. The football
+icons are 1.5× their original size (33px desktop, 24px tablet, 21px phone).
+Possession indicators are hidden when possession is unknown, the game is not live, or the
 feed is stale or offline.
 
+During live games and the drive demo, the quarter and game clock are centered
+**above the score**, including on phones. The date, venue, and broadcast remain
+below the matchup; the demo labels that lower row “SIMULATED GAME.” Overtime
+uses `OT1`, `OT2`, and so on. The upper clock is hidden for scheduled/final games
+and when the feed is stale or offline.
+
 See [branding sources](branding.md) for artwork, verified college overrides,
-and fallback behavior. The display uses system fonts; no external font
-download is required.
+and fallback behavior, including Graduate's open font license. The end-zone
+font is bundled locally; the rest of the display uses system fonts. No external
+font download is required at runtime.
 
 ## Next matchup and broadcasts
 
@@ -84,8 +103,12 @@ show a kick through the uprights for **6 seconds**. Made field goals use the
 same kick animation. **Punts** show a football flight for **4 seconds**;
 **blocked punts** show a deflected football for **12 seconds**. The
 event uses the scoring/recovering team's logo and color when attribution is
-known. A pick-six produces one touchdown takeover, not two alerts. Scores
-continue updating underneath.
+known. The event and team share a headline (for example, `TOUCHDOWN DALLAS`),
+wrapping when needed on narrow screens or for long team names.
+A pick-six produces one touchdown takeover, not two alerts. Scores
+continue updating underneath. Touchdowns show the current game score instead of
+“+6” (for example, `DAL 20-17 PHI`, selected team first). An active live touchdown
+takeover also updates that score on refresh without restarting its timer.
 
 Takeovers use structured ESPN play types and IDs/sequences:
 

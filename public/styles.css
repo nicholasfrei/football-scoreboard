@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Graduate";
+  src: url("/assets/fonts/Graduate-Regular.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   color-scheme: dark;
   --team-color: #a41f35;
@@ -112,7 +120,7 @@ body::before {
 
 .matchup {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 1.15fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(284px, 1.15fr) minmax(0, 1fr);
   align-items: center;
   gap: 20px;
   padding: clamp(16px, 3vw, 28px) 0 clamp(13px, 2.3vw, 22px);
@@ -136,7 +144,9 @@ body::before {
 .team-record { margin: 6px 0 0; max-width: 100%; color: #b0bcb3; font-size: 11px; font-weight: 600; line-height: 1.5; text-align: center; }
 
 .score-center { min-width: 0; }
-.score-readout { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto minmax(0, 1fr) 22px; align-items: center; gap: 8px; font-variant-numeric: tabular-nums lining-nums; }
+.game-clock { margin: 0 0 4px; color: #c4cdc0; font-size: 12px; font-weight: 700; line-height: 1.5; letter-spacing: .05em; text-align: center; font-variant-numeric: tabular-nums; }
+.game-clock[hidden] { display: none; }
+.score-readout { display: grid; grid-template-columns: 33px minmax(0, 1fr) auto minmax(0, 1fr) 33px; align-items: center; gap: 8px; font-variant-numeric: tabular-nums lining-nums; }
 .possession-ball { display: block; width: 100%; height: auto; }
 .possession-ball[hidden] { visibility: hidden; }
 .score-number { min-width: 0; color: #f5f4eb; font-size: clamp(48px, 7vw, 82px); font-weight: 700; line-height: 1.1; letter-spacing: -.02em; text-align: center; }
@@ -197,11 +207,13 @@ body::before {
   box-shadow: inset 0 0 0 2px var(--event-color);
 }
 .highlight-context { grid-column: 2; color: #fff; font-size: 10px; font-weight: 800; letter-spacing: .2em; }
-.highlight-logo { grid-column: 1; grid-row: 1 / 5; align-self: center; text-align: center; }
+.highlight-logo { grid-column: 1; grid-row: 1 / 4; align-self: center; text-align: center; }
 .highlight-logo img { width: 100%; height: 90px; object-fit: contain; }
-#highlight-title { grid-column: 2; font-size: clamp(22px, 4.7vw, 50px); font-weight: 900; line-height: 1.05; letter-spacing: .02em; overflow-wrap: anywhere; }
-#highlight-team { grid-column: 2; font-size: clamp(16px, 2.5vw, 25px); font-weight: 800; line-height: 1.1; overflow-wrap: anywhere; }
+.highlight-headline { grid-column: 2; display: flex; flex-wrap: wrap; align-items: baseline; gap: .15em .35em; min-width: 0; font-size: clamp(18px, 4vw, 44px); font-weight: 900; line-height: 1.05; letter-spacing: .02em; }
+#highlight-title, #highlight-team { min-width: 0; font: inherit; overflow-wrap: anywhere; }
+#highlight-team:empty { display: none; }
 #highlight-detail { grid-column: 2; color: #deded7; font-size: 10px; letter-spacing: .08em; }
+.highlight[data-kind="touchdown"] #highlight-detail { color: #fff; font-size: clamp(16px, 2.6vw, 26px); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
 .highlight-progress { position: absolute; bottom: 0; height: 4px; width: 100%; background: #fff; transform-origin: left; animation: highlight-countdown var(--event-duration) linear forwards; }
 .highlight-art { position: absolute; right: 8px; bottom: 8px; width: 150px; height: 120px; opacity: .3; pointer-events: none; }
 .highlight > :not(.highlight-art) { z-index: 1; }
@@ -211,7 +223,7 @@ body::before {
 .highlight[data-kind="punt"] .punt-art,
 .highlight[data-kind="blocked-punt"] .punt-art,
 .highlight[data-kind="blocked-punt"] .blocked-impact { display: block; }
-.highlight.is-animating #highlight-title { animation: highlight-arrive .45s ease-out both; }
+.highlight.is-animating .highlight-headline { animation: highlight-arrive .45s ease-out both; }
 .highlight.is-animating .kick-ball { animation: kick-good 1.8s ease-out both; }
 .punt-flight { transform-origin: 35px 125px; }
 .highlight.is-animating[data-kind="punt"] .punt-flight { animation: punt-flight 1.8s ease-out both; }
@@ -227,6 +239,7 @@ body::before {
   .highlight { grid-template-columns: 46px minmax(0, 1fr); gap: 6px 12px; padding: 14px; }
   .highlight-logo img { height: 46px; }
   .highlight-context { font-size: 8px; }
+  .highlight-headline { font-size: clamp(14px, 4vw, 22px); }
 }
 
 /* Team artwork stays in its original aspect ratio and colors. */
@@ -235,7 +248,7 @@ body::before {
 .team-seal img { display: block; width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: contain; object-position: center; }
 .team-name { white-space: normal; overflow: visible; overflow-wrap: anywhere; text-overflow: clip; }
 .endzone { fill: var(--home-color, #222222); }
-.endzone-text { fill: var(--endzone-ink, #ffffff); }
+.endzone-text { fill: var(--endzone-ink, #ffffff); font-family: "Graduate", Georgia, serif; font-size: 100px; font-weight: 400; letter-spacing: 3px; paint-order: stroke fill; stroke: rgba(0, 0, 0, .45); stroke-width: 2; stroke-linejoin: round; }
 .field-heading { gap: 12px; line-height: 1.5; }
 .field-heading > :last-child { text-align: right; }
 #ball-marker, #first-down-marker { transition: transform .8s ease; }
@@ -249,8 +262,9 @@ body::before {
 .demo-buttons button:hover, .demo-buttons a:hover { border-color: #f6d792; }
 .demo-buttons button:disabled { opacity: .5; cursor: default; }
 .demo-controls progress { width: 100%; height: 4px; accent-color: #d6b46a; }
-.ball-detail { width: fit-content; max-width: 100%; padding: 3px 8px; border-radius: 4px; background: var(--possession-color, #202b23); color: var(--possession-ink, #e4e9df); font-size: 11px; line-height: 1.5; text-align: center; margin: 8px auto 3px; }
-.down-distance.is-fourth-down { font-weight: 700; }
+.ball-detail { width: fit-content; max-width: 100%; color: #e4e9df; font-size: 11px; line-height: 1.5; text-align: center; margin: 8px auto 3px; }
+.possession-team { display: inline-block; padding: 3px 8px; border-radius: 4px; background: var(--possession-color, #202b23); color: var(--possession-ink, #e4e9df); }
+.down-distance.is-fourth-down { color: #f56367; font-weight: 700; }
 .play-panel { margin: 16px 24px 0; padding: 12px 16px; background: #0c120e; border-radius: 6px; }
 .play-panel h2 { margin: 0 0 8px; color: var(--gold); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
 #recent-plays { max-height: 126px; overflow-y: auto; list-style: none; margin: 0; padding: 0; }
@@ -282,8 +296,8 @@ body::before {
 }
 
 @media (min-width: 561px) and (max-width: 699px) {
-  .matchup { grid-template-columns: minmax(0, 1fr) minmax(180px, 1fr) minmax(0, 1fr); gap: 12px; }
-  .score-readout { grid-template-columns: 16px minmax(0, 1fr) auto minmax(0, 1fr) 16px; gap: 6px; }
+  .matchup { grid-template-columns: minmax(0, 1fr) minmax(204px, 1fr) minmax(0, 1fr); gap: 12px; }
+  .score-readout { grid-template-columns: 24px minmax(0, 1fr) auto minmax(0, 1fr) 24px; gap: 6px; }
 }
 
 @media (max-width: 560px) {
@@ -296,15 +310,17 @@ body::before {
   .matchup { grid-template-columns: minmax(74px, 1fr) auto minmax(74px, 1fr); gap: 8px; }
   .score-number { font-size: clamp(36px, 10vw, 48px); }
   .score-center { display: contents; }
-  #away-team { grid-area: 1 / 1; }
-  #home-team { grid-area: 1 / 3; }
-  .score-readout { grid-area: 1 / 2; }
-  .ball-detail { grid-column: 1 / -1; grid-row: 2; margin: 0; justify-self: center; }
-  .score-readout { grid-template-columns: 14px auto auto auto 14px; gap: 4px; }
+  .matchup { grid-template-areas: "away score home" "detail detail detail"; }
+  .matchup:has(.game-clock:not([hidden])) { grid-template-areas: "clock clock clock" "away score home" "detail detail detail"; }
+  .game-clock { grid-area: clock; margin: 0; justify-self: center; }
+  #away-team { grid-area: away; }
+  #home-team { grid-area: home; }
+  .score-readout { grid-area: score; grid-template-columns: 21px auto auto auto 21px; gap: 4px; }
+  .ball-detail { grid-area: detail; margin: 0; justify-self: center; }
   .score-divider { font-size: 16px; }
   .team-name { font-size: 12px; letter-spacing: 0; }
   .team-record { font-size: 9px; }
-  .team-seal { width: 60px; height: 50px; }
+  .team-seal { width: min(60px, 100%); height: 50px; }
   .field-wrap { margin-inline: 10px; padding: 9px 8px 6px; }
   .field-heading { font-size: 7px; }
   .footer-bar { grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; margin-inline: 14px; padding: 12px 0 6px; }

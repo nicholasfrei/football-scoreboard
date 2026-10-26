@@ -33,7 +33,8 @@ There is no frontend build step or third-party runtime dependency.
 - `src/scoreboard.js` selects and normalizes the displayed and next games.
 - `src/gamecast.js` normalizes recent plays and possession-aware field positions.
 - `src/game-details.js` normalizes broadcast listings and matchup predictors.
-- `src/team-stats.js` normalizes rankings, team records, and conference metadata.
+- `src/team-stats.js` normalizes rankings, team records, conference metadata, and NFL division standings.
+- `src/nfl-standings.js` provides a cached division-table fallback when NFL metadata only supplies a conference position.
 - `src/branding.js` contains verified college-team artwork and color overrides.
 - `src/highlights.js` normalizes highlight events; `public/highlights.js` tracks
   which new events should be shown by the browser.
