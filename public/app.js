@@ -1,5 +1,6 @@
 import { createHighlightTracker, highlightDuration, HIGHLIGHT_LABELS } from "./highlights.js";
 import { fieldBranding } from "./field-branding.js";
+import { possessionBranding } from "./possession-branding.js";
 
 const POLL_INTERVAL_MS = 30_000;
 let timeZone = "America/Chicago";
@@ -212,6 +213,10 @@ function updateField(game) {
 }
 
 function updatePossession(game) {
+  const branding = possessionBranding(game);
+  const detail = document.querySelector("#ball-detail");
+  detail.style.setProperty("--possession-color", branding.color);
+  detail.style.setProperty("--possession-ink", branding.ink);
   const home = game?.homeAway === "home" ? game.selectedTeam : game?.opponent;
   const away = game?.homeAway === "home" ? game.opponent : game?.selectedTeam;
   for (const [side, team] of [["home", home], ["away", away]]) {

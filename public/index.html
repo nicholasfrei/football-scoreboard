@@ -10,17 +10,12 @@
   </head>
   <body>
     <main class="mount" aria-label="Football scoreboard">
-      <div class="mount-screw screw-one" aria-hidden="true"></div>
-      <div class="mount-screw screw-two" aria-hidden="true"></div>
-      <div class="mount-screw screw-three" aria-hidden="true"></div>
-      <div class="mount-screw screw-four" aria-hidden="true"></div>
 
       <section class="display">
         <header class="brand-bar">
           <div id="brand-logo" class="brand-mark"></div>
           <div class="brand-copy">
-            <p id="brand-location" class="eyebrow">YOUR TEAM. EVERY GAME.</p>
-            <h1><strong id="brand-name">TEAM</strong> <span>FOOTBALL</span></h1>
+            <h1><strong id="brand-location">YOUR</strong> <strong id="brand-name">TEAM</strong></h1>
           </div>
           <div class="season-chip"><span id="league-name">—</span><span>•</span> <span id="season-year">—</span></div>
         </header>
@@ -116,13 +111,13 @@
                 <rect width="50" height="440" fill="#ffffff" opacity=".045" />
               </pattern>
             </defs>
-            <rect x="12" y="12" width="976" height="416" rx="18" fill="url(#turf)" />
-            <rect x="12" y="12" width="976" height="416" rx="18" fill="url(#mow-stripes)" />
-            <rect class="endzone" x="12" y="12" width="92" height="416" rx="12" />
-            <rect class="endzone" x="896" y="12" width="92" height="416" rx="12" />
+            <rect x="12" y="12" width="976" height="416" fill="url(#turf)" />
+            <rect x="12" y="12" width="976" height="416" fill="url(#mow-stripes)" />
+            <rect class="endzone" x="12" y="12" width="92" height="416" />
+            <rect class="endzone" x="896" y="12" width="92" height="416" />
             <g fill="none" stroke="#f4f1e6" stroke-opacity=".65" stroke-width="3">
               <path d="M104 12v416 M183.2 12v416 M262.4 12v416 M341.6 12v416 M420.8 12v416 M500 12v416 M579.2 12v416 M658.4 12v416 M737.6 12v416 M816.8 12v416 M896 12v416" />
-              <path d="M12 48h976 M12 392h976" stroke-opacity=".28" />
+              <path d="M104 48h792 M104 392h792" stroke-opacity=".28" />
             </g>
             <g fill="#f4f1e6" font-family="Arial, sans-serif" font-size="24" font-weight="700" text-anchor="middle" opacity=".86">
               <text x="183.2" y="90">10</text><text x="262.4" y="90">20</text><text x="341.6" y="90">30</text>
@@ -139,15 +134,12 @@
               <text id="endzone-mascot" x="942" y="230" transform="rotate(90 942 220)"></text>
             </g>
             <g id="first-down-marker" visibility="hidden" aria-label="Line to gain">
-              <line x1="0" y1="18" x2="0" y2="422" stroke="#ffda57" stroke-width="5" />
+              <line x1="0" y1="12" x2="0" y2="428" stroke="#ffda57" stroke-width="5" />
             </g>
             <g id="ball-marker" visibility="hidden" aria-label="Reported ball position">
-              <line x1="0" y1="18" x2="0" y2="422" stroke="#70c9ff" stroke-width="4" />
+              <line x1="0" y1="12" x2="0" y2="428" stroke="#70c9ff" stroke-width="4" />
               <ellipse cx="0" cy="220" rx="20" ry="12" fill="#6e331b" stroke="white" stroke-width="3" />
               <path d="M-10 220h20 M-5 215v10 M0 215v10 M5 215v10" stroke="white" stroke-width="2" />
-            </g>
-            <g fill="#f4f1e6" opacity=".75">
-              <path d="M140 80v26m-8-13h16 M140 334v26m-8-13h16 M860 80v26m-8-13h16 M860 334v26m-8-13h16" stroke="#f4f1e6" stroke-width="4" />
             </g>
           </svg>
         </section>
