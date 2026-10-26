@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#101611" />
     <title>Football Scoreboard</title>
+    <link rel="preload" href="/assets/fonts/Graduate-Regular.ttf" as="font" type="font/ttf" crossorigin />
     <link rel="stylesheet" href="/styles.css" />
     <script src="/app.js" type="module"></script>
   </head>
@@ -36,8 +37,10 @@
           <div id="highlight" class="highlight" role="status" hidden>
             <span id="highlight-context" class="highlight-context">BIG PLAY</span>
             <div id="highlight-logo" class="highlight-logo"></div>
-            <strong id="highlight-title"></strong>
-            <span id="highlight-team"></span>
+            <div class="highlight-headline">
+              <strong id="highlight-title"></strong>
+              <span id="highlight-team"></span>
+            </div>
             <span id="highlight-detail"></span>
             <svg class="highlight-art" viewBox="0 0 200 160" aria-hidden="true">
               <g class="kick-art">
@@ -64,6 +67,7 @@
             </div>
 
             <div class="score-center">
+              <p id="game-clock" class="game-clock" aria-label="Quarter and game clock" hidden></p>
               <div class="score-readout" aria-label="Game score">
                 <svg id="away-possession" class="possession-ball" viewBox="0 0 44 28" role="img" aria-label="Away team has possession" hidden>
                   <ellipse cx="22" cy="14" rx="20" ry="12" fill="#6e331b" stroke="white" stroke-width="2" />
@@ -129,9 +133,9 @@
             </g>
             <image id="field-logo" x="405" y="155" width="190" height="130" preserveAspectRatio="xMidYMid meet" />
             <text id="field-logo-fallback" x="500" y="230" fill="#fff" text-anchor="middle" font-size="28"></text>
-            <g class="endzone-text" font-family="Arial, sans-serif" font-size="25" font-weight="700" text-anchor="middle" letter-spacing="3">
-              <text id="endzone-school" x="58" y="230" transform="rotate(-90 58 220)"></text>
-              <text id="endzone-mascot" x="942" y="230" transform="rotate(90 942 220)"></text>
+            <g class="endzone-text">
+              <g transform="translate(58 220) rotate(-90)"><text id="endzone-school"></text></g>
+              <g transform="translate(942 220) rotate(90)"><text id="endzone-mascot"></text></g>
             </g>
             <g id="first-down-marker" visibility="hidden" aria-label="Line to gain">
               <line x1="0" y1="12" x2="0" y2="428" stroke="#ffda57" stroke-width="5" />

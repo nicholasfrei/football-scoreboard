@@ -1,9 +1,30 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { gameHighlights } from "../src/highlights.js";
-import { createHighlightTracker } from "../public/highlights.js";
+import { createHighlightTracker, highlightDetail } from "../public/highlights.js";
 
 const now = Date.parse("2026-10-31T23:55:00Z");
+
+test("touchdown details show the current score with the selected team first, never +6", () => {
+  const game = { selectedTeam: { id: "6", abbreviation: "DAL", score: 20 }, opponent: { id: "21", abbreviation: "PHI", score: 17 } };
+  for (const teamId of ["6", "21", null]) {
+    assert.equal(highlightDetail({ kind: "touchdown", teamId, detail: "+6 POINTS" }, game), "DAL 20-17 PHI");
+  }
+  assert.equal(highlightDetail({ kind: "touchdown" }, { ...game, homeAway: "away" }), "DAL 20-17 PHI");
+  game.selectedTeam.score = 0;
+  game.opponent.score = null;
+  assert.equal(highlightDetail({ kind: "touchdown" }, game), "DAL 0-— PHI");
+});
+
+test("other highlight details retain their labels and unknown-team safeguards", () => {
+  const game = { selectedTeam: { id: "6" }, opponent: { id: "21" } };
+  for (const [kind, label] of Object.entries({ interception: "INTERCEPTED BY", fumble: "RECOVERED BY", punt: "PUNTING TEAM", "blocked-punt": "BLOCKED BY" })) {
+    assert.equal(highlightDetail({ kind, teamId: "21" }, game), label);
+    assert.equal(highlightDetail({ kind, teamId: null }, game), "TEAM NOT CONFIRMED");
+  }
+  assert.equal(highlightDetail({ kind: "extra-point", detail: "IT’S GOOD · +1" }, game), "IT’S GOOD · +1");
+});
+
 function play(overrides = {}) {
   return {
     id: "p1", sequenceNumber: "10", type: { text: "Passing Touchdown" },

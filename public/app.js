@@ -1,6 +1,7 @@
-import { createHighlightTracker, highlightDuration, HIGHLIGHT_LABELS } from "./highlights.js";
-import { fieldBranding } from "./field-branding.js";
+import { createHighlightTracker, highlightDetail, highlightDuration, HIGHLIGHT_LABELS } from "./highlights.js";
+import { endzoneTextLayout, fieldBranding } from "./field-branding.js";
 import { possessionBranding } from "./possession-branding.js";
+import { teamRecordLabel } from "./team-record.js";
 
 const POLL_INTERVAL_MS = 30_000;
 let timeZone = "America/Chicago";
@@ -28,12 +29,7 @@ function showHighlight(event, game, demo = false, duration = highlightDuration(e
   document.querySelector("#highlight-context").textContent = demo ? "DEMO · NOT A LIVE PLAY" : "BIG PLAY";
   document.querySelector("#highlight-title").textContent = HIGHLIGHT_LABELS[event.kind];
   document.querySelector("#highlight-team").textContent = team?.location.toUpperCase() ?? "";
-  document.querySelector("#highlight-detail").textContent = event.kind === "interception" ? "INTERCEPTED BY"
-    : event.kind === "fumble" ? "RECOVERED BY" : event.kind === "blocked-punt" ? "BLOCKED BY"
-    : event.kind === "punt" ? "PUNTING TEAM" : event.detail;
-  if (!team && ["interception", "fumble", "punt", "blocked-punt"].includes(event.kind)) {
-    document.querySelector("#highlight-detail").textContent = "TEAM NOT CONFIRMED";
-  }
+  document.querySelector("#highlight-detail").textContent = highlightDetail(event, game);
   const logo = document.querySelector("#highlight-logo");
   logo.replaceChildren();
   if (team) setTeamLogo(logo, team);
@@ -63,6 +59,9 @@ function updateHighlights(payload) {
       && game.id === activeHighlight.gameId && game.league === activeHighlight.league && game.highlights?.some((event) =>
         event.id === activeHighlight.id && event.kind === activeHighlight.kind && event.teamId === activeHighlight.teamId);
     if (!stillValid) hideHighlight();
+    else if (activeHighlight.kind === "touchdown") {
+      document.querySelector("#highlight-detail").textContent = highlightDetail(activeHighlight, game);
+    }
   }
   const event = highlightTracker.observe(payload);
   if (event) showHighlight(event, game);
@@ -79,6 +78,7 @@ const elements = {
   gameStatus: document.querySelector("#game-status"),
   gameStatusText: document.querySelector("#game-status-text"),
   gameDetail: document.querySelector("#game-detail"),
+  gameClock: document.querySelector("#game-clock"),
   gameVenue: document.querySelector("#game-venue"),
   nextOpponent: document.querySelector("#next-opponent"),
   nextDetail: document.querySelector("#next-detail"),
@@ -144,6 +144,19 @@ function updateBrand(payload) {
   setTeamLogo(document.querySelector("#brand-logo"), team);
 }
 
+function fitEndzoneLabels() {
+  const labels = [...document.querySelectorAll(".endzone-text text")];
+  // Measure untransformed glyphs again when the local font finishes loading.
+  for (const label of labels) label.removeAttribute("transform");
+  const layout = endzoneTextLayout(labels.map((label) => label.getBBox()));
+  labels.forEach((label, index) => {
+    const fit = layout[index];
+    if (fit) label.setAttribute("transform", `matrix(${fit.scale} 0 0 ${fit.scale} ${fit.x} ${fit.y})`);
+  });
+}
+
+document.fonts.load('400 100px "Graduate"').then(fitEndzoneLabels).catch(() => {});
+
 function updateField(game) {
   const home = game.homeAway === "home" ? game.selectedTeam : game.opponent;
   const away = game.homeAway === "home" ? game.opponent : game.selectedTeam;
@@ -156,8 +169,8 @@ function updateField(game) {
   for (const [selector, text] of [["#endzone-school", home.location], ["#endzone-mascot", home.mascot]]) {
     const label = document.querySelector(selector);
     label.textContent = text.toUpperCase();
-    label.setAttribute("font-size", Math.min(25, 290 / (text.length * .8)));
   }
+  fitEndzoneLabels();
   const logo = document.querySelector("#field-logo");
   const fallback = document.querySelector("#field-logo-fallback");
   fallback.textContent = home.logo ? "" : home.abbreviation;
@@ -178,6 +191,9 @@ function updateField(game) {
   marker.setAttribute("visibility", game.ball ? "visible" : "hidden");
   if (game.ball) {
     marker.style.transform = `translateX(${104 + game.ball.percent * 7.92}px)`;
+    const possession = document.createElement("span");
+    possession.className = "possession-team";
+    possession.textContent = game.ball.possession;
     const down = document.createElement("span");
     down.className = "down-distance";
     down.textContent = game.ball.downDistance?.split(/\s+at\s+/i)[0] ?? "Ball position";
@@ -185,7 +201,7 @@ function updateField(game) {
     const position = game.ball.label ?? (game.ball.percent === 50 ? "50-yard line"
       : game.ball.percent < 50 ? `${home.abbreviation} ${game.ball.percent}` : `${away.abbreviation} ${100 - game.ball.percent}`);
     const qualifier = game.ball.source === "last reported play" ? " · last reported play" : "";
-    document.querySelector("#ball-detail").replaceChildren(`${game.ball.possession} · `, down, ` · ${position}${qualifier}`);
+    document.querySelector("#ball-detail").replaceChildren(possession, " · ", down, ` · ${position}${qualifier}`);
   } else {
     document.querySelector("#ball-detail").textContent = game.state === "live"
       ? "Ball position unavailable · waiting for the feed"
@@ -247,15 +263,16 @@ function rankedName(team) {
   return `${rank}${team.location ?? team.shortName}`;
 }
 
-function renderTeam(side, team) {
+function renderTeam(side, team, league) {
   document.querySelector(`#${side}-team`).dataset.teamId = team.id;
   document.querySelector(`#${side}-team`).classList.toggle("is-selected", team.id === selectedTeamId);
   const name = document.querySelector(`#${side}-name`);
   name.textContent = rankedName(team);
   name.title = team.rank ? team.rankSource ?? "ESPN event ranking" : "";
-  const overall = team.record?.overall ? `${team.record.overall} Overall` : "Record unavailable";
-  const conference = team.record?.conference ? ` (${team.record.conference} ${team.conferenceName ?? "Conf."})` : "";
-  document.querySelector(`#${side}-record`).textContent = `${overall}${conference}`;
+  const record = document.querySelector(`#${side}-record`);
+  record.textContent = teamRecordLabel(team, league);
+  record.title = league === "nfl" && team.divisionStanding
+    ? "Current division standing from ESPN; matchup record shown when available" : "";
   document.querySelector(`#${side}-score`).textContent = team.score ?? "—";
   setTeamLogo(document.querySelector(`#${side}-seal`), team);
 }
@@ -272,6 +289,8 @@ function renderNextDetails(game) {
 
 function updateGame(game, nextGame) {
   lastGameState = game?.state ?? null;
+  elements.gameClock.hidden = true;
+  elements.gameClock.textContent = "";
   updatePossession(game);
   renderNextDetails(nextGame);
   if (!game) {
@@ -285,15 +304,17 @@ function updateGame(game, nextGame) {
   const isHome = game.homeAway === "home";
 
   elements.gameLabel.textContent = upcoming ? "NEXT GAME" : game.state === "live" ? "GAME IN PROGRESS" : "MOST RECENT GAME";
-  renderTeam("away", isHome ? game.opponent : game.selectedTeam);
-  renderTeam("home", isHome ? game.selectedTeam : game.opponent);
+  renderTeam("away", isHome ? game.opponent : game.selectedTeam, game.league);
+  renderTeam("home", isHome ? game.selectedTeam : game.opponent, game.league);
   updateField(game);
   elements.gameVenue.textContent = game.venue ?? "VENUE TBD";
   document.querySelector("#game-broadcast").textContent = game.broadcasts?.join(" / ") || "TBD";
 
   if (game.state === "live") {
     const quarter = game.period > 4 ? `OT${game.period - 4}` : game.period ? `Q${game.period}` : "LIVE";
-    elements.gameDetail.textContent = `${quarter}${game.clock ? ` · ${game.clock}` : ""} · ${formatDate(game.kickoffAt)}`;
+    elements.gameClock.textContent = `${quarter}${game.clock ? ` · ${game.clock}` : ""}`;
+    elements.gameClock.hidden = false;
+    elements.gameDetail.textContent = formatDate(game.kickoffAt);
   } else if (upcoming) {
     elements.gameDetail.textContent = kickoffText(game);
   } else {
@@ -346,6 +367,7 @@ async function refreshScoreboard() {
     setFeedState(payload.stale ? "stale" : "fresh", payload.refreshedAt);
     if (payload.gamecastUnavailable) elements.feedLabel.textContent += " · GAMECAST UNAVAILABLE";
     if (payload.stale) {
+      elements.gameClock.hidden = true;
       document.querySelector("#ball-marker").setAttribute("visibility", "hidden");
       document.querySelector("#first-down-marker").setAttribute("visibility", "hidden");
       updatePossession(null);
@@ -354,6 +376,7 @@ async function refreshScoreboard() {
       elements.gameStatus.classList.remove("is-live");
     }
   } catch {
+    elements.gameClock.hidden = true;
     hideHighlight();
     highlightTracker.observe(null);
     setFeedState("error");
@@ -406,7 +429,7 @@ async function startDriveDemo() {
     elements.gameLabel.textContent = "DRIVE DEMO";
     elements.gameStatusText.textContent = "DEMO";
     elements.gameStatus.classList.remove("is-live");
-    elements.gameDetail.textContent = `Q1 · ${frame.spotlight.clock} · SIMULATED GAME`;
+    elements.gameDetail.textContent = "SIMULATED GAME";
     elements.feedLabel.textContent = "OFFLINE DEMO · FICTIONAL PLAYS";
     elements.nextOpponent.textContent = "TD + XP · FIELD GOAL · PUNT · BLOCKED PUNT";
     elements.nextDetail.textContent = "Accelerated playback · 5 seconds per step at 1×";

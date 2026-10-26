@@ -47,7 +47,7 @@ export function createDemoFrames() {
   const plays = [];
   const highlights = [];
   const details = {
-    "first-down": "MOVE THE CHAINS", "extra-point": "IT’S GOOD · +1", touchdown: "+6 POINTS",
+    "first-down": "MOVE THE CHAINS", "extra-point": "IT’S GOOD · +1",
     "field-goal": "IT’S GOOD · +3", punt: "PUNTING TEAM", "blocked-punt": "BLOCKED BY",
   };
   return steps.map((step, index) => {

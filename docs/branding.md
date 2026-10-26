@@ -14,6 +14,16 @@ Original logo artwork is displayed without
 recoloring, stretching, mirroring, or replacing it with an invented monogram.
 End-zone names are plain display text, not reproductions of proprietary wordmarks.
 
+## End-zone font
+
+End-zone lettering uses [Graduate](https://fonts.google.com/specimen/Graduate),
+bundled unchanged from [Google Fonts](https://github.com/google/fonts/tree/main/ofl/graduate)
+at `public/assets/fonts/Graduate-Regular.ttf`. Graduate is licensed under the
+**SIL Open Font License 1.1**, allowing personal/commercial use and embedding with
+the copyright and license notice preserved in `public/assets/fonts/OFL-Graduate.txt`.
+It has no trial period or registration requirement. The previous ESPN trial font
+is no longer bundled or served.
+
 ## Local artwork
 
 - `public/assets/arkansas.png`: [Arkansas Athletics' dark-background Razorback artwork](https://arkansasrazorbacks.com/wp-content/uploads/2021/09/arkansas-dark-logo.png), linked by the [official athletics site](https://arkansasrazorbacks.com/).
@@ -45,7 +55,8 @@ or `college-football`. College lookups include FBS and FCS opponents; there is
 no conference, opponent-name, or season allowlist.
 The canonical `displayName`, `location`, and `name` supply the scoreboard name,
 location-name end zone, and mascot end zone respectively. This avoids guessing a
-mascot from shortened schedule labels. Metadata is cached for 24 hours; failures
+mascot from shortened schedule labels. College metadata is cached for 24 hours;
+NFL metadata for one minute to refresh division standings. Failures
 retain available event data or cached metadata and retry after one minute.
 
 Other opponents' logos and colors come from that metadata rather than a separate
@@ -61,10 +72,19 @@ needed, without adding opponent-specific fetching logic.
 
 Both end zones use the **designated home team's primary color**, or its alternate
 color when the primary is green, with its location name in one and mascot in the
-other. The same team's logo occupies midfield.
+other. White Graduate lettering fits inside a centered 320 × 50 area within
+each 416 × 92 end zone, with clear margins. Both names share one uniform scale
+that preserves the font's natural proportions. Short names keep their natural
+length rather than stretching; long names shrink both labels to keep them consistent.
+Bright colors such as Packers gold keep white text; a dark outline separates it
+from light paint.
+Glyph bounds are fitted after the local font loads so long team names stay inside
+the end zones. The same team's logo occupies midfield.
 For neutral-site games the heading explicitly says “designated home.” The
 field is a schematic, not a replica of the stadium's painted surface.
 The fixed orientation is home offense → and away offense ←; it does not simulate
 real-world quarter-by-quarter changes of end.
 The caption below the score displays possession, down/distance, and the yard-line
 spot during play, and FINAL for completed games.
+Only the possessing team's name gets a primary-color badge; the down and yard-line
+remain on the plain background, with fourth downs in red.

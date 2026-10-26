@@ -46,6 +46,7 @@ export function enrichGame(game, summary) {
     team.record.conference ??= previous.record?.conference ?? null;
     team.conferenceId ??= previous.conferenceId ?? null;
     team.conferenceName ??= previous.conferenceName ?? null;
+    team.divisionStanding ??= previous.divisionStanding ?? null;
   }
   const home = updated.homeAway === "home" ? updated.selectedTeam : updated.opponent;
   const away = updated.homeAway === "home" ? updated.opponent : updated.selectedTeam;

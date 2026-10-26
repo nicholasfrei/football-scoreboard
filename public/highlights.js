@@ -18,6 +18,19 @@ export function highlightDuration(kind) {
   return ["first-down", "punt"].includes(kind) ? 4_000 : kind === "extra-point" ? 6_000 : HIGHLIGHT_DURATION_MS;
 }
 
+export function highlightDetail(event, game) {
+  if (event.kind === "touchdown") {
+    const { selectedTeam, opponent } = game;
+    return `${selectedTeam.abbreviation} ${selectedTeam.score ?? "—"}-${opponent.score ?? "—"} ${opponent.abbreviation}`;
+  }
+  const labels = { interception: "INTERCEPTED BY", fumble: "RECOVERED BY", punt: "PUNTING TEAM", "blocked-punt": "BLOCKED BY" };
+  if (Object.hasOwn(labels, event.kind)) {
+    return [game.selectedTeam, game.opponent].some((team) => team.id === event.teamId)
+      ? labels[event.kind] : "TEAM NOT CONFIRMED";
+  }
+  return event.detail;
+}
+
 /** Track a play-sequence watermark, not score deltas or matching prose.
  * First load, reconnects, and game changes establish a baseline silently.
  * If several big plays arrive together, show the newest rather than a backlog.

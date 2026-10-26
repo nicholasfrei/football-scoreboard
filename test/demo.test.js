@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createDemoFrames } from "../public/demo.js";
-import { createHighlightTracker } from "../public/highlights.js";
+import { createHighlightTracker, highlightDetail } from "../public/highlights.js";
 
 test("Cowboys playback delivers first downs, TD, NFL XP, FG, punt, and blocked punt", () => {
   const frames = createDemoFrames();
@@ -15,6 +15,7 @@ test("Cowboys playback delivers first downs, TD, NFL XP, FG, punt, and blocked p
   assert.equal(events.filter((event) => event.kind === "first-down").length, 6);
   const td = events.find((event) => event.kind === "touchdown");
   assert.equal(td.game.selectedTeam.score, 6);
+  assert.equal(highlightDetail(td, td.game), "DAL 6-0 PHI");
   assert.equal(td.game.ball.percent, 100);
   assert.equal(events.find((event) => event.kind === "extra-point").game.selectedTeam.score, 7);
   const fg = events.find((event) => event.kind === "field-goal");

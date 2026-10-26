@@ -13,6 +13,19 @@ function isGreen(color) {
 export function fieldBranding(team) {
   const color = isGreen(team.color) && /^#[0-9a-f]{6}$/i.test(team.alternateColor ?? "")
     ? team.alternateColor : team.color;
-  const [r, g, b] = color.slice(1).match(/../g).map((channel) => parseInt(channel, 16));
-  return { color, ink: r * .299 + g * .587 + b * .114 > 155 ? "#000000" : "#FFFFFF" };
+  return { color, ink: "#FFFFFF" };
+}
+
+export function endzoneTextLayout(bounds) {
+  const width = Math.max(0, ...bounds.map((box) => box.width));
+  const height = Math.max(0, ...bounds.map((box) => box.height));
+  if (!width || !height) return bounds.map(() => null);
+  // Both names use one uniform scale: shorter names keep their natural length,
+  // and a long name reduces both labels instead of distorting either one.
+  const scale = Math.min(320 / width, 50 / height);
+  return bounds.map((box) => box.width && box.height ? {
+    scale,
+    x: -(box.x + box.width / 2) * scale,
+    y: -(box.y + box.height / 2) * scale,
+  } : null);
 }

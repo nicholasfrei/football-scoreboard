@@ -3,10 +3,13 @@ import { enrichGame } from "./gamecast.js";
 import { teamBrand } from "./branding.js";
 import { teamStats } from "./team-stats.js";
 import { DEFAULT_CONFIG } from "./config.js";
+import { getNflDivisionStandings } from "./nfl-standings.js";
 
 const BASE_URL = "https://site.api.espn.com/apis/site/v2/sports/football";
 const REQUEST_TIMEOUT_MS = 10_000;
 const TEAM_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+// NFL team metadata includes current division standings, which change on game day.
+const NFL_TEAM_CACHE_TTL_MS = 60_000;
 // Separate caches for injected fetch implementations keep tests isolated.
 const teamCaches = new WeakMap();
 const conferenceCaches = new WeakMap();
@@ -51,7 +54,7 @@ async function getTeam(id, league, fetchImpl) {
     if (String(team?.id) !== id || !team.displayName || !team.location || !team.name) {
       throw new Error("Incomplete or mismatched team metadata");
     }
-    cache.set(key, { team, expiresAt: Date.now() + TEAM_CACHE_TTL_MS });
+    cache.set(key, { team, expiresAt: Date.now() + (league === "nfl" ? NFL_TEAM_CACHE_TTL_MS : TEAM_CACHE_TTL_MS) });
     return team;
   } catch {
     // Keep previous metadata during an outage; retry after a short backoff.
@@ -71,6 +74,7 @@ function applyTeamMetadata(team, metadata, state, league) {
     abbreviation: metadata.abbreviation ?? team.abbreviation,
     conferenceId: team.conferenceId ?? stats.conferenceId,
     conferenceName: team.conferenceName ?? stats.conferenceName,
+    divisionStanding: stats.divisionStanding ?? team.divisionStanding,
     record: {
       // A current team record is not a historical game's record.
       overall: team.record.overall ?? (state === "final" ? null : stats.record.overall),
@@ -136,6 +140,10 @@ export async function getScoreboard({ config = DEFAULT_CONFIG, now = new Date(),
   const conferenceIds = [...new Set(teams.filter((team) => !team.conferenceName && team.conferenceId).map((team) => team.conferenceId))];
   const conferences = new Map(await Promise.all(conferenceIds.map(async (id) => [id, await getConference(id, league, fetchImpl)])));
   for (const team of teams) team.conferenceName ??= conferences.get(team.conferenceId) ?? null;
+  if (league === "nfl" && teams.some((team) => !team.divisionStanding)) {
+    const standings = await getNflDivisionStandings(scoreboard.season, fetchImpl);
+    for (const team of teams) team.divisionStanding ??= standings.get(team.id) ?? null;
+  }
   const selectedMetadata = metadata.get(teamId);
   if (selectedMetadata) {
     scoreboard.team = {

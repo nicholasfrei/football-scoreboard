@@ -37,4 +37,10 @@ test("server serves every startup module so the dashboard can leave its loading 
   }
   await checkModule("/app.js");
   await checkModule("/demo.js");
+  const font = await fetch(`http://127.0.0.1:${port}/assets/fonts/Graduate-Regular.ttf`);
+  assert.equal(font.status, 200);
+  assert.equal(font.headers.get("content-type"), "font/ttf");
+  const bytes = new Uint8Array(await font.arrayBuffer());
+  assert.deepEqual([...bytes.slice(0, 4)], [0, 1, 0, 0], "end-zone font must be a TrueType file");
+  assert.equal((await fetch(`http://127.0.0.1:${port}/assets/fonts/esp_bold.ttf`)).status, 404);
 });
