@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101611" />
+    <title>Football Scoreboard</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" type="module"></script>
+  </head>
+  <body>
+    <main class="mount" aria-label="Football scoreboard">
+      <div class="mount-screw screw-one" aria-hidden="true"></div>
+      <div class="mount-screw screw-two" aria-hidden="true"></div>
+      <div class="mount-screw screw-three" aria-hidden="true"></div>
+      <div class="mount-screw screw-four" aria-hidden="true"></div>
+
+      <section class="display">
+        <header class="brand-bar">
+          <div id="brand-logo" class="brand-mark"></div>
+          <div class="brand-copy">
+            <p id="brand-location" class="eyebrow">YOUR TEAM. EVERY GAME.</p>
+            <h1><strong id="brand-name">TEAM</strong> <span>FOOTBALL</span></h1>
+          </div>
+          <div class="season-chip"><span id="league-name">—</span><span>•</span> <span id="season-year">—</span></div>
+        </header>
+
+        <section class="score-panel" aria-live="polite" aria-busy="true">
+          <div id="highlight" class="highlight" role="status" hidden>
+            <span id="highlight-context" class="highlight-context">BIG PLAY</span>
+            <div id="highlight-logo" class="highlight-logo"></div>
+            <strong id="highlight-title"></strong>
+            <span id="highlight-team"></span>
+            <span id="highlight-detail"></span>
+            <div class="highlight-progress" aria-hidden="true"></div>
+          </div>
+          <div class="score-topline">
+            <span id="game-label" class="eyebrow">Loading game</span>
+            <span id="game-status" class="status-pill"><i></i><span id="game-status-text">CONNECTING</span></span>
+          </div>
+
+          <div class="matchup">
+            <div id="away-team" class="team-block">
+              <div id="away-seal" class="team-seal"></div>
+              <p id="away-name" class="team-name">Away team</p>
+              <p id="away-record" class="team-record">—</p>
+            </div>
+
+            <div class="score-readout" aria-label="Game score">
+              <span id="away-score" class="score-number">—</span>
+              <span class="score-divider" aria-hidden="true">–</span>
+              <span id="home-score" class="score-number">—</span>
+            </div>
+
+            <div id="home-team" class="team-block">
+              <div id="home-seal" class="team-seal"></div>
+              <p id="home-name" class="team-name">Home team</p>
+              <p id="home-record" class="team-record">—</p>
+            </div>
+          </div>
+
+          <div class="game-meta">
+            <span id="game-detail">Checking the latest score…</span>
+            <span class="meta-divider" aria-hidden="true"></span>
+            <span id="game-venue">ESPN public score feed</span>
+            <span id="game-broadcast" class="broadcast-badge">TBD</span>
+          </div>
+        </section>
+
+        <div class="gamecast-layout">
+        <section class="field-wrap" aria-label="Home team field illustration">
+          <div class="field-heading">
+            <span id="field-home">HOME FIELD</span>
+            <span id="field-venue">LOADING VENUE</span>
+          </div>
+          <svg class="football-field" viewBox="0 0 1000 390" role="img" aria-label="Illustration of a striped football field">
+            <defs>
+              <linearGradient id="turf" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#2d723d" />
+                <stop offset="1" stop-color="#17482d" />
+              </linearGradient>
+              <pattern id="mow-stripes" width="100" height="390" patternUnits="userSpaceOnUse">
+                <rect width="50" height="390" fill="#ffffff" opacity=".045" />
+              </pattern>
+            </defs>
+            <rect x="12" y="12" width="976" height="366" rx="18" fill="url(#turf)" />
+            <rect x="12" y="12" width="976" height="366" rx="18" fill="url(#mow-stripes)" />
+            <rect class="endzone" x="12" y="12" width="92" height="366" rx="12" />
+            <rect class="endzone" x="896" y="12" width="92" height="366" rx="12" />
+            <g fill="none" stroke="#f4f1e6" stroke-opacity=".65" stroke-width="3">
+              <path d="M104 12v366 M183.2 12v366 M262.4 12v366 M341.6 12v366 M420.8 12v366 M500 12v366 M579.2 12v366 M658.4 12v366 M737.6 12v366 M816.8 12v366 M896 12v366" />
+              <path d="M12 48h976 M12 342h976" stroke-opacity=".28" />
+            </g>
+            <g fill="#f4f1e6" font-family="Arial, sans-serif" font-size="24" font-weight="700" text-anchor="middle" opacity=".86">
+              <text x="183.2" y="90">10</text><text x="262.4" y="90">20</text><text x="341.6" y="90">30</text>
+              <text x="420.8" y="90">40</text><text x="500" y="90">50</text><text x="579.2" y="90">40</text>
+              <text x="658.4" y="90">30</text><text x="737.6" y="90">20</text><text x="816.8" y="90">10</text>
+              <text x="183.2" y="320">10</text><text x="262.4" y="320">20</text><text x="341.6" y="320">30</text>
+              <text x="420.8" y="320">40</text><text x="500" y="320">50</text><text x="579.2" y="320">40</text>
+              <text x="658.4" y="320">30</text><text x="737.6" y="320">20</text><text x="816.8" y="320">10</text>
+            </g>
+            <image id="field-logo" x="405" y="130" width="190" height="130" preserveAspectRatio="xMidYMid meet" />
+            <text id="field-logo-fallback" x="500" y="205" fill="#fff" text-anchor="middle" font-size="28"></text>
+            <g class="endzone-text" font-family="Arial, sans-serif" font-size="25" font-weight="700" text-anchor="middle" letter-spacing="3">
+              <text id="endzone-school" x="58" y="205" transform="rotate(-90 58 195)"></text>
+              <text id="endzone-mascot" x="942" y="205" transform="rotate(90 942 195)"></text>
+            </g>
+            <g id="ball-marker" visibility="hidden" aria-label="Reported ball position">
+              <line x1="0" y1="18" x2="0" y2="372" stroke="#70c9ff" stroke-width="4" />
+              <ellipse cx="0" cy="280" rx="20" ry="12" fill="#6e331b" stroke="white" stroke-width="3" />
+              <path d="M-10 280h20 M-5 275v10 M0 275v10 M5 275v10" stroke="white" stroke-width="2" />
+            </g>
+            <g fill="#f4f1e6" opacity=".75">
+              <path d="M140 80v26m-8-13h16 M140 284v26m-8-13h16 M860 80v26m-8-13h16 M860 284v26m-8-13h16" stroke="#f4f1e6" stroke-width="4" />
+            </g>
+          </svg>
+          <div class="field-caption">
+            <span class="field-dot"></span>
+            <span id="team-caption">FOOTBALL</span>
+            <span class="field-caption-rule"></span>
+            <span id="field-season">—</span>
+            <span class="field-dot"></span>
+          </div>
+          <p id="ball-detail" class="ball-detail">Waiting for game data</p>
+        </section>
+
+        <section class="play-panel" aria-label="Recent plays">
+          <h2 id="plays-heading">RECENT PLAYS</h2>
+          <ol id="recent-plays"><li>Waiting for game details…</li></ol>
+        </section>
+        </div>
+
+        <footer class="footer-bar">
+          <div class="next-game">
+            <span class="next-label">NEXT UP</span>
+            <strong id="next-opponent">Loading schedule…</strong>
+            <span id="next-detail">Checking game schedule</span>
+            <span id="next-predictor">Win chance: unavailable</span>
+          </div>
+          <div class="feed-status">
+            <span id="feed-dot" class="feed-dot"></span>
+            <span id="feed-label">CONNECTING TO LIVE FEED</span>
+            <button id="refresh-button" type="button" aria-label="Refresh score now" title="Refresh score now">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5.6 9a7 7 0 0 1 11.7-2L20 12M4 12l2.7 5a7 7 0 0 0 11.7-2" /></svg>
+            </button>
+          </div>
+        </footer>
+      </section>
+    </main>
+  </body>
+</html>

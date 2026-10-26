@@ -1,0 +1,14 @@
+{
+  "name": "football-scoreboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A configurable, always-on NFL and NCAA football scoreboard.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
