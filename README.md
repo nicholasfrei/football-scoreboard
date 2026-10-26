@@ -14,11 +14,11 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
-![Football Scoreboard running with the Dallas Cowboys selected, showing a completed game, recent plays, and the next matchup.](docs/images/cowboys-scoreboard.png)
+![Animated Dallas Cowboys scoreboard demo showing ball movement, first downs, a touchdown, extra point, field goal, punt, and blocked punt.](docs/images/cowboys-drive-demo.gif)
 
-*The running app with Dallas selected. The field uses the home team's branding;
-this away-game screenshot shows Green Bay's field. Scores are a snapshot, not a
-live image.*
+*A fictional Cowboys–Eagles game recorded from the running app at 2× speed.
+The football follows each reported spot; scores and possession update as the
+plays unfold. [Run the interactive demo locally](http://localhost:4173/?demo=drive).*
 
 ## About
 
@@ -30,7 +30,8 @@ a small screen in a shadow box for an always-on game-day scoreboard.
 - **See the game unfold:** recent plays and a schematic field with reported ball
   position when live data is available.
 - **Celebrate big plays:** brief screen takeovers for touchdowns, interceptions,
-  fumbles, made field goals, and safeties.
+  fumbles, made field goals, safeties, first downs, made extra points, punts,
+  and blocked punts.
 - **Look ahead:** the next matchup and ESPN's pregame win-chance estimates, when available.
 - **Make it yours:** choose an ESPN team page and time zone in one configuration file.
 
@@ -71,6 +72,11 @@ for game data and team artwork.
 3. Open **<http://localhost:4173>**. Stop the server with **Ctrl+C**.
 
 No `npm install` is needed: the app uses only Node.js built-in modules.
+
+**See it in action:** open [the animated drive demo](http://localhost:4173/?demo=drive)
+to watch ball movement, first downs, a touchdown, an extra point, and a field
+goal, plus punts and blocked punts. This fictional Cowboys–Eagles game works
+without the ESPN feed and has pause, next-play, replay, and speed controls.
 
 ### Choose your team
 

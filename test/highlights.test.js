@@ -46,20 +46,66 @@ test("own and opponent fumble recoveries are identified without inventing a turn
   }
 });
 
-test("made field goals qualify but misses, extra points, and nullified plays do not", () => {
+test("made field goals and extra points qualify but misses and nullified plays do not", () => {
   assert.equal(classify(play({ type: { text: "Field Goal Good" } }))[0].kind, "field-goal");
+  assert.equal(classify(play({ type: { text: "Extra Point Good" } }))[0].kind, "extra-point");
   for (const p of [
     play({ type: { text: "Field Goal Missed" }, scoringPlay: false }),
-    play({ type: { text: "Extra Point Good" } }),
+    play({ type: { text: "Extra Point Missed" }, scoringPlay: false }),
+    play({ type: { text: "Extra Point Blocked" }, scoringPlay: false }),
+    play({ type: { text: "Two Point Pass" } }),
     play({ text: "Touchdown nullified, no play" }),
     play({ type: { text: "Pass Reception" }, scoringPlay: false, text: "Touchdown overturned" }),
     play({ scoringPlay: false }),
   ]) assert.deepEqual(classify(p), []);
 });
 
+test("first downs use a confirmed new series on the same possession", () => {
+  const first = play({ type: { text: "Pass Reception" }, scoringPlay: false,
+    start: { team: { id: "8" }, down: 2, distance: 6, yardsToEndzone: 71 },
+    end: { team: { id: "8" }, down: 1, distance: 10, yardsToEndzone: 63 } });
+  assert.equal(classify(first)[0].kind, "first-down");
+  assert.equal(classify(first)[0].teamId, "8");
+  // A 12-yard gain on first and ten also moves the chains.
+  assert.equal(classify({ ...first, start: { ...first.start, down: 1, distance: 10, yardsToEndzone: 75 } })[0].kind, "first-down");
+  for (const p of [
+    { ...first, type: { text: "Kickoff" } },
+    { ...first, type: { text: "Timeout" } },
+    { ...first, isTurnover: true },
+    { ...first, text: "Penalty, no play" },
+    { ...first, end: { ...first.end, team: { id: "238" } } },
+    { ...first, end: { ...first.end, down: 3 } },
+    { ...first, start: undefined },
+    { ...first, start: { ...first.start, down: 1, distance: 10 } },
+  ]) assert.deepEqual(classify(p), []);
+});
+
 function event(sequence, overrides = {}) {
   return { id: `p${sequence}`, sequence, kind: "touchdown", teamId: "8", occurredAt: new Date(now).toISOString(), ...overrides };
 }
+
+test("punts credit the kicking team, not the receiving team", () => {
+  for (const type of ["Punt", "Punt Return", "Punt Fair Catch", "Punt Touchback"]) {
+    const result = classify(play({ type: { text: type }, scoringPlay: false,
+      start: { team: { id: "8" } }, end: { team: { id: "238" } } }));
+    assert.equal(result[0].kind, "punt");
+    assert.equal(result[0].teamId, "8");
+  }
+  assert.equal(classify(play({ type: { text: "Punt" }, scoringPlay: false, start: undefined }))[0].teamId, null);
+});
+
+test("blocked punts credit the blocking team independently of recovery", () => {
+  for (const recovery of ["8", "238"]) {
+    const result = classify(play({ type: { text: "Blocked Punt" }, scoringPlay: false,
+      start: { team: { id: "238" } }, end: { team: { id: recovery } } }));
+    assert.equal(result[0].kind, "blocked-punt");
+    assert.equal(result[0].teamId, "8");
+  }
+  assert.equal(classify(play({ type: { text: "Punt Blocked" }, scoringPlay: false, start: undefined }))[0].teamId, null);
+  assert.equal(classify(play({ type: { text: "Blocked Punt Touchdown" } }))[0].kind, "touchdown");
+  assert.deepEqual(classify(play({ type: { text: "Blocked Punt" }, scoringPlay: false, text: "No play, penalty" })), []);
+  assert.deepEqual(classify(play({ type: { text: "Timeout" }, scoringPlay: false, text: "Punt unit coming on" })), []);
+});
 function payload(sequence, highlights = [], overrides = {}) {
   return { spotlight: { id: "game", state: "live", latestPlaySequence: sequence, highlights, ...overrides } };
 }

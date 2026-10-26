@@ -176,7 +176,10 @@ body::before {
 .team-block.is-selected .team-name { color: var(--team-accent); }
 .team-record { margin: 6px 0 0; max-width: 100%; color: #b0bcb3; font-size: 11px; font-weight: 600; line-height: 1.5; text-align: center; }
 
-.score-readout { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 20px; font-variant-numeric: tabular-nums lining-nums; }
+.score-center { min-width: 0; }
+.score-readout { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto minmax(0, 1fr) 22px; align-items: center; gap: 8px; font-variant-numeric: tabular-nums lining-nums; }
+.possession-ball { display: block; width: 100%; height: auto; }
+.possession-ball[hidden] { visibility: hidden; }
 .score-number { min-width: 0; color: #f5f4eb; font-size: clamp(48px, 7vw, 82px); font-weight: 700; line-height: 1.1; letter-spacing: -.02em; text-align: center; }
 .score-divider { color: #647168; font-size: 24px; font-weight: 400; }
 
@@ -187,19 +190,16 @@ body::before {
 .field-wrap {
   position: relative;
   margin: clamp(12px, 2vw, 19px) clamp(12px, 2.5vw, 24px) 0;
-  padding: 12px 12px 8px;
+  padding: 12px 8px 8px;
   border: 1px solid rgba(214, 180, 106, .17);
   border-radius: 7px;
   background: linear-gradient(180deg, #171f19, #111713);
   box-shadow: inset 0 1px rgba(255, 255, 255, .03);
 }
 
-.field-heading, .field-caption { display: flex; align-items: center; justify-content: space-between; color: #9aa59a; font-size: 9px; font-weight: 700; letter-spacing: .08em; }
+.field-heading { display: flex; align-items: center; justify-content: space-between; color: #9aa59a; font-size: 9px; font-weight: 700; letter-spacing: .08em; }
 .field-heading { padding: 0 5px 8px; }
 .football-field { display: block; width: 100%; height: auto; max-height: 320px; border: 1px solid rgba(229, 225, 205, .55); border-radius: 7px; box-shadow: 0 5px 14px rgba(0, 0, 0, .35); }
-.field-caption { justify-content: center; gap: 10px; padding: 9px 0 1px; color: #c7b987; font-size: 8px; letter-spacing: .24em; }
-.field-caption-rule { width: clamp(26px, 8vw, 80px); height: 1px; background: linear-gradient(90deg, transparent, rgba(214, 180, 106, .48), transparent); }
-.field-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--team-accent); }
 
 .footer-bar {
   display: grid;
@@ -222,6 +222,7 @@ body::before {
 
 #refresh-button { display: grid; width: 29px; height: 29px; flex: 0 0 29px; place-items: center; padding: 0; border: 1px solid #485149; border-radius: 50%; color: #b7c0b4; background: #1c241e; cursor: pointer; }
 #refresh-button:hover { border-color: var(--gold); color: white; }
+#refresh-button[hidden] { display: none; }
 #refresh-button svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.6; }
 #refresh-button.is-spinning svg { animation: spin .7s linear infinite; }
 
@@ -244,6 +245,25 @@ body::before {
 #highlight-team { grid-column: 2; font-size: clamp(16px, 2.5vw, 25px); font-weight: 800; line-height: 1.1; overflow-wrap: anywhere; }
 #highlight-detail { grid-column: 2; color: #deded7; font-size: 10px; letter-spacing: .08em; }
 .highlight-progress { position: absolute; bottom: 0; height: 4px; width: 100%; background: #fff; transform-origin: left; animation: highlight-countdown var(--event-duration) linear forwards; }
+.highlight-art { position: absolute; right: 8px; bottom: 8px; width: 150px; height: 120px; opacity: .3; pointer-events: none; }
+.highlight > :not(.highlight-art) { z-index: 1; }
+.kick-art, .punt-art, .blocked-impact { display: none; }
+.highlight[data-kind="extra-point"] .kick-art,
+.highlight[data-kind="field-goal"] .kick-art { display: block; }
+.highlight[data-kind="punt"] .punt-art,
+.highlight[data-kind="blocked-punt"] .punt-art,
+.highlight[data-kind="blocked-punt"] .blocked-impact { display: block; }
+.highlight.is-animating #highlight-title { animation: highlight-arrive .45s ease-out both; }
+.highlight.is-animating .kick-ball { animation: kick-good 1.8s ease-out both; }
+.punt-flight { transform-origin: 35px 125px; }
+.highlight.is-animating[data-kind="punt"] .punt-flight { animation: punt-flight 1.8s ease-out both; }
+.highlight.is-animating[data-kind="blocked-punt"] .punt-flight { animation: punt-blocked 1.8s ease-out both; }
+.highlight.is-animating .blocked-impact { animation: block-impact 1.8s ease-out both; }
+@keyframes punt-flight { 0% { transform: translate(0, 0) rotate(0); } 50% { transform: translate(65px, -95px) rotate(-90deg); } 100% { transform: translate(130px, -10px) rotate(-180deg); } }
+@keyframes punt-blocked { 0% { transform: translate(0, 0) rotate(0); } 40% { transform: translate(65px, -65px) rotate(-70deg); } 100% { transform: translate(15px, 10px) rotate(150deg); } }
+@keyframes block-impact { 0%, 35%, 75%, 100% { opacity: 0; } 40%, 60% { opacity: 1; } }
+@keyframes highlight-arrive { from { opacity: 0; transform: translateY(12px) scale(.95); } to { opacity: 1; transform: none; } }
+@keyframes kick-good { from { transform: translateY(0); } to { transform: translateY(-100px) scale(.65); transform-origin: 100px 130px; } }
 @keyframes highlight-countdown { to { transform: scaleX(0); } }
 @media (max-width: 560px) {
   .highlight { grid-template-columns: 46px minmax(0, 1fr); gap: 6px 12px; padding: 14px; }
@@ -260,8 +280,19 @@ body::before {
 .endzone-text { fill: var(--endzone-ink, #ffffff); }
 .field-heading { gap: 12px; line-height: 1.5; }
 .field-heading > :last-child { text-align: right; }
-#ball-marker { transition: transform .8s ease; }
+#ball-marker, #first-down-marker { transition: transform .8s ease; }
+.demo-controls[hidden] { display: none; }
+.demo-controls { display: grid; gap: 10px; padding: 12px 24px; background: #20291f; color: #eee9db; border-bottom: 1px solid #536044; }
+.demo-controls strong { color: #f6d792; font-size: 11px; letter-spacing: .1em; }
+.demo-controls p { min-height: 3em; margin: 6px 0 0; font-size: 12px; line-height: 1.5; }
+.demo-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 11px; }
+.demo-buttons button, .demo-buttons select, .demo-buttons a { border: 1px solid #536044; border-radius: 4px; padding: 7px 10px; color: #eee9db; background: #111713; font: inherit; cursor: pointer; }
+.demo-buttons a { margin-left: auto; }
+.demo-buttons button:hover, .demo-buttons a:hover { border-color: #f6d792; }
+.demo-buttons button:disabled { opacity: .5; cursor: default; }
+.demo-controls progress { width: 100%; height: 4px; accent-color: #d6b46a; }
 .ball-detail { color: #d3dccf; font-size: 11px; line-height: 1.5; text-align: center; margin: 8px 0 3px; }
+.down-distance.is-fourth-down { color: #f56367; font-weight: 700; }
 .play-panel { margin: 16px 24px 0; padding: 12px 16px; background: #0c120e; border-radius: 6px; }
 .play-panel h2 { margin: 0 0 8px; color: var(--gold); font-size: 10px; font-weight: 700; letter-spacing: .08em; }
 #recent-plays { max-height: 126px; overflow-y: auto; list-style: none; margin: 0; padding: 0; }
@@ -277,8 +308,9 @@ body::before {
   .gamecast-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; margin: 12px 24px 0; }
   .field-wrap { margin: 0; padding-block: 8px; }
   .football-field { max-height: none; }
-  .play-panel { margin: 0; padding: 12px; min-height: 0; }
-  #recent-plays { max-height: 220px; }
+  /* Let the field set the row height; plays fill and scroll within that row. */
+  .play-panel { margin: 0; padding: 12px; min-height: 0; display: flex; flex-direction: column; contain: size; }
+  #recent-plays { flex: 1; min-height: 0; max-height: none; }
   #recent-plays li { display: block; }
   #recent-plays li span:first-child { display: block; font-size: 10px; }
   .footer-bar { padding-block: 12px 6px; }
@@ -287,14 +319,13 @@ body::before {
 @media (min-width: 700px) and (max-height: 800px) {
   .gamecast-layout { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); margin-top: 10px; }
   .score-panel { padding-block: 10px; }
-  #recent-plays { max-height: 190px; }
   .team-seal { height: 56px; }
   .footer-bar { margin-top: 10px; padding-top: 10px; }
 }
 
 @media (min-width: 561px) and (max-width: 699px) {
   .matchup { grid-template-columns: minmax(0, 1fr) minmax(180px, 1fr) minmax(0, 1fr); gap: 12px; }
-  .score-readout { gap: 10px; }
+  .score-readout { grid-template-columns: 16px minmax(0, 1fr) auto minmax(0, 1fr) 16px; gap: 6px; }
 }
 
 @media (max-width: 560px) {
@@ -307,14 +338,18 @@ body::before {
   .season-chip { font-size: 9px; }
   .matchup { grid-template-columns: minmax(74px, 1fr) auto minmax(74px, 1fr); gap: 8px; }
   .score-number { font-size: clamp(36px, 10vw, 48px); }
-  .score-readout { gap: 7px; }
+  .score-center { display: contents; }
+  #away-team { grid-area: 1 / 1; }
+  #home-team { grid-area: 1 / 3; }
+  .score-readout { grid-area: 1 / 2; }
+  .ball-detail { grid-column: 1 / -1; grid-row: 2; margin: 0; }
+  .score-readout { grid-template-columns: 14px auto auto auto 14px; gap: 4px; }
   .score-divider { font-size: 16px; }
   .team-name { font-size: 12px; letter-spacing: 0; }
   .team-record { font-size: 9px; }
   .team-seal { width: 60px; height: 50px; }
   .field-wrap { margin-inline: 10px; padding: 9px 8px 6px; }
   .field-heading { font-size: 7px; }
-  .football-field { min-height: 128px; object-fit: cover; }
   .footer-bar { grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; margin-inline: 14px; padding: 12px 0 6px; }
   .feed-status { font-size: 8px; }
   .play-panel { margin-inline: 10px; padding-inline: 10px; }
@@ -322,5 +357,5 @@ body::before {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }

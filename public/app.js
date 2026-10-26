@@ -1,4 +1,5 @@
-import { createHighlightTracker, HIGHLIGHT_DURATION_MS, HIGHLIGHT_LABELS } from "./highlights.js";
+import { createHighlightTracker, highlightDuration, HIGHLIGHT_LABELS } from "./highlights.js";
+import { fieldBranding } from "./field-branding.js";
 
 const POLL_INTERVAL_MS = 30_000;
 let timeZone = "America/Chicago";
@@ -18,24 +19,29 @@ function hideHighlight() {
   }
 }
 
-function showHighlight(event, game, demo = false) {
+function showHighlight(event, game, demo = false, duration = highlightDuration(event.kind)) {
   hideHighlight();
   const team = [game.selectedTeam, game.opponent].find((team) => team.id === event.teamId);
   const overlay = document.querySelector("#highlight");
+  overlay.dataset.kind = event.kind;
   document.querySelector("#highlight-context").textContent = demo ? "DEMO · NOT A LIVE PLAY" : "BIG PLAY";
   document.querySelector("#highlight-title").textContent = HIGHLIGHT_LABELS[event.kind];
   document.querySelector("#highlight-team").textContent = team?.location.toUpperCase() ?? "";
   document.querySelector("#highlight-detail").textContent = event.kind === "interception" ? "INTERCEPTED BY"
-    : event.kind === "fumble" ? "RECOVERED BY" : event.detail;
-  if (!team && ["interception", "fumble"].includes(event.kind)) {
+    : event.kind === "fumble" ? "RECOVERED BY" : event.kind === "blocked-punt" ? "BLOCKED BY"
+    : event.kind === "punt" ? "PUNTING TEAM" : event.detail;
+  if (!team && ["interception", "fumble", "punt", "blocked-punt"].includes(event.kind)) {
     document.querySelector("#highlight-detail").textContent = "TEAM NOT CONFIRMED";
   }
   const logo = document.querySelector("#highlight-logo");
   logo.replaceChildren();
   if (team) setTeamLogo(logo, team);
   overlay.style.setProperty("--event-color", team?.color ?? "#454545");
-  overlay.style.setProperty("--event-duration", `${HIGHLIGHT_DURATION_MS}ms`);
+  overlay.style.setProperty("--event-duration", `${duration}ms`);
   overlay.hidden = false;
+  overlay.classList.remove("is-animating");
+  void overlay.offsetWidth;
+  overlay.classList.add("is-animating");
   // Restart the progress animation if a newer play replaces this one.
   const progress = overlay.querySelector(".highlight-progress");
   progress.style.animation = "none";
@@ -46,7 +52,7 @@ function showHighlight(event, game, demo = false) {
     document.querySelector(selector).setAttribute("aria-hidden", "true");
   }
   activeHighlight = { ...event, gameId: game.id, league: game.league, demo };
-  highlightTimer = setTimeout(hideHighlight, HIGHLIGHT_DURATION_MS);
+  highlightTimer = setTimeout(hideHighlight, duration);
 }
 
 function updateHighlights(payload) {
@@ -62,7 +68,7 @@ function updateHighlights(payload) {
   if (previewPending && game) {
     const kind = previewPending;
     previewPending = null;
-    if (Object.hasOwn(HIGHLIGHT_LABELS, kind)) showHighlight({ kind, teamId: game.selectedTeam.id, detail: "Score returns after 12 seconds" }, game, true);
+    if (Object.hasOwn(HIGHLIGHT_LABELS, kind)) showHighlight({ kind, teamId: game.selectedTeam.id, detail: `Score returns after ${highlightDuration(kind) / 1000} seconds` }, game, true);
   }
 }
 
@@ -134,19 +140,16 @@ function updateBrand(payload) {
   document.querySelector("#brand-location").textContent = team.location;
   document.querySelector("#brand-name").textContent = team.mascot.toUpperCase();
   document.querySelector("#league-name").textContent = leagueName;
-  document.querySelector("#team-caption").textContent = payload.league === "college-football" && team.id === "8"
-    ? "CALL THE HOGS" : `${team.mascot.toUpperCase()} FOOTBALL`;
   setTeamLogo(document.querySelector("#brand-logo"), team);
 }
 
 function updateField(game) {
   const home = game.homeAway === "home" ? game.selectedTeam : game.opponent;
+  const away = game.homeAway === "home" ? game.opponent : game.selectedTeam;
   const field = document.querySelector(".field-wrap");
-  field.style.setProperty("--home-color", home.color);
-  // White is legible over dark team colors, black over light colors.
-  const rgb = home.color.slice(1).match(/../g).map((channel) => parseInt(channel, 16));
-  const brightness = rgb[0] * .299 + rgb[1] * .587 + rgb[2] * .114;
-  field.style.setProperty("--endzone-ink", brightness > 155 ? "#000000" : "#FFFFFF");
+  const branding = fieldBranding(home);
+  field.style.setProperty("--home-color", branding.color);
+  field.style.setProperty("--endzone-ink", branding.ink);
   document.querySelector("#field-home").textContent = `${home.location.toUpperCase()} · ${game.neutralSite ? "DESIGNATED HOME" : "HOME"}`;
   document.querySelector("#field-venue").textContent = game.venue ?? "VENUE TBD";
   for (const [selector, text] of [["#endzone-school", home.location], ["#endzone-mascot", home.mascot]]) {
@@ -167,16 +170,26 @@ function updateField(game) {
   else logo.removeAttribute("href");
 
   const marker = document.querySelector("#ball-marker");
+  const lineToGain = document.querySelector("#first-down-marker");
+  const hasLineToGain = game.ball && Number.isFinite(game.ball.firstDownPercent);
+  lineToGain.setAttribute("visibility", hasLineToGain ? "visible" : "hidden");
+  if (hasLineToGain) lineToGain.style.transform = `translateX(${104 + game.ball.firstDownPercent * 7.92}px)`;
   marker.setAttribute("visibility", game.ball ? "visible" : "hidden");
   if (game.ball) {
     marker.style.transform = `translateX(${104 + game.ball.percent * 7.92}px)`;
-    document.querySelector("#ball-detail").textContent = `${game.ball.possession} ${game.ball.direction === "right" ? "→" : "←"} · ${game.ball.downDistance ?? game.ball.label ?? "Ball position"} · ${game.ball.source}`;
+    const down = document.createElement("span");
+    down.className = "down-distance";
+    down.textContent = game.ball.downDistance?.split(/\s+at\s+/i)[0] ?? "Ball position";
+    down.classList.toggle("is-fourth-down", /^4th\b/i.test(down.textContent));
+    const position = game.ball.label ?? (game.ball.percent === 50 ? "50-yard line"
+      : game.ball.percent < 50 ? `${home.abbreviation} ${game.ball.percent}` : `${away.abbreviation} ${100 - game.ball.percent}`);
+    const qualifier = game.ball.source === "last reported play" ? " · last reported play" : "";
+    document.querySelector("#ball-detail").replaceChildren(`${game.ball.possession} · `, down, ` · ${position}${qualifier}`);
   } else {
     document.querySelector("#ball-detail").textContent = game.state === "live"
       ? "Ball position unavailable · waiting for the feed"
        : game.state === "final" ? "FINAL" : "Ball position appears during play";
   }
-  document.querySelector("#field-season").textContent = game.neutralSite ? "NEUTRAL SITE" : game.homeAway === "home" ? "HOME" : "AWAY";
 
   document.querySelector("#plays-heading").textContent = game.state === "final" ? "LAST PLAYS · COMPLETED GAME" : "RECENT PLAYS";
   const list = document.querySelector("#recent-plays");
@@ -195,6 +208,16 @@ function updateField(game) {
     const item = document.createElement("li");
     item.textContent = game.state === "scheduled" ? "Play-by-play begins at kickoff." : "Play-by-play unavailable. Scores will continue updating.";
     list.append(item);
+  }
+}
+
+function updatePossession(game) {
+  const home = game?.homeAway === "home" ? game.selectedTeam : game?.opponent;
+  const away = game?.homeAway === "home" ? game.opponent : game?.selectedTeam;
+  for (const [side, team] of [["home", home], ["away", away]]) {
+    const football = document.querySelector(`#${side}-possession`);
+    football.toggleAttribute("hidden", !team || game?.state !== "live" || game.possessionTeamId !== team.id);
+    football.setAttribute("aria-label", `${team?.location ?? side} has possession`);
   }
 }
 
@@ -244,6 +267,7 @@ function renderNextDetails(game) {
 
 function updateGame(game, nextGame) {
   lastGameState = game?.state ?? null;
+  updatePossession(game);
   renderNextDetails(nextGame);
   if (!game) {
     elements.gameLabel.textContent = "SEASON SCHEDULE";
@@ -318,6 +342,8 @@ async function refreshScoreboard() {
     if (payload.gamecastUnavailable) elements.feedLabel.textContent += " · GAMECAST UNAVAILABLE";
     if (payload.stale) {
       document.querySelector("#ball-marker").setAttribute("visibility", "hidden");
+      document.querySelector("#first-down-marker").setAttribute("visibility", "hidden");
+      updatePossession(null);
       document.querySelector("#ball-detail").textContent = lastGameState === "final" ? "FINAL" : "Feed delayed · last known score and plays";
       elements.gameStatusText.textContent = "FEED DELAYED";
       elements.gameStatus.classList.remove("is-live");
@@ -330,6 +356,8 @@ async function refreshScoreboard() {
     elements.gameStatus.classList.remove("is-live", "is-upcoming");
     elements.gameDetail.textContent = "Can’t reach the score feed. Retrying automatically.";
     document.querySelector("#ball-marker").setAttribute("visibility", "hidden");
+    document.querySelector("#first-down-marker").setAttribute("visibility", "hidden");
+    updatePossession(null);
     document.querySelector("#ball-detail").textContent = lastGameState === "final" ? "FINAL" : "Offline · last known score and plays";
   } finally {
     elements.panel.setAttribute("aria-busy", "false");
@@ -338,6 +366,75 @@ async function refreshScoreboard() {
   }
 }
 
-elements.refreshButton.addEventListener("click", refreshScoreboard);
-refreshScoreboard();
-window.setInterval(refreshScoreboard, POLL_INTERVAL_MS);
+async function startDriveDemo() {
+  const { createDemoFrames } = await import("./demo.js");
+  const frames = createDemoFrames();
+  let index = 0;
+  let paused = false;
+  let timer;
+  const controls = document.querySelector("#demo-controls");
+  const toggle = document.querySelector("#demo-toggle");
+  const next = document.querySelector("#demo-next");
+  const speed = document.querySelector("#demo-speed");
+  controls.hidden = false;
+  elements.refreshButton.hidden = true;
+  updateBrand(frames[0]);
+  document.title = `Drive Demo · ${frames[0].team.name} Football Scoreboard`;
+  document.querySelector("#season-year").textContent = "DEMO";
+  elements.panel.setAttribute("aria-busy", "false");
+  let tracker = createHighlightTracker();
+
+  function schedule() {
+    clearTimeout(timer);
+    if (!paused && index < frames.length - 1) timer = setTimeout(() => { index++; render(); }, 5_000 / Number(speed.value));
+  }
+
+  function render() {
+    hideHighlight();
+    const frame = frames[index];
+    updateGame(frame.spotlight, null);
+    // Replays and manual stepping must still establish a fresh tracker baseline.
+    if (index === 0) tracker = createHighlightTracker();
+    const event = tracker.observe(frame, index * 5_000);
+    if (event) showHighlight(event, frame.spotlight, true, 3_200 / Number(speed.value));
+    document.querySelectorAll(".team-record").forEach((record) => { record.textContent = "SIMULATED GAME"; });
+    elements.gameLabel.textContent = "DRIVE DEMO";
+    elements.gameStatusText.textContent = "DEMO";
+    elements.gameStatus.classList.remove("is-live");
+    elements.gameDetail.textContent = `Q1 · ${frame.spotlight.clock} · SIMULATED GAME`;
+    elements.feedLabel.textContent = "OFFLINE DEMO · FICTIONAL PLAYS";
+    elements.nextOpponent.textContent = "TD + XP · FIELD GOAL · PUNT · BLOCKED PUNT";
+    elements.nextDetail.textContent = "Accelerated playback · 5 seconds per step at 1×";
+    document.querySelector("#next-predictor").textContent = "Home offense moves right · Away offense moves left";
+    if (!frame.spotlight.ball) document.querySelector("#ball-detail").textContent = "Between plays · simulated game";
+    document.querySelector("#demo-step").textContent = `${index + 1} / ${frames.length} · ${frame.caption}`;
+    document.querySelector("#demo-progress").max = frames.length;
+    document.querySelector("#demo-progress").value = index + 1;
+    if (index === frames.length - 1) paused = true;
+    toggle.textContent = paused ? "Play" : "Pause";
+    toggle.disabled = next.disabled = index === frames.length - 1;
+    schedule();
+  }
+
+  toggle.addEventListener("click", () => {
+    paused = !paused;
+    toggle.textContent = paused ? "Play" : "Pause";
+    schedule();
+  });
+  next.addEventListener("click", () => {
+    paused = true;
+    index = Math.min(index + 1, frames.length - 1);
+    render();
+  });
+  document.querySelector("#demo-restart").addEventListener("click", () => { index = 0; paused = false; render(); });
+  speed.addEventListener("change", schedule);
+  render();
+}
+
+if (new URLSearchParams(location.search).get("demo") === "drive") {
+  startDriveDemo();
+} else {
+  elements.refreshButton.addEventListener("click", refreshScoreboard);
+  refreshScoreboard();
+  window.setInterval(refreshScoreboard, POLL_INTERVAL_MS);
+}

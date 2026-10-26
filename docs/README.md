@@ -18,9 +18,9 @@ You can run the scoreboard on your computer before buying any display hardware.
   feed provides, its limitations, and the original college-football feed research.
 - **[Team branding sources](branding.md):** logo provenance, verified college
   color overrides, and how home-field artwork is selected.
-- **[Cowboys screenshot](images/cowboys-scoreboard.png):** the actual app running
-  with Dallas selected, captured October 26, 2026. It shows a completed away game,
-  not a simulated live game or a photo of an assembled physical display.
+- **[Cowboys drive animation](images/cowboys-drive-demo.gif):** the actual app
+  playing a fictional Cowboys–Eagles game at 2× speed, including scoring plays,
+  punts, and a blocked punt.
 
 ## Code map
 
@@ -38,6 +38,8 @@ There is no frontend build step or third-party runtime dependency.
 - `src/highlights.js` normalizes highlight events; `public/highlights.js` tracks
   which new events should be shown by the browser.
 - `public/` contains the HTML, CSS, JavaScript, and bundled artwork.
+- `public/demo.js` supplies the offline Cowboys drive sequence; `public/field-branding.js`
+  chooses contrasting end-zone colors, including alternate colors for green teams.
 - `test/` contains network-independent tests; run them with `npm test`.
 
 ## Before deploying

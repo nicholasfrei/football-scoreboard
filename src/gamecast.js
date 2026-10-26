@@ -54,6 +54,8 @@ export function enrichGame(game, summary) {
   let possessionId = situation?.possession == null ? null : String(situation.possession);
   let position = positionFromText(situation?.possessionText, home, away);
   let downDistance = situation?.downDistanceText ?? situation?.shortDownDistanceText ?? null;
+  let down = situation?.down;
+  let distance = situation?.distance;
   let positionLabel = situation?.possessionText ?? null;
   let positionSource = "current situation";
 
@@ -68,6 +70,8 @@ export function enrichGame(game, summary) {
       position = possessionId === home.id ? 100 - end.yardsToEndzone
         : possessionId === away.id ? end.yardsToEndzone : null;
       downDistance = end.downDistanceText ?? null;
+      down = end.down;
+      distance = end.distance;
       positionLabel = end.possessionText ?? null;
     }
     positionSource = "last reported play";
@@ -81,6 +85,8 @@ export function enrichGame(game, summary) {
     label: positionLabel,
     downDistance,
     source: positionSource,
+    firstDownPercent: [1, 2, 3, 4].includes(down) && Number.isFinite(distance) && distance > 0
+      ? Math.max(0, Math.min(100, position + (possessionId === home.id ? distance : -distance))) : null,
   } : null;
 
   return {
@@ -88,6 +94,7 @@ export function enrichGame(game, summary) {
     broadcasts: updated.broadcasts.length ? updated.broadcasts : game.broadcasts ?? [],
     matchupPredictor: matchupPredictor(summary.predictor, updated),
     ball,
+    possessionTeamId: updated.state === "live" && possessionTeam && (situation || ball) ? possessionTeam.id : null,
     highlights: gameHighlights(plays, summary.scoringPlays, [home.id, away.id]),
     latestPlaySequence: Math.max(0, ...plays.map((play) => Number(play.sequenceNumber)).filter(Number.isFinite)),
     plays: plays.slice(-5).reverse().map((play) => ({
