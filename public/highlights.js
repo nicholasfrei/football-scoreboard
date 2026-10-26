@@ -8,7 +8,15 @@ export const HIGHLIGHT_LABELS = {
   fumble: "FUMBLE",
   "field-goal": "FIELD GOAL",
   safety: "SAFETY",
+  "first-down": "FIRST DOWN",
+  "extra-point": "EXTRA POINT",
+  punt: "PUNT",
+  "blocked-punt": "BLOCKED PUNT",
 };
+
+export function highlightDuration(kind) {
+  return ["first-down", "punt"].includes(kind) ? 4_000 : kind === "extra-point" ? 6_000 : HIGHLIGHT_DURATION_MS;
+}
 
 /** Track a play-sequence watermark, not score deltas or matching prose.
  * First load, reconnects, and game changes establish a baseline silently.

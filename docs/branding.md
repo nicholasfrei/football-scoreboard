@@ -3,7 +3,7 @@
 [Documentation](README.md) · [Display behavior](display-behavior.md)
 
 The app supports both NFL and NCAA teams. This reference records the bundled
-college artwork and verified overrides; other teams use provider metadata.
+artwork and verified college overrides; other teams use provider metadata.
 
 Verified October 26, 2026. `src/branding.js` overrides provider colors with the
 school-published values below **only in the college-football league**. NFL teams
@@ -18,12 +18,15 @@ End-zone names are plain display text, not reproductions of proprietary wordmark
 
 - `public/assets/arkansas.png`: [Arkansas Athletics' dark-background Razorback artwork](https://arkansasrazorbacks.com/wp-content/uploads/2021/09/arkansas-dark-logo.png), linked by the [official athletics site](https://arkansasrazorbacks.com/).
 - `public/assets/vanderbilt.png`: [Vanderbilt white-outline athletic V artwork](https://storage.googleapis.com/vucommodores-prod/2024/12/Vanderbilt-White-Outline.png), served by the [official athletics site](https://vucommodores.com/). The [athletics brand guide](https://vucommodores.com/vanderbilt-athletics-brand-guide) identifies the athletic V as the primary mark.
+- `public/assets/cowboys.png`: [Dallas dark-background logo](https://a.espncdn.com/i/teamlogos/nfl/500-dark/dal.png), returned by [ESPN's Dallas team metadata](https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/6).
+- `public/assets/eagles.png`: [Philadelphia dark-background logo](https://a.espncdn.com/i/teamlogos/nfl/500-dark/phi.png), returned by [ESPN's Philadelphia team metadata](https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/21).
 
 Artwork remains the property of its respective owner; these source links establish
 provenance, not a license or an official endorsement of this project.
 
-The [Cowboys screenshot](images/cowboys-scoreboard.png) uses Dallas and Green Bay
-artwork returned by ESPN. NFL logos are not replaced with college overrides.
+The [Cowboys drive animation](images/cowboys-drive-demo.gif) uses the bundled NFL
+logos and provider colors for the offline demo. NFL logos are not replaced with
+college overrides.
 
 ## Color overrides for Arkansas and its 2026 road hosts
 
@@ -56,11 +59,12 @@ needed, without adding opponent-specific fetching logic.
 
 ## Field behavior
 
-Both end zones use the **designated home team's primary color**, with its location
-name in one and mascot in the other. The same team's logo occupies midfield.
+Both end zones use the **designated home team's primary color**, or its alternate
+color when the primary is green, with its location name in one and mascot in the
+other. The same team's logo occupies midfield.
 For neutral-site games the heading explicitly says “designated home.” The
 field is a schematic, not a replica of the stadium's painted surface.
 The fixed orientation is home offense → and away offense ←; it does not simulate
 real-world quarter-by-quarter changes of end.
-The field footer displays one HOME/AWAY label relative to the selected team (NEUTRAL SITE
-for neutral games), and FINAL for completed games.
+The caption below the score displays possession, down/distance, and the yard-line
+spot during play, and FINAL for completed games.

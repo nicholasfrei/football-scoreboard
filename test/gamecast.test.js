@@ -36,6 +36,33 @@ test("away possession uses fixed field coordinates and points left", () => {
   assert.equal(result.ball.percent, 75);
   assert.equal(result.ball.direction, "left");
   assert.equal(result.ball.downDistance, "1st & 10");
+  assert.equal(result.possessionTeamId, "8");
+});
+
+test("score possession follows confirmed live possession, even without a yard-line spot", () => {
+  const result = enrichGame(game, summary({ situation: { possession: "238" } }));
+  assert.equal(result.ball, null);
+  assert.equal(result.possessionTeamId, "238");
+  for (const options of [
+    { state: "post", situation: { possession: "8", possessionText: "ARK 25" } },
+    { situation: { possession: "unknown" } },
+    {},
+    { current: { plays: [{ id: "td", text: "Touchdown", scoringPlay: true, end: { team: { id: "8" }, yardsToEndzone: 0 } }] } },
+  ]) assert.equal(enrichGame(game, summary(options)).possessionTeamId, null);
+});
+
+test("line to gain follows possession and only uses valid down/distance metadata", () => {
+  for (const [possession, possessionText, down, distance, expected] of [
+    ["238", "VAN 25", 1, 10, 35],
+    ["8", "ARK 25", 2, 6, 69],
+    ["238", "ARK 5", 1, 5, 100],
+    ["8", "VAN 5", 1, 5, 0],
+    ["8", "ARK 25", undefined, undefined, null],
+    ["8", "ARK 25", 0, 10, null],
+  ]) {
+    const result = enrichGame(game, summary({ situation: { possession, possessionText, down, distance } }));
+    assert.equal(result.ball.firstDownPercent, expected);
+  }
 });
 
 test("home/away branding follows the matchup, including Arkansas home games", () => {
@@ -58,6 +85,7 @@ test("turnover fallback uses the end possession, not the drive team", () => {
   assert.equal(result.ball.percent, 65);
   assert.equal(result.ball.direction, "left");
   assert.equal(result.ball.source, "last reported play");
+  assert.equal(result.possessionTeamId, "8");
 });
 
 test("final, missing and invalid position data never invent a live ball", () => {
