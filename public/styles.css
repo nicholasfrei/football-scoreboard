@@ -289,6 +289,7 @@ body::before {
 .endzone-text { fill: var(--away-ink, #ffffff); font-family: "Graduate", Georgia, serif; font-size: 100px; font-weight: 400; letter-spacing: 3px; paint-order: stroke fill; stroke: rgba(0, 0, 0, .45); stroke-width: 2; stroke-linejoin: round; }
 .endzone-text g:last-child { fill: var(--home-ink, #ffffff); }
 #ball-marker, #first-down-marker { transition: transform .8s ease; }
+#first-down-marker.is-fourth-down line { stroke: #f56367; }
 .demo-controls[hidden] { display: none; }
 .demo-controls { display: grid; gap: 10px; padding: 12px 24px; background: #20291f; color: #eee9db; border-bottom: 1px solid #536044; }
 .demo-controls strong { color: #f6d792; font-size: 11px; letter-spacing: .1em; }

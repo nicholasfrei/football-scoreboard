@@ -34,3 +34,13 @@ for (const [key, option] of Object.entries(REPLAY_GAMES)) {
     }
   });
 }
+
+test("Texas–Ole Miss replay holds the ball at Texas 29 after a zero-yard rush", async () => {
+  const option = REPLAY_GAMES.college;
+  const summary = JSON.parse(gunzipSync(await readFile(new URL(`fixtures/games/${option.file}`, import.meta.url))));
+  const frames = createReplayFrames(summary, option);
+  assert.match(frames[22].caption, /K\.Lacy rush left for 0 yards to the TEXAS29/);
+  assert.equal(frames[22].spotlight.ball?.label, "TEX 29");
+  assert.equal(frames[22].spotlight.ball?.percent, 71, "away offense at the home 29 belongs near the right end zone");
+  assert.equal(frames[22].spotlight.ball?.direction, "right");
+});

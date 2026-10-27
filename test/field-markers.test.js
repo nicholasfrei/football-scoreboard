@@ -46,6 +46,14 @@ test("possession and first-down lines reach both edges of the turf", async () =>
   }
 });
 
+test("the first-down line turns red on fourth down and resets on other downs", async () => {
+  const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
+  const css = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
+  assert.match(app, /lineToGain\.classList\.toggle\("is-fourth-down", isFourthDown\)/);
+  assert.match(app, /down\.classList\.toggle\("is-fourth-down", isFourthDown\)/);
+  assert.match(css, /#first-down-marker\.is-fourth-down line\s*\{\s*stroke:\s*#f56367/);
+});
+
 test("grass stripes start at the goal line and alternate at every numbered yard line", async () => {
   const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
   const pattern = html.match(/<pattern id="mow-stripes" x="([\d.]+)" width="([\d.]+)"[^>]*>\s*<rect width="([\d.]+)"/);

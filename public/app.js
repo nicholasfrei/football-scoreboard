@@ -225,6 +225,8 @@ function updateField(game) {
   redzone.setAttribute("x", game.ball?.direction === "left" ? "104" : "737.6");
   const hasLineToGain = game.ball && Number.isFinite(game.ball.firstDownPercent);
   lineToGain.setAttribute("visibility", hasLineToGain ? "visible" : "hidden");
+  const isFourthDown = /^4th\b/i.test(game.ball?.downDistance ?? "");
+  lineToGain.classList.toggle("is-fourth-down", isFourthDown);
   if (hasLineToGain) lineToGain.style.transform = `translateX(${104 + game.ball.firstDownPercent * 7.92}px)`;
   marker.setAttribute("visibility", game.ball ? "visible" : "hidden");
   if (game.ball) {
@@ -235,7 +237,7 @@ function updateField(game) {
     const down = document.createElement("span");
     down.className = "down-distance";
     down.textContent = game.ball.downDistance?.split(/\s+at\s+/i)[0] ?? "Ball position";
-    down.classList.toggle("is-fourth-down", /^4th\b/i.test(down.textContent));
+    down.classList.toggle("is-fourth-down", isFourthDown);
     const position = game.ball.label ?? (game.ball.percent === 50 ? "50-yard line"
       : game.ball.percent < 50 ? `${away.abbreviation} ${game.ball.percent}` : `${home.abbreviation} ${100 - game.ball.percent}`);
     const pause = game.ballHeld && /timeout/i.test(game.fieldContext?.lastPlayType ?? "") ? "TIMEOUT · " : "";

@@ -163,7 +163,12 @@ for (const fixture of fixtures) {
         if (game.ball) {
           const positionPlay = frame.drives.current.plays.findLast((play) => !/Timeout|End Period|End of Half|End of Regulation/i.test(play.type.text));
           const homePossession = positionPlay.end.team.id === entry.homeTeamId;
-          assert.equal(game.ball.percent, homePossession ? positionPlay.end.yardsToEndzone : 100 - positionPlay.end.yardsToEndzone);
+          const home = base.homeAway === "home" ? base.selectedTeam : base.opponent;
+          const away = base.homeAway === "home" ? base.opponent : base.selectedTeam;
+          const spot = /^(.*?)\s+(\d{1,2})$/.exec(positionPlay.end.possessionText ?? "");
+          const named = spot && Number(spot[2]) <= 50 ? spot[1] === home.abbreviation ? 100 - Number(spot[2])
+            : spot[1] === away.abbreviation ? Number(spot[2]) : null : null;
+          assert.equal(game.ball.percent, named ?? (homePossession ? positionPlay.end.yardsToEndzone : 100 - positionPlay.end.yardsToEndzone));
           assert.equal(game.ball.direction, homePossession ? "left" : "right");
           assert.equal(game.ball.source, "last reported play");
           assert.equal(game.possessionTeamId, String(positionPlay.end.team.id));

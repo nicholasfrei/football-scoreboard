@@ -148,10 +148,13 @@ export function enrichGame(game, summary) {
     const last = currentPlays.findLast((play) => !isPause(play));
     const end = last?.end;
     possessionId = end?.team?.id == null ? null : String(end.team.id);
-    if (Number.isFinite(end?.yardsToEndzone) && end.yardsToEndzone >= 0 && end.yardsToEndzone <= 100
+    // ESPN can flip yardsToEndzone on a no-gain play while its possessionText
+    // still names the correct side of the field. Prefer that named yard line.
+    const namedPosition = positionFromText(end?.possessionText, home, away);
+    if ((namedPosition !== null || (Number.isFinite(end?.yardsToEndzone) && end.yardsToEndzone >= 0 && end.yardsToEndzone <= 100))
         && !last.scoringPlay && !/End Period|End of|Timeout|Kickoff|Extra Point/i.test(last.type?.text ?? "")) {
-      position = possessionId === home.id ? end.yardsToEndzone
-        : possessionId === away.id ? 100 - end.yardsToEndzone : null;
+      position = namedPosition ?? (possessionId === home.id ? end.yardsToEndzone
+        : possessionId === away.id ? 100 - end.yardsToEndzone : null);
       downDistance = end.downDistanceText ?? null;
       down = end.down;
       distance = end.distance;
