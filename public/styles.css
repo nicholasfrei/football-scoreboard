@@ -366,9 +366,12 @@ body::before {
 .leader-category { font-size: 14px; }
 .leader-name { font-size: 14px; }
 .leader-metric { font-size: 13px; }
-/* Reserve space for all three leader rows while keeping the full replay on screen. */
-.display:has(.game-leaders:not([hidden])) .football-field { height: 385px; object-fit: contain; }
-
+/* Give the full-width replay field room without hiding the last leaders row. */
+.display:has(.demo-controls:not([hidden])) .demo-controls { gap: 4px; padding-block: 8px; }
+.display:has(.demo-controls:not([hidden])) .demo-controls p { min-height: 1.5em; margin-top: 2px; }
+.display:has(.demo-controls:not([hidden])) .score-panel { margin-top: 10px; padding-block: 12px; }
+.display:has(.demo-controls:not([hidden])) .matchup { padding-block: 8px; }
+.display:has(.demo-controls:not([hidden])) .gamecast-layout { margin-top: 10px; }
 /* Twelve points (16 CSS px) is the minimum legible type size throughout the UI. */
 .eyebrow, .season-chip, .score-topline .eyebrow, .status-pill, .team-record,
 .countdown-label, .leader-category, .leader-extras, .leader-name, .leader-position, .leader-metric,
@@ -382,6 +385,15 @@ body::before {
 }
 #recent-plays li span:first-child { font-size: max(12pt, 1em); }
 #next-detail, #next-predictor, #highlight-detail { font-size: max(12pt, 1em); }
+
+/* Make matchup records and the possession/down-and-distance caption legible when scaled. */
+.team-record, .ball-detail { font-size: 19px; }
+#kickoff-countdown-value { font-size: 66px; }
+.countdown-label { font-size: 16px; }
+.countdown-demo[hidden] { display: none; }
+.countdown-demo { display: flex; align-items: center; gap: 18px; padding: 12px 24px; border-bottom: 1px solid #536044; background: #20291f; font-size: 16px; }
+.countdown-demo strong { color: #f6d792; letter-spacing: .08em; }
+.countdown-demo a { margin-left: auto; color: #eee9db; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }

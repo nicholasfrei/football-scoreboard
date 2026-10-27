@@ -21,3 +21,9 @@ test("the layout is fixed rather than reflowing at browser breakpoints", async (
   assert.match(css, /\.mount\s*\{[^}]*width: 1920px;[^}]*height: 1200px;/);
   assert.doesNotMatch(css, /@media\s*\((?:min|max)-(?:width|height)|\b\d+vw\b/);
 });
+
+test("the replay field fills its panel even when game leaders are visible", async () => {
+  const css = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
+  const letterboxed = /\.display:has\(\.game-leaders:not\(\[hidden\]\)\) \.football-field\s*\{[^}]*object-fit:\s*contain/.test(css);
+  assert.equal(letterboxed, false, "the replay field should use its full-width natural aspect ratio");
+});

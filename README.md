@@ -14,10 +14,10 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
-![Animated Dallas Cowboys scoreboard demo showing ball movement, first downs, a touchdown, extra point, field goal, punt, and blocked punt.](docs/images/cowboys-drive-demo.gif)
+![Animated replay of every play in the Cowboys–Eagles game, showing scores, field position, highlights, and changing player statistics.](docs/images/cowboys-drive-demo.gif)
 
-*An earlier fictional Cowboys–Eagles demo recording (the current replay uses
-recorded game plays instead). [Try the full-game replay locally](http://localhost:4173/?demo=drive).*
+*Every recorded play of Cowboys–Eagles, with reconstructed per-play player stats.
+[Try the full-game replay locally](http://localhost:4173/?demo=drive).*
 
 ## About
 
@@ -72,6 +72,11 @@ for game data and team artwork.
 
 3. Open **<http://localhost:4173>**. Stop the server with **Ctrl+C**.
 
+To preview the final 24-hour kickoff countdown without waiting for a real game,
+open the [sample Cowboys–Eagles countdown](http://localhost:4173/?demo=countdown).
+It uses a bundled matchup with a simulated kickoff 24 hours after you open the page;
+the clock ticks locally and the preview never polls the live score feed.
+
 No `npm install` is needed: the app uses only Node.js built-in modules.
 
 **See it in action:** open [the full-game replay](http://localhost:4173/?demo=drive)
@@ -81,6 +86,9 @@ scores, penalties, and field position, or play automatically at 1× or 2×.
 The recorded summaries are bundled locally; replay does not poll ESPN. Historical
 play data is not a recording of the live feed, so field position is inferred
 from each play rather than a saved live game situation.
+In the NFL replay, the Game Leaders panel reconstructs passing, rushing, and
+receiving totals after each play; its final totals are checked against the saved
+box score. These are replay estimates, not archived live-stat snapshots.
 
 ### Choose your team
 

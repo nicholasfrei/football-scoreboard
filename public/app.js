@@ -711,8 +711,45 @@ async function startDriveDemo() {
   loadGame();
 }
 
-if (new URLSearchParams(location.search).get("demo") === "drive") {
+async function startCountdownDemo() {
+  const banner = document.querySelector("#countdown-demo");
+  banner.hidden = false;
+  elements.refreshButton.hidden = true;
+  try {
+    // Reuse the bundled Cowboys–Eagles matchup, but never show its recorded
+    // result or plays as if they were part of an upcoming game.
+    const response = await fetch("/api/demo?game=nfl");
+    if (!response.ok) throw new Error("Sample game unavailable");
+    const [frame] = await response.json();
+    if (!frame) throw new Error("Sample game unavailable");
+    const game = { ...frame.spotlight,
+      state: "scheduled", status: "Scheduled", kickoffAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      timeTbd: false, period: null, clock: null, possessionTeamId: null,
+      ball: null, ballHeld: false, fieldContext: null, drives: [], plays: [], highlights: [], leaders: [],
+      matchupPredictor: null,
+      selectedTeam: { ...frame.spotlight.selectedTeam, score: null },
+      opponent: { ...frame.spotlight.opponent, score: null },
+    };
+    updateBrand(frame);
+    document.title = `Countdown Preview · ${frame.team.name} Football Scoreboard`;
+    document.querySelector("#season-year").textContent = frame.season;
+    updateGame(game, game);
+    elements.feedLabel.textContent = "SAMPLE MATCHUP · NOT LIVE";
+    window.setInterval(updateCountdown, 1000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) updateCountdown(); });
+  } catch {
+    elements.feedLabel.textContent = "SAMPLE GAME UNAVAILABLE";
+    banner.querySelector("span").textContent = "Could not load the bundled sample game. Try reloading.";
+  } finally {
+    elements.panel.setAttribute("aria-busy", "false");
+  }
+}
+
+const demo = new URLSearchParams(location.search).get("demo");
+if (demo === "drive") {
   startDriveDemo();
+} else if (demo === "countdown") {
+  startCountdownDemo();
 } else {
   const polling = createRefreshLoop({ refresh: refreshScoreboard, getPayload: () => lastPayload });
   elements.refreshButton.addEventListener("click", polling.refreshNow);
