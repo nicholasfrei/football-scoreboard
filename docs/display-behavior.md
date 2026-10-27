@@ -36,8 +36,8 @@ does not preserve the previous game data.
   including their scores.
 - The header follows your selected team. Midfield displays the designated home
   team's logo. The left end zone uses the away team's color and mascot; the right
-  uses the home team's color and mascot. A green primary uses the team's alternate
-  color when available to stand out from the turf. White Graduate lettering leaves
+  uses the home team's color and mascot. End zones always use each team's primary
+  color, including green teams. White Graduate lettering leaves
   clear margins on all sides. Both end-zone
   names share a uniform scale without stretching the font, with a dark
   outline for bright backgrounds. Neutral-site

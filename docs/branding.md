@@ -70,9 +70,9 @@ needed, without adding opponent-specific fetching logic.
 
 ## Field behavior
 
-The left end zone uses the away team's color and mascot; the right uses the
-designated home team's color and mascot. A green primary uses the team's alternate
-color when available so it stands out from the turf. White Graduate lettering fits inside a centered 320 × 50 area within
+The left end zone uses the away team's primary color and mascot; the right uses the
+designated home team's primary color and mascot. Green primary colors stay green.
+White Graduate lettering fits inside a centered 320 × 50 area within
 each 416 × 92 end zone, with clear margins. Both names share one uniform scale
 that preserves the font's natural proportions. Short names keep their natural
 length rather than stretching; long names shrink both labels to keep them consistent.

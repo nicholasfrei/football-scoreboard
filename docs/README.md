@@ -45,7 +45,7 @@ There is no frontend build step or third-party runtime dependency.
 - `public/ball-position.js` holds confirmed spots through fresh-feed timeout/gaps,
   resetting at scores, drive/possession changes, and unavailable feeds.
 - `public/demo.js` supplies the offline Cowboys drive sequence; `public/field-branding.js`
-  chooses alternate end-zone colors for green teams when available.
+  keeps each team's primary end-zone color, including green teams.
 - `test/` contains network-independent tests; run them with `npm test`.
 - `test/fixtures/games/` holds ten complete compressed ESPN summaries and their
   provenance manifest; `scripts/capture-game-fixtures.js` explicitly refreshes them.
