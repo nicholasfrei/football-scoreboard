@@ -14,9 +14,11 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
-![Animated replay of every play in the Cowboys–Eagles game, showing scores, field position, highlights, and changing player statistics.](docs/images/cowboys-drive-demo.gif)
+![Full Dallas Cowboys–Philadelphia Eagles replay: all 187 plays, animated trajectories, synchronized football and blue scrimmage line, highlights, and changing player statistics.](docs/images/cowboys-drive-demo.gif)
 
-*Every recorded play of Cowboys–Eagles, with reconstructed per-play player stats.
+*All 187 recorded plays of Dallas–Philadelphia, ending Dallas 38–21 Philadelphia.
+Updated trajectories keep the football and blue line together; incompletions leave both in place.
+Player statistics are reconstructed after each play.
 [Try the full-game replay locally](http://localhost:4173/?demo=drive).*
 
 ## About
