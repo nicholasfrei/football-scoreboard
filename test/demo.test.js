@@ -16,7 +16,7 @@ test("Cowboys playback delivers first downs, TD, NFL XP, FG, punt, and blocked p
   const td = events.find((event) => event.kind === "touchdown");
   assert.equal(td.game.selectedTeam.score, 6);
   assert.equal(highlightDetail(td, td.game), "DAL 6-0 PHI");
-  assert.equal(td.game.ball.percent, 100);
+  assert.equal(td.game.ball.percent, 0);
   assert.equal(events.find((event) => event.kind === "extra-point").game.selectedTeam.score, 7);
   const fg = events.find((event) => event.kind === "field-goal");
   assert.equal(fg.teamId, "21");

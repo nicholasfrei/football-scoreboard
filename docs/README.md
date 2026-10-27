@@ -26,8 +26,9 @@ You can run the scoreboard on your computer before buying any display hardware.
 
 There is no frontend build step or third-party runtime dependency.
 
-- `server.js` serves the display and `/api/scoreboard`, with a 20-second in-memory
-  response cache and shared in-flight requests.
+- `server.js` serves the display and `/api/scoreboard`; `src/scoreboard-cache.js`
+  caches between-games responses for up to 20 seconds, bypassing the cache for
+  pregame/live polling, with shared in-flight requests.
 - `config.json` selects the default team and time zone; `src/config.js` validates it.
 - `src/espn.js` fetches league-aware schedules, summaries, and team metadata.
 - `src/scoreboard.js` selects and normalizes the displayed and next games.
@@ -39,9 +40,15 @@ There is no frontend build step or third-party runtime dependency.
 - `src/highlights.js` normalizes highlight events; `public/highlights.js` tracks
   which new events should be shown by the browser.
 - `public/` contains the HTML, CSS, JavaScript, and bundled artwork.
+- `public/game-timing.js` shares countdown windows and adaptive refresh timing
+  between the browser, game selector, and server cache.
+- `public/ball-position.js` holds confirmed spots through fresh-feed timeout/gaps,
+  resetting at scores, drive/possession changes, and unavailable feeds.
 - `public/demo.js` supplies the offline Cowboys drive sequence; `public/field-branding.js`
-  chooses contrasting end-zone colors, including alternate colors for green teams.
+  keeps the home team's primary color in both end zones, including green teams.
 - `test/` contains network-independent tests; run them with `npm test`.
+- `test/fixtures/games/` holds ten complete compressed ESPN summaries and their
+  provenance manifest; `scripts/capture-game-fixtures.js` explicitly refreshes them.
 
 ## Before deploying
 

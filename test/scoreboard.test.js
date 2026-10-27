@@ -78,3 +78,38 @@ test("ignores malformed events without both Arkansas and an opponent", () => {
   assert.equal(scoreboard.spotlight, null);
   assert.equal(scoreboard.nextGame, null);
 });
+
+test("the next matchup replaces the last final only within its final 24 hours", () => {
+  const final = event({ id: "final", date: "2026-10-17T23:00:00Z", state: "post", status: "Final", opponentId: "238", homeAway: "away", arkScore: 31, opponentScore: 21 });
+  const next = event({ id: "next", date: "2026-10-31T23:45:00Z", state: "pre", status: "Scheduled", opponentId: "142", homeAway: "home", arkScore: null, opponentScore: null });
+  const later = event({ id: "later", date: "2026-11-07T23:45:00Z", state: "pre", status: "Scheduled", opponentId: "99", homeAway: "home", arkScore: null, opponentScore: null });
+  const kickoff = Date.parse(next.date);
+  const data = payload([final, next, later]);
+  assert.equal(selectScoreboard(data, new Date(kickoff - 86_400_001)).spotlight.id, "final");
+  for (const now of [kickoff - 86_400_000, kickoff - 1, kickoff, kickoff + 3_600_000]) {
+    const board = selectScoreboard(data, new Date(now));
+    assert.equal(board.spotlight.id, "next");
+    assert.equal(board.spotlight.state, "scheduled", "wall clock does not invent kickoff");
+    assert.equal(board.nextGame.id, "later");
+  }
+  next.timeValid = false;
+  assert.equal(selectScoreboard(data, new Date(kickoff - 1000)).spotlight.id, "final");
+  next.timeValid = true;
+  next.competitions[0].status.type = { state: "in", detail: "1st Quarter" };
+  assert.equal(selectScoreboard(data, new Date(kickoff)).spotlight.state, "live");
+  next.competitions[0].status.type = { state: "post", completed: true, detail: "Final" };
+  assert.equal(selectScoreboard(data, new Date(kickoff + 4 * 3_600_000)).spotlight.state, "final");
+});
+
+test("temporary delays and suspensions stay in view, but canceled/postponed or old interruptions do not", () => {
+  const final = event({ id: "final", date: "2026-10-17T23:00:00Z", state: "post", status: "Final", opponentId: "238", homeAway: "away", arkScore: 31, opponentScore: 21 });
+  const interrupted = event({ id: "interrupted", date: "2026-10-31T23:45:00Z", state: "in", status: "Delayed", opponentId: "142", homeAway: "home", arkScore: 0, opponentScore: 0 });
+  for (const name of ["STATUS_DELAYED", "STATUS_SUSPENDED", "STATUS_POSTPONED", "STATUS_CANCELED"]) {
+    interrupted.competitions[0].status.type = { state: "in", name, detail: name.slice(7) };
+    const board = selectScoreboard(payload([final, interrupted]), new Date("2026-11-01T00:00Z"));
+    assert.equal(board.spotlight.id, /DELAYED|SUSPENDED/.test(name) ? "interrupted" : "final");
+  }
+  interrupted.competitions[0].status.type = { state: "in", name: "STATUS_SUSPENDED", detail: "Suspended" };
+  interrupted.date = "2026-10-10T23:00Z";
+  assert.equal(selectScoreboard(payload([final, interrupted]), NOW).spotlight.id, "final");
+});

@@ -51,7 +51,7 @@ Configuration is read at server startup, not hot-reloaded:
 
 1. Save the file.
 2. Stop the running server with Ctrl+C, then run `npm start` again.
-3. Reload the browser, or wait for its next 30-second refresh.
+3. Reload the browser, or wait for its next refresh (five minutes outside live play).
 
 On a Pi configured with the [systemd service](raspberry-pi.md#start-the-server-at-boot),
 run `sudo systemctl restart football-scoreboard` instead.

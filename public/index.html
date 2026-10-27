@@ -55,7 +55,14 @@
             <div class="highlight-progress" aria-hidden="true"></div>
           </div>
           <div class="score-topline">
-            <span id="game-label" class="eyebrow">Loading game</span>
+            <div class="game-meta">
+              <span id="game-label">Loading game</span>
+              <span class="meta-divider" aria-hidden="true">·</span>
+              <span id="game-venue">ESPN public score feed</span>
+              <span class="meta-divider" aria-hidden="true">·</span>
+              <span id="game-broadcast">TBD</span>
+              <span id="game-detail" hidden>Checking the latest score…</span>
+            </div>
             <span id="game-status" class="status-pill"><i></i><span id="game-status-text">CONNECTING</span></span>
           </div>
 
@@ -68,6 +75,10 @@
 
             <div class="score-center">
               <p id="game-clock" class="game-clock" aria-label="Quarter and game clock" hidden></p>
+              <div id="kickoff-countdown" class="kickoff-countdown" role="timer" aria-live="off" aria-label="Countdown to kickoff" hidden>
+                <span id="kickoff-countdown-value"></span>
+                <span class="countdown-label">UNTIL KICKOFF</span>
+              </div>
               <div class="score-readout" aria-label="Game score">
                 <svg id="away-possession" class="possession-ball" viewBox="0 0 44 28" role="img" aria-label="Away team has possession" hidden>
                   <ellipse cx="22" cy="14" rx="20" ry="12" fill="#6e331b" stroke="white" stroke-width="2" />
@@ -91,34 +102,25 @@
             </div>
           </div>
 
-          <div class="game-meta">
-            <span id="game-detail">Checking the latest score…</span>
-            <span class="meta-divider" aria-hidden="true"></span>
-            <span id="game-venue">ESPN public score feed</span>
-            <span id="game-broadcast" class="broadcast-badge">TBD</span>
-          </div>
         </section>
 
         <div class="gamecast-layout">
-        <section class="field-wrap" aria-label="Home team field illustration">
-          <div class="field-heading">
-            <span id="field-home">HOME FIELD</span>
-            <span id="field-venue">LOADING VENUE</span>
-          </div>
+        <section class="field-wrap" aria-label="Football field illustration">
           <svg class="football-field" viewBox="0 0 1000 440" role="img" aria-label="Illustration of a striped football field">
             <defs>
               <linearGradient id="turf" x1="0" y1="0" x2="1" y2="1">
                 <stop offset="0" stop-color="#2d723d" />
                 <stop offset="1" stop-color="#17482d" />
               </linearGradient>
-              <pattern id="mow-stripes" width="100" height="440" patternUnits="userSpaceOnUse">
-                <rect width="50" height="440" fill="#ffffff" opacity=".045" />
+              <pattern id="mow-stripes" x="104" width="158.4" height="440" patternUnits="userSpaceOnUse">
+                <rect width="79.2" height="440" fill="#ffffff" opacity=".045" />
               </pattern>
             </defs>
             <rect x="12" y="12" width="976" height="416" fill="url(#turf)" />
-            <rect x="12" y="12" width="976" height="416" fill="url(#mow-stripes)" />
-            <rect class="endzone" x="12" y="12" width="92" height="416" />
-            <rect class="endzone" x="896" y="12" width="92" height="416" />
+            <rect x="104" y="12" width="792" height="416" fill="url(#mow-stripes)" />
+            <rect class="endzone away-endzone" x="12" y="12" width="92" height="416" />
+            <rect class="endzone home-endzone" x="896" y="12" width="92" height="416" />
+            <rect id="redzone-tint" x="104" y="12" width="158.4" height="416" fill="#df3434" opacity=".3" visibility="hidden" />
             <g fill="none" stroke="#f4f1e6" stroke-opacity=".65" stroke-width="3">
               <path d="M104 12v416 M183.2 12v416 M262.4 12v416 M341.6 12v416 M420.8 12v416 M500 12v416 M579.2 12v416 M658.4 12v416 M737.6 12v416 M816.8 12v416 M896 12v416" />
               <path d="M104 48h792 M104 392h792" stroke-opacity=".28" />
@@ -148,9 +150,20 @@
           </svg>
         </section>
 
-        <section class="play-panel" aria-label="Recent plays">
-          <h2 id="plays-heading">RECENT PLAYS</h2>
-          <ol id="recent-plays"><li>Waiting for game details…</li></ol>
+        <section class="play-panel" aria-label="Drive history and play-by-play">
+          <div class="drive-heading">
+            <button id="drive-current" type="button" hidden>← Current drive</button>
+            <h2 id="plays-heading">DRIVE PLAY-BY-PLAY</h2>
+          </div>
+          <strong id="drive-title" class="drive-title" hidden></strong>
+          <p id="drive-summary" class="drive-summary"></p>
+          <div id="drive-content" class="drive-content">
+            <ol id="recent-plays"><li>Waiting for game details…</li></ol>
+            <section id="drive-history" class="drive-history" aria-label="Recent drives" hidden>
+              <h3>DRIVES <span id="drive-count"></span></h3>
+              <div id="drive-list" class="drive-list"></div>
+            </section>
+          </div>
         </section>
         </div>
 
@@ -161,6 +174,10 @@
             <span id="next-detail">Checking game schedule</span>
             <span id="next-predictor">Win chance: unavailable</span>
           </div>
+          <section id="game-leaders" class="game-leaders" aria-label="Live game leaders" hidden>
+            <span class="next-label">GAME LEADERS</span>
+            <div id="leader-list" class="leader-list"></div>
+          </section>
           <div class="feed-status">
             <span id="feed-dot" class="feed-dot"></span>
             <span id="feed-label">CONNECTING TO LIVE FEED</span>

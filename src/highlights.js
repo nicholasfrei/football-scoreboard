@@ -15,16 +15,23 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
   const scoringTeams = new Map((scoringPlays ?? []).map((play) => [String(play.id), play.team?.id]));
   return plays.flatMap((play) => {
     const type = play.type?.text ?? "";
-    if (/no play|nullified/i.test(play.text ?? "")) return [];
+    const acceptedPenalty = play.penalty?.status?.slug === "accepted" && play.penalty.type?.text;
+    if (/no play|nullified/i.test(play.text ?? "") && !acceptedPenalty) return [];
     let kind;
     if (play.scoringPlay && (play.scoringType?.name === "touchdown" || /touchdown/i.test(type))) kind = "touchdown";
     else if (/interception/i.test(type) && !/touchdown/i.test(type)) kind = "interception";
-    else if (/fumble/i.test(type) && !/touchdown/i.test(type)) kind = "fumble";
+    else if (/fumble recovery/i.test(type) && !/touchdown/i.test(type)) kind = "fumble";
     else if (play.scoringPlay && (play.scoringType?.name === "field-goal" || /field goal good/i.test(type))) kind = "field-goal";
     else if (play.scoringPlay && /safety/i.test(type)) kind = "safety";
     else if (play.scoringPlay && (play.scoringType?.name === "extra-point" || /^Extra Point Good$/i.test(type))) kind = "extra-point";
+    else if (acceptedPenalty) kind = "penalty";
     else if (/\b(?:blocked punt|punt blocked)\b/i.test(type)) kind = "blocked-punt";
     else if (/^Punt(?: Return| Fair Catch| Downed| Out of Bounds| Touchback)?$/i.test(type)) kind = "punt";
+    else if (/^Sack$/i.test(type)) kind = "sack";
+    else if (/^Rush$/i.test(type) && !play.scoringPlay && !play.isTurnover
+      && String(play.start?.team?.id) === String(play.end?.team?.id)
+      && Number.isFinite(play.start?.yardsToEndzone) && Number.isFinite(play.end?.yardsToEndzone)
+      && play.end.yardsToEndzone > play.start.yardsToEndzone) kind = "tackle-for-loss";
     else if (isFirstDown(play)) kind = "first-down";
     if (!kind) return [];
 
@@ -37,6 +44,12 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
       const puntingTeam = String(play.start?.team?.id);
       teamId = teamIds.includes(puntingTeam) && teamIds.length === 2
         ? teamIds.find((id) => id !== puntingTeam) : null;
+    } else if (kind === "penalty") {
+      // The penalty metadata names the infraction, but not the penalized team.
+      teamId = null;
+    } else if (kind === "sack" || kind === "tackle-for-loss") {
+      const offense = String(play.start?.team?.id);
+      teamId = teamIds.includes(offense) && teamIds.length === 2 ? teamIds.find((id) => id !== offense) : null;
     } else if (!teamId && kind !== "safety") {
       teamId = play.end?.team?.id;
       // Don't credit an interception to the throwing team when possession
@@ -50,7 +63,9 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
       sequence: Number(play.sequenceNumber),
       kind,
       teamId,
-      detail: type,
+      detail: kind === "penalty" ? `${play.penalty.type.text}${Number.isFinite(play.penalty.yards) ? ` · ${play.penalty.yards} YDS` : ""}` : type,
+      penaltyType: kind === "penalty" ? play.penalty.type.text : null,
+      penaltyYards: kind === "penalty" && Number.isFinite(play.penalty.yards) ? play.penalty.yards : null,
       occurredAt: play.wallclock ?? null,
     }];
   }).filter((event) => Number.isFinite(event.sequence)).slice(-20);

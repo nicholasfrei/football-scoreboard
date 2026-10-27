@@ -70,13 +70,13 @@ needed, without adding opponent-specific fetching logic.
 
 ## Field behavior
 
-Both end zones use the **designated home team's primary color**, or its alternate
-color when the primary is green, with its location name in one and mascot in the
+Both end zones use the **designated home team's primary color**, including green,
+with its location name in one and mascot in the
 other. White Graduate lettering fits inside a centered 320 × 50 area within
 each 416 × 92 end zone, with clear margins. Both names share one uniform scale
 that preserves the font's natural proportions. Short names keep their natural
 length rather than stretching; long names shrink both labels to keep them consistent.
-Bright colors such as Packers gold keep white text; a dark outline separates it
+Bright primary colors keep white text; a dark outline separates it
 from light paint.
 Glyph bounds are fitted after the local font loads so long team names stay inside
 the end zones. The same team's logo occupies midfield.
