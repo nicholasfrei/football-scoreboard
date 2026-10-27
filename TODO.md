@@ -23,7 +23,7 @@
 - [x] "END QUARTER 2" = HALFTIME - show that in place of Q2 00:00
 
 
-- [ ] sack by and tackle for loss shows as empty
+- [x] sack by and tackle for loss shows as empty
 - [x] we don't have an event for turnover on downs
 - [x] redzone is orange-ish and not red enough
 - [x] stats section for the home team is inverted. It should be an exact flip of the left side.

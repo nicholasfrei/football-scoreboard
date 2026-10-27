@@ -291,7 +291,8 @@ body::before {
 .home-endzone { fill: var(--home-color, #222222); }
 .endzone-text { fill: var(--away-ink, #ffffff); font-family: "Graduate", Georgia, serif; font-size: 100px; font-weight: 400; letter-spacing: 3px; paint-order: stroke fill; stroke: rgba(0, 0, 0, .45); stroke-width: 2; stroke-linejoin: round; }
 .endzone-text g:last-child { fill: var(--home-ink, #ffffff); }
-#ball-marker, #first-down-marker { transition: transform .8s ease; }
+#first-down-marker { transition: transform .8s ease; }
+#ball-marker, #football-marker { transition: none; }
 #first-down-marker.is-fourth-down line { stroke: #f56367; }
 .demo-controls[hidden] { display: none; }
 .demo-controls { display: grid; gap: 10px; padding: 12px 24px; background: #20291f; color: #eee9db; border-bottom: 1px solid #536044; }
@@ -360,7 +361,7 @@ body::before {
 .drive-latest .drive-route { stroke: #fff3bd; stroke-width: 8; filter: drop-shadow(0 1px 5px #121914); }
 .drive-yac-route { stroke: #fff3bd; stroke-width: 7; stroke-linecap: round; }
 .drive-return-route { stroke: #ff666b; stroke-width: 7; stroke-linecap: round; }
-.drive-yac-route.is-revealing, .drive-return-route.is-revealing { stroke-dasharray: 100; stroke-dashoffset: 100; animation: draw-route .55s 1s ease-out forwards; }
+.drive-yac-route.is-revealing, .drive-return-route.is-revealing { stroke-dasharray: 100; stroke-dashoffset: 100; animation: draw-route var(--return-duration, .55s) var(--return-delay, 1s) ease-out forwards; }
 .drive-yac-label { fill: #fff3bd; font: bold 20px Arial, sans-serif; paint-order: stroke; stroke: #15241b; stroke-width: 5; stroke-linejoin: round; }
 .drive-return-label { fill: #ff8588; font: bold 20px Arial, sans-serif; paint-order: stroke; stroke: #15241b; stroke-width: 5; stroke-linejoin: round; }
 .drive-catch { fill: #fff3bd; stroke: #172019; stroke-width: 2; }
@@ -370,7 +371,7 @@ body::before {
 .drive-end { fill: #fff3bd; stroke: var(--drive-color, #172019); stroke-width: 4; }
 .drive-end.is-interception { fill: #ff666b; stroke: #fff3bd; }
 .drive-final { fill: none; stroke: #fff3bd; stroke-width: 4; stroke-dasharray: 4 4; }
-.route-reveal { stroke: white; stroke-width: 12; stroke-dasharray: 100; stroke-dashoffset: 100; animation: draw-route 1.1s ease-out forwards; }
+.route-reveal { stroke: white; stroke-width: 12; stroke-dasharray: 100; stroke-dashoffset: 100; animation: draw-route var(--route-duration, 1.1s) ease-out forwards; }
 @keyframes draw-route { to { stroke-dashoffset: 0; } }
 /* The field sets the row height; the plays scroll within that row. */
 .play-panel { margin: 0; padding: 16px; min-height: 0; display: flex; flex-direction: column; contain: size; }

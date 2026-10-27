@@ -40,6 +40,21 @@ function blockingPlayer(text) {
   return playerAtStart(explicit ?? parenthesized);
 }
 
+function defensiveStopPlayer(text) {
+  // NFL reversals append the corrected play; college reviews append the original.
+  const result = (text ?? "").split(/\bplay was REVERSED\.\s*/i).at(-1).split(/\(Original Play:/i)[0];
+  // Only the credit immediately following yardage/the ending spot is a tackle.
+  // Formation, fumble, penalty and injury parentheses are not defender credits.
+  const credit = /\bfor\s+(?:(?:a\s+)?loss\s+of\s+)?-?\d+\s+yards?(?:\s+loss)?(?:\s+to\s+(?:the\s+)?[a-z-]+\s*\d{1,2})?\s*\(([^()]*)\)/i.exec(result)?.[1];
+  if (!credit) return null;
+  const players = credit.replace(/^sack split by\s+/i, "")
+    .split(/;\s*|,(?!\s*(?:Jr|Sr)\.?(?:\s*,|\s*$))\s*|\s+and\s+/i).map((name) => name.trim());
+  // ESPN uses initial/surname names here. Validate the entire credit rather than
+  // treating arbitrary commentary or a team placeholder as a player's name.
+  const name = /^(?:#\d+\s+)?(?:[A-Z][a-zA-Z]{0,2}\.)+[A-Z][a-zA-Z.'’-]*(?:\s+[A-Z][a-zA-Z.'’-]*){0,2}(?:,\s*(?:Jr|Sr)\.?)?$/;
+  return players.every((player) => name.test(player)) ? [...new Set(players)].join(" & ") : null;
+}
+
 function rushingLoss(play) {
   // Voluntary kneels count as negative rushing yards, but are not defensive stops.
   if (/\b(?:kneel(?:s|ed|ing)?(?:[\s-]*down)?|knelt|(?:takes?|taking|took)\s+a\s+knee)\b/i.test(play.text ?? "")) return false;
@@ -116,6 +131,7 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
       teamId,
       detail: kind === "penalty" ? `${acceptedPenalty.type}${acceptedPenalty.yards !== null ? ` · ${acceptedPenalty.yards} YDS` : ""}` : type,
       player: kind === "interception" ? interceptionPlayer(play.text)
+        : kind === "sack" || kind === "tackle-for-loss" ? defensiveStopPlayer(play.text)
         : kind === "blocked-field-goal" ? blockingPlayer(play.text) : null,
       penaltyType: kind === "penalty" ? acceptedPenalty.type : null,
       penaltyYards: kind === "penalty" ? acceptedPenalty.yards : null,

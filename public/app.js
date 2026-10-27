@@ -3,11 +3,12 @@ import { endzoneTextLayout, fieldBranding } from "./field-branding.js";
 import { possessionBranding } from "./possession-branding.js";
 import { teamRecordLabel } from "./team-record.js";
 import { kickoffCountdown, createRefreshLoop } from "./game-timing.js";
-import { createBallPositionTracker } from "./ball-position.js";
+import { ballPositionFallback, createBallPositionTracker } from "./ball-position.js";
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT, displayScale } from "./display-size.js";
 import { scoringNeedsHighlight } from "./scoring-style.js";
 import { leaderCellItems, showGameLeaders } from "./leader-layout.js";
 import { illustratedDrive, yardageLabel } from "./drive-illustration.js";
+import { createBallPlacement, ROUTE_DURATION_MS, RETURN_DELAY_MS, RETURN_DURATION_MS } from "./field-animation.js";
 
 function fitDisplay() {
   const scale = displayScale(window.innerWidth, window.innerHeight);
@@ -26,6 +27,8 @@ let timeZone = "America/Chicago";
 let selectedTeamId = null;
 const highlightTracker = createHighlightTracker();
 const ballPositionTracker = createBallPositionTracker();
+const ballPlacement = createBallPlacement({ render: updateFootballMarker });
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let highlightTimer;
 let activeHighlight = null;
 let previewPending = new URLSearchParams(location.search).get("preview");
@@ -35,6 +38,8 @@ let renderedDriveId = null;
 let renderedLastPlayId = null;
 let renderedIllustrationKey = null;
 let renderedIllustratedPlayId = null;
+let renderedIllustrationView = null;
+let renderedRouteAnimation = null;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 function svgElement(tag, attributes = {}) {
@@ -51,9 +56,12 @@ function renderFieldDrive(game, drive) {
     drive.plays.map((play) => [play.id, play.trajectory, play.snapPercent, play.penaltyMotion, play.type]),
   ])}` : null;
   // Repeated polls must not replay the same play or move the route backwards.
-  if (key === renderedIllustrationKey) return;
+  if (key === renderedIllustrationKey) return renderedRouteAnimation;
   const previousIllustratedPlayId = renderedIllustratedPlayId;
-  const animate = renderedIllustrationKey !== null && key !== null;
+  const view = `${game.league}:${game.id}:${game.homeAway}:${selectedDriveId ?? "current"}`;
+  const animate = renderedIllustrationKey !== null && key !== null && renderedIllustrationView === view && !reducedMotion.matches;
+  renderedIllustrationView = view;
+  renderedRouteAnimation = null;
   renderedIllustrationKey = key;
   renderedIllustratedPlayId = null;
   layer.replaceChildren();
@@ -68,6 +76,13 @@ function renderFieldDrive(game, drive) {
   // If the last offensive snap is a kick or a penalty, do not replay an older
   // pass as if it were the final play. Keep only the net drive line.
   const current = track.segment;
+  layer.style.setProperty("--route-duration", `${ROUTE_DURATION_MS}ms`);
+  layer.style.setProperty("--return-delay", `${RETURN_DELAY_MS}ms`);
+  layer.style.setProperty("--return-duration", `${RETURN_DURATION_MS}ms`);
+  const rememberAnimation = (element, durationMs) => {
+    // The final animated leg determines when the ball may be placed.
+    renderedRouteAnimation = { element, durationMs, start: current.start, playId: current.id };
+  };
   renderedIllustratedPlayId = current?.id ?? null;
   const color = [game.selectedTeam, game.opponent].find((team) => team.id === drive.teamId)?.color ?? "#d6b46a";
   layer.style.setProperty("--drive-color", color);
@@ -83,7 +98,9 @@ function renderFieldDrive(game, drive) {
       // height for a horizontal rush (or pass) and hides its entire route.
       const mask = svgElement("mask", { id: "route-reveal", maskUnits: "userSpaceOnUse",
         x: 0, y: 0, width: 1000, height: 440 });
-      mask.append(svgElement("path", { d: current.path, class: "route-reveal", fill: "none", pathLength: 100 }));
+      const reveal = svgElement("path", { d: current.path, class: "route-reveal", fill: "none", pathLength: 100 });
+      mask.append(reveal);
+      rememberAnimation(reveal, ROUTE_DURATION_MS);
       group.append(mask);
       path.setAttribute("mask", "url(#route-reveal)");
     }
@@ -93,6 +110,7 @@ function renderFieldDrive(game, drive) {
       if (animate && current.id !== previousIllustratedPlayId) {
         yac.setAttribute("pathLength", "100");
         yac.classList.add("is-revealing");
+        rememberAnimation(yac, RETURN_DELAY_MS + RETURN_DURATION_MS);
       }
       group.append(yac);
       group.append(svgElement("circle", { cx: current.to, cy: current.y, r: 6, class: "drive-catch" }));
@@ -107,6 +125,7 @@ function renderFieldDrive(game, drive) {
         if (animate && current.id !== previousIllustratedPlayId) {
           returning.setAttribute("pathLength", "100");
           returning.classList.add("is-revealing");
+          rememberAnimation(returning, RETURN_DELAY_MS + RETURN_DURATION_MS);
         }
         group.append(returning);
         const label = svgElement("text", { x: (current.to + current.finish) / 2,
@@ -142,6 +161,7 @@ function renderFieldDrive(game, drive) {
     : track.end == null ? "" : `LAST TRACKED ${spot(track.end)}`;
   caption.textContent = `${drive.team} DRIVE · START ${spot(driveStart)} · ${summary}${latest ? ` · ${latest}` : ""}${drive.result ? ` · ${drive.result}` : ""}`;
   caption.hidden = false;
+  return renderedRouteAnimation;
 }
 
 function hideHighlight() {
@@ -328,8 +348,12 @@ function updateField(game) {
   };
   if (home.logo) logo.setAttribute("href", home.logo);
   else logo.removeAttribute("href");
+  updateBallMarkers(game);
+}
 
-  const marker = document.querySelector("#ball-marker");
+function updateBallMarkers(game) {
+  const home = game.homeAway === "home" ? game.selectedTeam : game.opponent;
+  const away = game.homeAway === "home" ? game.opponent : game.selectedTeam;
   const lineToGain = document.querySelector("#first-down-marker");
   const redzone = document.querySelector("#redzone-tint");
   const inRedzone = Boolean(game.ball && ((game.ball.direction === "left" && game.ball.percent <= 20)
@@ -341,9 +365,7 @@ function updateField(game) {
   const isFourthDown = /^4th\b/i.test(game.ball?.downDistance ?? "");
   lineToGain.classList.toggle("is-fourth-down", isFourthDown);
   if (hasLineToGain) lineToGain.style.transform = `translateX(${104 + game.ball.firstDownPercent * 7.92}px)`;
-  marker.setAttribute("visibility", game.ball ? "visible" : "hidden");
   if (game.ball) {
-    marker.style.transform = `translateX(${104 + game.ball.percent * 7.92}px)`;
     const possession = document.createElement("span");
     possession.className = "possession-team";
     possession.textContent = game.ball.possession;
@@ -356,13 +378,22 @@ function updateField(game) {
     const pause = game.ballHeld && /timeout/i.test(game.fieldContext?.lastPlayType ?? "") ? "TIMEOUT · " : "";
     document.querySelector("#ball-detail").replaceChildren(pause, possession, " · ", down, ` · ${position}`);
   } else {
-    document.querySelector("#ball-detail").textContent = game.state === "live"
-      ? game.fieldContext?.scoring
-        ? `${/touchdown/i.test(game.fieldContext.lastPlayType) ? "TOUCHDOWN" : "SCORING PLAY"} · awaiting next play`
-        : "TIMEOUT · awaiting ball position"
-       : game.state === "final" ? "FINAL" : "Ball position appears during play";
+    document.querySelector("#ball-detail").textContent = ballPositionFallback(game);
   }
 
+}
+
+function updateFootballMarker(game, { hidden = false } = {}) {
+  const visibility = !hidden && game.ball ? "visible" : "hidden";
+  for (const selector of ["#football-marker", "#ball-marker"]) {
+    const marker = document.querySelector(selector);
+    // No hide/show cycle or transform reset when an incompletion keeps the spot.
+    if (marker.getAttribute("visibility") !== visibility) marker.setAttribute("visibility", visibility);
+    if (game.ball) {
+      const transform = `translateX(${104 + game.ball.percent * 7.92}px)`;
+      if (marker.style.transform !== transform) marker.style.transform = transform;
+    }
+  }
 }
 
 function renderDrives(game) {
@@ -376,7 +407,17 @@ function renderDrives(game) {
       document.querySelector(selector).setAttribute("visibility", "hidden");
     }
   }
-  renderFieldDrive(game, selected);
+  const animation = renderFieldDrive(game, selected);
+  const playId = game.fieldContext?.lastPlayId ?? game.latestPlayOrder?.at(-1);
+  const startGame = { ...game, ball: animation ? { percent: animation.start } : null };
+  ballPlacement.update({
+    key: `${game.league}:${game.id}:${game.homeAway}:${selected?.id}:${playId}`,
+    game, startGame,
+    animation: animation?.playId === playId ? animation : null,
+    visible: (!selected || selected.id === drives.at(-1)?.id)
+      && !document.querySelector(".field-wrap").classList.contains("is-feed-delayed"),
+    reducedMotion: reducedMotion.matches,
+  });
   const index = drives.indexOf(selected);
   const history = document.querySelector("#drive-history");
   const driveList = document.querySelector("#drive-list");
@@ -455,6 +496,9 @@ function renderDrives(game) {
 document.querySelector("#drive-current").addEventListener("click", () => {
   selectedDriveId = null;
   if (displayedGame) { updateField(displayedGame); renderDrives(displayedGame); }
+});
+reducedMotion.addEventListener("change", () => {
+  if (displayedGame) renderDrives(displayedGame);
 });
 document.querySelector("#drive-list").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-drive-id]");
@@ -607,6 +651,8 @@ function updateGame(game, nextGame, demo = false) {
   renderNextDetails(nextGame);
   renderLeaders(game, demo);
   if (!game) {
+    ballPlacement.reset();
+    document.querySelector("#football-marker").setAttribute("visibility", "hidden");
     renderFieldDrive({ league: "", id: "" }, null);
     elements.gameDetail.hidden = true;
     driveGameId = null;
@@ -703,6 +749,7 @@ async function refreshScoreboard() {
     if (payload.stale) {
       elements.gameClock.hidden = true;
       document.querySelector("#ball-marker").setAttribute("visibility", "hidden");
+      document.querySelector("#football-marker").setAttribute("visibility", "hidden");
       document.querySelector("#first-down-marker").setAttribute("visibility", "hidden");
       updatePossession(null);
       document.querySelector("#ball-detail").textContent = lastGameState === "final" ? "FINAL" : "Feed delayed · last known score and plays";
@@ -712,6 +759,7 @@ async function refreshScoreboard() {
   } catch {
     document.querySelector(".field-wrap").classList.add("is-feed-delayed");
     ballPositionTracker.reset();
+    ballPlacement.reset();
     elements.gameClock.hidden = true;
     hideHighlight();
     highlightTracker.observe(null);
@@ -720,6 +768,7 @@ async function refreshScoreboard() {
     elements.gameStatus.classList.remove("is-live", "is-upcoming");
     elements.gameDetail.textContent = "Can’t reach the score feed. Retrying automatically.";
     document.querySelector("#ball-marker").setAttribute("visibility", "hidden");
+    document.querySelector("#football-marker").setAttribute("visibility", "hidden");
     document.querySelector("#first-down-marker").setAttribute("visibility", "hidden");
     updatePossession(null);
     document.querySelector("#ball-detail").textContent = lastGameState === "final" ? "FINAL" : "Offline · last known score and plays";
@@ -778,6 +827,7 @@ async function startDriveDemo() {
   async function loadGame() {
     const requestId = ++loadId;
     clearTimeout(timer);
+    ballPlacement.reset();
     paused = true;
     hideHighlight();
     toggle.disabled = next.disabled = previous.disabled = true;

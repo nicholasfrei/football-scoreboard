@@ -12,6 +12,15 @@ function compareInOrder(order, currentId, previousId) {
   return current < 0 || previous < 0 ? null : current - previous;
 }
 
+export function ballPositionFallback(game) {
+  if (game.state === "final") return "FINAL";
+  if (game.state !== "live") return "Ball position appears during play";
+  const type = game.fieldContext?.lastPlayType ?? "";
+  if (game.fieldContext?.scoring) return `${/touchdown/i.test(type) ? "TOUCHDOWN" : "SCORING PLAY"} · awaiting next play`;
+  if (/timeout/i.test(type)) return "TIMEOUT · awaiting ball position";
+  return "Awaiting ball position";
+}
+
 export function createBallPositionTracker() {
   let previous = null;
   return {

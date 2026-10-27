@@ -210,6 +210,18 @@ marker at its reported starting spot. Feed outages hide the illustration.
 Opening a replay or completed game draws the selected drive without replaying
 old movement. New plays reveal their route once; repeated polls do not restart
 the animation, and reduced-motion preferences show the whole route immediately.
+Route reveals take **1.1 seconds**, or **1.55 seconds** including a YAC/return
+leg. During the reveal, the football and blue scrimmage line stay at the play's
+snap spot. When the final leg finishes, both snap together to the latest confirmed
+position without an additional sliding transition. Incompletions leave both
+continuously visible at scrimmage, without resetting or blinking. The yellow
+first-down line retains its normal immediate updates and 0.8-second transition;
+it is never hidden or reset by a trajectory. Field labels and red-zone shading also
+continue updating normally. A schematic pass target,
+interception catch or kick endpoint never substitutes for that confirmed spot;
+incompletions stay at scrimmage. Missing positions remain unavailable afterward.
+Initial loads, history browsing and reduced-motion mode place the ball immediately.
+New plays, game changes and feed outages cancel pending placements.
 Penalty plays use gold text and a flag. Scoring play text uses the scorer's
 primary team color; when its contrast against the dark panel is below 4.5:1,
 the text gets a white background. Attribution comes from ESPN's scoring-play
@@ -263,6 +275,12 @@ Takeovers use structured ESPN play types, stable play IDs, and ordered play hist
   require a negative rushing gain, preferring reported rushing yardage over
   potentially inconsistent end-zone coordinates.
   Explicit kneel-downs do not trigger defensive tackle-for-loss celebrations.
+  Sacks and tackles for loss show the defenders explicitly credited after the
+  play's yardage/ending spot (`SACK BY` / `STOPPED BY`), including shared sacks
+  and assisted tackles. Names retain reported initials, jersey numbers and suffixes;
+  replay corrections take precedence over the original attribution. Missing
+  player credits remain team-only; the app does not guess from the ball carrier,
+  formation, fumble, penalty or injury commentary.
 - Turnovers on downs require a confirmed fourth-down scrimmage play and a change
   to the other team's possession. They show one **TURNOVER ON DOWNS** takeover for
   the gaining team, including when the failed fourth-down play was a sack.

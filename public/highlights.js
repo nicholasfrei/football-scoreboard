@@ -29,6 +29,8 @@ export function highlightDetail(event, game) {
   if (event.kind === "penalty") return Number.isFinite(event.penaltyYards) ? `${event.penaltyYards} YDS` : "";
   if (event.kind === "interception") return event.player ? `INTERCEPTED BY ${event.player}` : "";
   if (event.kind === "blocked-field-goal" && event.player) return `BLOCKED BY ${event.player}`;
+  if (event.kind === "sack" && event.player) return `SACK BY ${event.player}`;
+  if (event.kind === "tackle-for-loss" && event.player) return `STOPPED BY ${event.player}`;
   if (event.kind === "touchdown") {
     const { selectedTeam, opponent } = game;
     return `${selectedTeam.abbreviation} ${selectedTeam.score ?? "—"}-${opponent.score ?? "—"} ${opponent.abbreviation}`;
