@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { enrichGame } from "../src/gamecast.js";
 import { getScoreboard } from "../src/espn.js";
+import { illustratedDrive } from "../public/drive-illustration.js";
 
 function summary({ arkHome = false, state = "in", situation, current, previous = [] } = {}) {
   return {
@@ -21,6 +22,37 @@ function summary({ arkHome = false, state = "in", situation, current, previous =
   };
 }
 const game = { id: "401856726", name: "Arkansas at Vanderbilt", venue: "FirstBank Stadium" };
+
+test("accepted penalty yardage reaches the drive illustration, but declined and bundled plays do not", () => {
+  const spot = (label) => ({ team: { id: "8" }, possessionText: `ARK ${label}`, down: 1 });
+  const foul = { id: "flag", sequenceNumber: "1", type: { text: "Penalty" },
+    text: "PENALTY ARK False Start 5 yards. NO PLAY", start: spot(25), end: spot(20),
+    penalty: { status: { slug: "accepted" }, type: { text: "False Start" }, yards: 5 } };
+  const drive = (play) => enrichGame(game, summary({ current: { id: "drive", team: { id: "8" }, plays: [play] } })).drives.at(-1);
+  const motion = drive(foul).plays[0].penaltyMotion;
+  assert.deepEqual(motion, { start: 25, end: 20 });
+  const chart = illustratedDrive({ ...drive(foul), direction: "right" });
+  assert.deepEqual(chart.penaltyPaths, [`M ${104 + 25 * 7.92} 220 L ${104 + 20 * 7.92} 220`]);
+  assert.equal(chart.finalMarker.x, 104 + 20 * 7.92);
+  const homeFoul = { ...foul, start: { team: { id: "238" }, possessionText: "VAN 25", down: 1 },
+    end: { team: { id: "238" }, possessionText: "VAN 20", down: 1 } };
+  const homeDrive = enrichGame(game, summary({ current: { id: "home-drive", team: { id: "238" }, plays: [homeFoul] } })).drives.at(-1);
+  assert.deepEqual(homeDrive.plays[0].penaltyMotion, { start: 75, end: 80 });
+  assert.equal(illustratedDrive({ ...homeDrive, direction: "left" }).finalMarker.x, 104 + 80 * 7.92);
+  const following = { id: "rush", sequenceNumber: "2", type: { text: "Rush" }, text: "Rush for 5",
+    start: spot(20), end: spot(25) };
+  const later = enrichGame(game, summary({ current: { id: "drive", team: { id: "8" }, plays: [foul, following] } })).drives.at(-1);
+  const laterChart = illustratedDrive({ ...later, direction: "right" });
+  assert.deepEqual(laterChart.penaltyPaths, [], "the next play replaces the yellow line with solid progress");
+  assert.equal(laterChart.progressPath, `M ${104 + 25 * 7.92} 220 L ${104 + 20 * 7.92} 220`);
+  const between = illustratedDrive({ ...drive(foul), direction: "right", plays: [...drive(foul).plays,
+    { id: "timeout", type: "Timeout", snapPercent: null }] });
+  assert.deepEqual(between.penaltyPaths, [], "a later non-snap event also ends the current penalty display");
+  assert.equal(between.progressPath, `M ${104 + 25 * 7.92} 220 L ${104 + 20 * 7.92} 220`);
+  assert.equal(drive({ ...foul, penalty: { ...foul.penalty, status: { slug: "declined" } } }).plays[0].penaltyMotion, null);
+  assert.equal(drive({ ...foul, type: { text: "Rush" }, text: "Rush for 5, penalty enforced" }).plays[0].penaltyMotion, null);
+  assert.equal(drive({ ...foul, end: spot(25) }).plays[0].penaltyMotion, null);
+});
 
 test("home possession attacks left across the field", () => {
   for (const [label, expected] of [["VAN 25", 75], ["ARK 32", 32], ["VAN 50", 50]]) {

@@ -1,7 +1,7 @@
 import { normalizeGame } from "./scoreboard.js";
 import { gameHighlights } from "./highlights.js";
 import { matchupPredictor } from "./game-details.js";
-import { textIntentionalGrounding } from "./penalty.js";
+import { acceptedPenalty, textIntentionalGrounding } from "./penalty.js";
 import { kickPosition } from "./kick-position.js";
 import { comparePlays } from "./play-order.js";
 import { fallbackPlayEnd } from "./play-position.js";
@@ -37,11 +37,24 @@ function driveSummary(drive, orderedPlays, scoringTeams, home, away) {
       trajectory: playTrajectory(play, offenseId, home, away),
       snapPercent: String(play.start?.team?.id) === offenseId && [1, 2, 3, 4].includes(play.start?.down)
         ? fieldPercent(play.start, home, away) : null,
+      penaltyMotion: penaltyMotion(play, offenseId, home, away),
       type: play.type?.text ?? null,
       penalty: play.penalty?.type?.text ?? (textIntentionalGrounding(play) ? "Intentional Grounding"
         : /penalty/i.test(play.type?.text ?? "") ? "Penalty" : null),
     })),
   };
+}
+
+function penaltyMotion(play, offenseId, home, away) {
+  // A bundled run/pass may contain both play yardage and enforcement. Its net
+  // end spot is not the penalty distance, so only use a standalone/no-play foul.
+  if (!acceptedPenalty(play) || !(/penalty/i.test(play.type?.text ?? "")
+      || /\b(?:no play|nullified)\b/i.test(play.text ?? ""))) return null;
+  if (String(play.start?.team?.id) !== offenseId || String(play.end?.team?.id) !== offenseId
+      || ![1, 2, 3, 4].includes(play.start?.down) || ![0, 1, 2, 3, 4].includes(play.end?.down)) return null;
+  const start = fieldPercent(play.start, home, away);
+  const end = fieldPercent(fallbackPlayEnd(play, [play], home, away), home, away);
+  return start !== null && end !== null && start !== end ? { start, end } : null;
 }
 
 function gameLeaders(summary, teamIds) {

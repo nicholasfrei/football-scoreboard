@@ -353,6 +353,7 @@ body::before {
 .field-drive-caption[hidden], .field-wrap.is-feed-delayed #field-drive-caption { display: none; }
 .field-wrap.is-feed-delayed #drive-illustration { visibility: hidden; }
 .drive-progress { stroke: #f5f0d7; stroke-width: 6; stroke-linecap: round; opacity: .8; filter: drop-shadow(0 1px 3px #121914); }
+.drive-penalty { stroke: #efc744; stroke-width: 8; stroke-dasharray: 7 9; filter: drop-shadow(0 1px 3px #121914); }
 .drive-route { stroke: #f5f0d7; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
 .drive-route.is-pass, .drive-route.is-incomplete, .drive-route.is-interception, .drive-route.is-run,
 .drive-route.is-punt, .drive-route.is-field-goal { stroke-dasharray: 6 13; }

@@ -48,7 +48,7 @@ function renderFieldDrive(game, drive) {
   const caption = document.querySelector("#field-drive-caption");
   const key = drive ? `${game.league}:${game.id}:${drive.id}:${JSON.stringify([
     drive.result, drive.description, game.state, game.currentDriveId,
-    drive.plays.map((play) => [play.id, play.trajectory, play.snapPercent, play.type]),
+    drive.plays.map((play) => [play.id, play.trajectory, play.snapPercent, play.penaltyMotion, play.type]),
   ])}` : null;
   // Repeated polls must not replay the same play or move the route backwards.
   if (key === renderedIllustrationKey) return;
@@ -73,6 +73,7 @@ function renderFieldDrive(game, drive) {
   layer.style.setProperty("--drive-color", color);
   const driveStart = track.start ?? finalSnap?.snapPercent;
   if (track.progressPath) layer.append(svgElement("path", { d: track.progressPath, class: "drive-progress", fill: "none" }));
+  for (const d of track.penaltyPaths) layer.append(svgElement("path", { d, class: "drive-penalty", fill: "none" }));
   if (current) {
     const group = svgElement("g", { class: "drive-latest" });
     const path = current.path && svgElement("path", { d: current.path, class: `drive-route is-${current.kind}`, fill: "none" });

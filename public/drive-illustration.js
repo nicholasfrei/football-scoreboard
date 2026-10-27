@@ -7,6 +7,8 @@ export function illustratedDrive(drive) {
   const { motions, start, end } = driveTrack(drive);
   const motion = motions.at(-1);
   const lastSnap = drive.plays?.findLast((play) => Number.isFinite(play.snapPercent));
+  const lastPenalty = lastSnap?.penaltyMotion;
+  const currentPenalty = lastSnap === drive.plays?.at(-1) ? lastPenalty : null;
   const active = !lastSnap || lastSnap.id === motion?.id;
   const target = motion?.kind === "incomplete" ? motion.targetPercent : null;
   const schematic = motion?.kind === "incomplete" && motion.schematicYards != null
@@ -25,12 +27,13 @@ export function illustratedDrive(drive) {
       ? `M ${to} ${CENTER} L ${finish} ${CENTER}` : null,
     returnPath: motion.kind === "interception" && motion.returnYards !== null && to !== finish
       ? `M ${to} ${CENTER} L ${finish} ${CENTER}` : null } : null;
+  const progressEnd = segment?.start ?? (currentPenalty ? lastSnap.snapPercent : lastPenalty?.end ?? lastSnap?.snapPercent);
   return {
     start, end, count: motions.length, segment,
-    finalMarker: !segment && lastSnap ? { x: x(lastSnap.snapPercent), y: CENTER } : null,
-    progressPath: start !== null && (segment?.start ?? lastSnap?.snapPercent) != null
-      && start !== (segment?.start ?? lastSnap?.snapPercent)
-      ? `M ${x(start)} ${CENTER} L ${x(segment?.start ?? lastSnap.snapPercent)} ${CENTER}` : null,
+    penaltyPaths: currentPenalty ? [`M ${x(currentPenalty.start)} ${CENTER} L ${x(currentPenalty.end)} ${CENTER}`] : [],
+    finalMarker: !segment && lastSnap ? { x: x(lastPenalty?.end ?? lastSnap.snapPercent), y: CENTER } : null,
+    progressPath: start !== null && progressEnd != null && start !== progressEnd
+      ? `M ${x(start)} ${CENTER} L ${x(progressEnd)} ${CENTER}` : null,
   };
 }
 
