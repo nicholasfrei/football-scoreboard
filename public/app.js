@@ -7,6 +7,7 @@ import { createBallPositionTracker } from "./ball-position.js";
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT, displayScale } from "./display-size.js";
 import { scoringNeedsHighlight } from "./scoring-style.js";
 import { leaderCellItems, showGameLeaders } from "./leader-layout.js";
+import { illustratedDrive, yardageLabel } from "./drive-illustration.js";
 
 function fitDisplay() {
   const scale = displayScale(window.innerWidth, window.innerHeight);
@@ -32,6 +33,115 @@ let driveGameId = null;
 let selectedDriveId = null; // null follows the newest drive through live updates.
 let renderedDriveId = null;
 let renderedLastPlayId = null;
+let renderedIllustrationKey = null;
+let renderedIllustratedPlayId = null;
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function svgElement(tag, attributes = {}) {
+  const element = document.createElementNS(SVG_NS, tag);
+  for (const [name, value] of Object.entries(attributes)) element.setAttribute(name, String(value));
+  return element;
+}
+
+function renderFieldDrive(game, drive) {
+  const layer = document.querySelector("#drive-illustration");
+  const caption = document.querySelector("#field-drive-caption");
+  const key = drive ? `${game.league}:${game.id}:${drive.id}:${JSON.stringify([
+    drive.result, drive.description, game.state, game.currentDriveId,
+    drive.plays.map((play) => [play.id, play.trajectory, play.snapPercent, play.type]),
+  ])}` : null;
+  // Repeated polls must not replay the same play or move the route backwards.
+  if (key === renderedIllustrationKey) return;
+  const previousIllustratedPlayId = renderedIllustratedPlayId;
+  const animate = renderedIllustrationKey !== null && key !== null;
+  renderedIllustrationKey = key;
+  renderedIllustratedPlayId = null;
+  layer.replaceChildren();
+  caption.hidden = true;
+  caption.textContent = "";
+  if (!drive) return;
+  const home = game.homeAway === "home" ? game.selectedTeam : game.opponent;
+  const away = game.homeAway === "home" ? game.opponent : game.selectedTeam;
+  const track = illustratedDrive({ ...drive, direction: drive.teamId === home.id ? "left" : "right" });
+  const finalSnap = drive.plays.findLast((play) => Number.isFinite(play.snapPercent));
+  if (!track.segment && !finalSnap) return;
+  // If the last offensive snap is a kick or a penalty, do not replay an older
+  // pass as if it were the final play. Keep only the net drive line.
+  const current = track.segment;
+  renderedIllustratedPlayId = current?.id ?? null;
+  const color = [game.selectedTeam, game.opponent].find((team) => team.id === drive.teamId)?.color ?? "#d6b46a";
+  layer.style.setProperty("--drive-color", color);
+  const driveStart = track.start ?? finalSnap?.snapPercent;
+  if (track.progressPath) layer.append(svgElement("path", { d: track.progressPath, class: "drive-progress", fill: "none" }));
+  if (current) {
+    const group = svgElement("g", { class: "drive-latest" });
+    const path = current.path && svgElement("path", { d: current.path, class: `drive-route is-${current.kind}`, fill: "none" });
+    if (path && animate && current.id !== previousIllustratedPlayId) {
+      // Reveal a solid or dotted route with the same mask, regardless of direction.
+      // Use field coordinates: the default object-bounding-box mask has zero
+      // height for a horizontal rush (or pass) and hides its entire route.
+      const mask = svgElement("mask", { id: "route-reveal", maskUnits: "userSpaceOnUse",
+        x: 0, y: 0, width: 1000, height: 440 });
+      mask.append(svgElement("path", { d: current.path, class: "route-reveal", fill: "none", pathLength: 100 }));
+      group.append(mask);
+      path.setAttribute("mask", "url(#route-reveal)");
+    }
+    if (path) group.append(path);
+    if (current.yacPath) {
+      const yac = svgElement("path", { d: current.yacPath, class: "drive-yac-route", fill: "none" });
+      if (animate && current.id !== previousIllustratedPlayId) {
+        yac.setAttribute("pathLength", "100");
+        yac.classList.add("is-revealing");
+      }
+      group.append(yac);
+      group.append(svgElement("circle", { cx: current.to, cy: current.y, r: 6, class: "drive-catch" }));
+      const label = svgElement("text", { x: (current.to + current.finish) / 2,
+        y: current.y + 38, class: "drive-yac-label", "text-anchor": "middle" });
+      label.textContent = `${current.yac} YAC`;
+      group.append(label);
+    }
+    if (current.kind === "interception") {
+      if (current.returnPath) {
+        const returning = svgElement("path", { d: current.returnPath, class: "drive-return-route", fill: "none" });
+        if (animate && current.id !== previousIllustratedPlayId) {
+          returning.setAttribute("pathLength", "100");
+          returning.classList.add("is-revealing");
+        }
+        group.append(returning);
+        const label = svgElement("text", { x: (current.to + current.finish) / 2,
+          y: current.y + 38, class: "drive-return-label", "text-anchor": "middle" });
+        label.textContent = `${current.returnYards} YD RETURN`;
+        group.append(label);
+      }
+      group.append(svgElement("circle", { cx: current.to, cy: current.y, r: 7, class: "drive-pick" }));
+    }
+    if (current.kind === "incomplete") {
+      const cross = svgElement("g", { class: "drive-miss" });
+      const y = current.y;
+      cross.append(svgElement("path", { d: `M ${current.to - 10} ${y - 10} L ${current.to + 10} ${y + 10} M ${current.to + 10} ${y - 10} L ${current.to - 10} ${y + 10}` }));
+      group.append(cross);
+    } else if (current.kind !== "interception" || current.returnPath) group.append(svgElement("circle", {
+      cx: current.finish, cy: current.y, r: 8,
+      class: current.kind === "interception" ? "drive-end is-interception" : "drive-end",
+    }));
+    layer.append(group);
+  }
+  layer.prepend(svgElement("circle", { cx: 104 + driveStart * 7.92, cy: 220,
+    r: 8, class: "drive-start" }));
+  if (track.finalMarker) {
+    layer.append(svgElement("circle", { cx: track.finalMarker.x, cy: track.finalMarker.y,
+      r: 11, class: "drive-final", "aria-label": `Final offensive snap: ${finalSnap.type ?? "play"}` }));
+  }
+  const spot = (percent) => percent === 50 ? "50" : percent < 50
+    ? `${away.abbreviation} ${percent}` : `${home.abbreviation} ${100 - percent}`;
+  const summary = drive.description ?? `${track.count} tracked ${track.count === 1 ? "play" : "plays"}`;
+  const completed = Boolean(drive.result) || game.state === "final" || drive.id !== game.currentDriveId;
+  const latest = current ? yardageLabel(current) : finalSnap
+    ? `${completed ? "FINAL" : "LATEST"} SNAP ${finalSnap.type?.toUpperCase() ?? "PLAY"} · ${spot(finalSnap.snapPercent)}`
+    : track.end == null ? "" : `LAST TRACKED ${spot(track.end)}`;
+  caption.textContent = `${drive.team} DRIVE · START ${spot(driveStart)} · ${summary}${latest ? ` · ${latest}` : ""}${drive.result ? ` · ${drive.result}` : ""}`;
+  caption.hidden = false;
+}
 
 function hideHighlight() {
   clearTimeout(highlightTimer);
@@ -260,6 +370,12 @@ function renderDrives(game) {
   const drives = game.drives ?? [];
   if (selectedDriveId && !drives.some((drive) => drive.id === selectedDriveId)) selectedDriveId = null;
   const selected = drives.find((drive) => drive.id === selectedDriveId) ?? drives.at(-1);
+  if (selected && selected.id !== drives.at(-1)?.id) {
+    for (const selector of ["#ball-marker", "#first-down-marker", "#redzone-tint"]) {
+      document.querySelector(selector).setAttribute("visibility", "hidden");
+    }
+  }
+  renderFieldDrive(game, selected);
   const index = drives.indexOf(selected);
   const history = document.querySelector("#drive-history");
   const driveList = document.querySelector("#drive-list");
@@ -337,12 +453,13 @@ function renderDrives(game) {
 
 document.querySelector("#drive-current").addEventListener("click", () => {
   selectedDriveId = null;
-  if (displayedGame) renderDrives(displayedGame);
+  if (displayedGame) { updateField(displayedGame); renderDrives(displayedGame); }
 });
 document.querySelector("#drive-list").addEventListener("click", (event) => {
   const button = event.target.closest("button[data-drive-id]");
   if (!button || !displayedGame?.drives?.some((drive) => drive.id === button.dataset.driveId)) return;
   selectedDriveId = button.dataset.driveId === displayedGame.drives.at(-1).id ? null : button.dataset.driveId;
+  updateField(displayedGame);
   renderDrives(displayedGame);
 });
 
@@ -489,6 +606,7 @@ function updateGame(game, nextGame, demo = false) {
   renderNextDetails(nextGame);
   renderLeaders(game, demo);
   if (!game) {
+    renderFieldDrive({ league: "", id: "" }, null);
     elements.gameDetail.hidden = true;
     driveGameId = null;
     selectedDriveId = null;
@@ -574,6 +692,7 @@ async function refreshScoreboard() {
     if (!response.ok) throw new Error(payload.error ?? "Score feed request failed");
 
     lastPayload = payload;
+    document.querySelector(".field-wrap").classList.toggle("is-feed-delayed", Boolean(payload.stale || payload.gamecastUnavailable));
     updateBrand(payload);
     updateGame(ballPositionTracker.observe(payload), payload.nextGame);
     updateHighlights(payload);
@@ -590,6 +709,7 @@ async function refreshScoreboard() {
       elements.gameStatus.classList.remove("is-live");
     }
   } catch {
+    document.querySelector(".field-wrap").classList.add("is-feed-delayed");
     ballPositionTracker.reset();
     elements.gameClock.hidden = true;
     hideHighlight();
@@ -632,6 +752,7 @@ async function startDriveDemo() {
 
   function render() {
     hideHighlight();
+    document.querySelector(".field-wrap").classList.remove("is-feed-delayed");
     const frame = frames[index];
     updateGame(frame.spotlight, null, true);
     if (frame.event) showHighlight(frame.event, frame.spotlight, true, 3_200 / Number(speed.value));
@@ -671,6 +792,8 @@ async function startDriveDemo() {
       driveGameId = null;
       selectedDriveId = null;
       renderedDriveId = null;
+      renderedIllustrationKey = null;
+      renderedIllustratedPlayId = null;
       updateBrand(frames[0]);
       document.title = `Game Replay · ${frames[0].team.name} Football Scoreboard`;
       document.querySelector("#season-year").textContent = frames[0].season;

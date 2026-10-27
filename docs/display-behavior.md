@@ -170,8 +170,46 @@ Headshots sit at the outside edges; each team's numbers sit beside its name.
 The gamecast shows every reported play in the current drive, newest first, its
 provider drive summary, and drive history at the bottom of the same scrolling play panel. Select
 a drive in that history to read its plays; a left-side Current drive button appears
-only while browsing an older drive and restores automatic following. Only older
+only while browsing an older drive and restores automatic following. Browsing an
+older drive hides the current ball, line to gain, and red-zone tint so they do
+not look like part of the selected history. Only older
 drives display a small team/result title above the plays/yards/possession-time summary.
+The 2D field also traces the selected drive from its first confirmed offensive
+scrimmage spot. Earlier plays collapse into one static, straight line through
+the center of the field up to the latest snap; only that play has its own route.
+A run follows a centered dotted line; passes take a centered dotted arc of the
+same height regardless of distance or left/right description. Even a catch at
+the snap uses a small arc instead of a flat or zero-length flight.
+NFL summaries usually supply structured yards after catch. When the reported
+gain matches the confirmed start/end spots, the arc ends at the derived catch
+yard line and a solid segment shows YAC. College play text usually supplies a
+`caught at` spot instead; that spot establishes the catch line and YAC when the
+reported gain agrees with the endpoints. Without a reliable split, the arc goes
+to the final spot without claiming a catch point.
+An incomplete pass uses the reported `thrown to` yard line (including college
+team-name aliases) for its centered dotted route and red X. When no reliable
+target spot is reported, depth-only `short`/`deep` descriptions (common in NFL)
+draw a schematic arc (15/30 yards, clamped to the goal line), not a measured
+landing spot; the caption never calls it a reported target or shows `(EST.)`.
+Spikes and other passes with no useful depth keep only the X at the snap. The
+caption shows a reported target when available and zero gain. It otherwise
+identifies the drive start, provider drive summary when available, and latest
+tracked play and yards. An interception uses the same fixed-height pass arc
+to the reported pick spot and, when its final spot and return yardage agree,
+a solid red line back to the defender's final spot. A pick with no return ends
+at the catch; a touchback shows the pick in the end zone but no fictitious
+runback to the 20. Nullified, overturned, and ambiguous picks do not get an
+invented return. An ordinary punt arcs from the snap to ESPN's named
+receiving spot after the return, fair catch, or touchback; it does not treat the
+first catch as the next possession spot. An ordinary made or missed field goal
+arcs to the back of the attacking end zone, not to the subsequent possession.
+Blocked, short, nullified and enforced-penalty kicks have no invented full
+flight. Kickoffs, timeouts, other turnovers, nullified and penalized results
+are not drawn as offensive gains; an unillustrated scrimmage play gets a dashed snap
+marker at its reported starting spot. Feed outages hide the illustration.
+Opening a replay or completed game draws the selected drive without replaying
+old movement. New plays reveal their route once; repeated polls do not restart
+the animation, and reduced-motion preferences show the whole route immediately.
 Penalty plays use gold text and a flag. Scoring play text uses the scorer's
 primary team color; when its contrast against the dark panel is below 4.5:1,
 the text gets a white background. Attribution comes from ESPN's scoring-play

@@ -349,6 +349,28 @@ body::before {
 .gamecast-layout { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 14px; margin: 14px 22px 0; }
 .field-wrap { margin: 0; padding: 8px; }
 .football-field { max-height: none; }
+.field-drive-caption { padding: 8px 4px 2px; color: #e8d6a5; font-size: 16px; font-weight: 700; line-height: 1.4; letter-spacing: .03em; }
+.field-drive-caption[hidden], .field-wrap.is-feed-delayed #field-drive-caption { display: none; }
+.field-wrap.is-feed-delayed #drive-illustration { visibility: hidden; }
+.drive-progress { stroke: #f5f0d7; stroke-width: 6; stroke-linecap: round; opacity: .8; filter: drop-shadow(0 1px 3px #121914); }
+.drive-route { stroke: #f5f0d7; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+.drive-route.is-pass, .drive-route.is-incomplete, .drive-route.is-interception, .drive-route.is-run,
+.drive-route.is-punt, .drive-route.is-field-goal { stroke-dasharray: 6 13; }
+.drive-latest .drive-route { stroke: #fff3bd; stroke-width: 8; filter: drop-shadow(0 1px 5px #121914); }
+.drive-yac-route { stroke: #fff3bd; stroke-width: 7; stroke-linecap: round; }
+.drive-return-route { stroke: #ff666b; stroke-width: 7; stroke-linecap: round; }
+.drive-yac-route.is-revealing, .drive-return-route.is-revealing { stroke-dasharray: 100; stroke-dashoffset: 100; animation: draw-route .55s 1s ease-out forwards; }
+.drive-yac-label { fill: #fff3bd; font: bold 20px Arial, sans-serif; paint-order: stroke; stroke: #15241b; stroke-width: 5; stroke-linejoin: round; }
+.drive-return-label { fill: #ff8588; font: bold 20px Arial, sans-serif; paint-order: stroke; stroke: #15241b; stroke-width: 5; stroke-linejoin: round; }
+.drive-catch { fill: #fff3bd; stroke: #172019; stroke-width: 2; }
+.drive-pick { fill: #ff666b; stroke: #fff3bd; stroke-width: 2; }
+.drive-miss { fill: none; stroke: #ff666b; stroke-width: 8; stroke-linecap: round; paint-order: stroke; filter: drop-shadow(0 1px 3px #172019); }
+.drive-start { fill: #fff3bd; stroke: var(--drive-color, #172019); stroke-width: 4; }
+.drive-end { fill: #fff3bd; stroke: var(--drive-color, #172019); stroke-width: 4; }
+.drive-end.is-interception { fill: #ff666b; stroke: #fff3bd; }
+.drive-final { fill: none; stroke: #fff3bd; stroke-width: 4; stroke-dasharray: 4 4; }
+.route-reveal { stroke: white; stroke-width: 12; stroke-dasharray: 100; stroke-dashoffset: 100; animation: draw-route 1.1s ease-out forwards; }
+@keyframes draw-route { to { stroke-dashoffset: 0; } }
 /* The field sets the row height; the plays scroll within that row. */
 .play-panel { margin: 0; padding: 16px; min-height: 0; display: flex; flex-direction: column; contain: size; }
 .play-panel h2, .drive-history h3 { font-size: 15px; }
@@ -397,4 +419,5 @@ body::before {
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+  .drive-yac-route.is-revealing, .drive-return-route.is-revealing { animation: none !important; stroke-dashoffset: 0; }
 }

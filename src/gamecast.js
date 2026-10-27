@@ -6,6 +6,7 @@ import { kickPosition } from "./kick-position.js";
 import { comparePlays } from "./play-order.js";
 import { fallbackPlayEnd } from "./play-position.js";
 import { uncertainBlockedFieldGoalSpot } from "./blocked-kick-position.js";
+import { fieldPercent, playTrajectory } from "../public/play-trajectory.js";
 
 function recentPlays(summary) {
   const drives = [...(summary.drives?.previous ?? []), summary.drives?.current].filter(Boolean);
@@ -16,11 +17,12 @@ function recentPlays(summary) {
   return [...byId.values()].sort(comparePlays);
 }
 
-function driveSummary(drive, orderedPlays, scoringTeams) {
+function driveSummary(drive, orderedPlays, scoringTeams, home, away) {
   const ids = new Set((drive.plays ?? []).map((play) => String(play.id)));
+  const offenseId = drive.team?.id == null ? null : String(drive.team.id);
   return {
     id: String(drive.id),
-    teamId: drive.team?.id == null ? null : String(drive.team.id),
+    teamId: offenseId,
     team: drive.team?.abbreviation ?? drive.team?.shortDisplayName ?? "—",
     result: drive.displayResult ?? null,
     description: drive.description ?? null,
@@ -32,6 +34,10 @@ function driveSummary(drive, orderedPlays, scoringTeams) {
       clock: play.clock?.displayValue ?? null,
       scoring: Boolean(play.scoringPlay),
       scoringTeamId: play.scoringPlay ? scoringTeams.get(String(play.id)) ?? null : null,
+      trajectory: playTrajectory(play, offenseId, home, away),
+      snapPercent: String(play.start?.team?.id) === offenseId && [1, 2, 3, 4].includes(play.start?.down)
+        ? fieldPercent(play.start, home, away) : null,
+      type: play.type?.text ?? null,
       penalty: play.penalty?.type?.text ?? (textIntentionalGrounding(play) ? "Intentional Grounding"
         : /penalty/i.test(play.type?.text ?? "") ? "Penalty" : null),
     })),
@@ -169,7 +175,7 @@ export function enrichGame(game, summary) {
   const currentPlays = plays.filter((play) => currentIds.has(String(play.id)));
   const driveMap = new Map();
   for (const drive of [...(summary.drives?.previous ?? []), currentDrive].filter((drive) => drive?.id != null)) {
-    driveMap.set(String(drive.id), driveSummary(drive, plays, scoringTeams));
+    driveMap.set(String(drive.id), driveSummary(drive, plays, scoringTeams, home, away));
   }
   const drives = [...driveMap.values()].filter((drive) => drive.plays.length);
   const isPause = (play) => /Timeout|Two-minute warning|End Period|End of Half|End of Regulation/i.test(play?.type?.text ?? "");
