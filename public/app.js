@@ -4,6 +4,18 @@ import { possessionBranding } from "./possession-branding.js";
 import { teamRecordLabel } from "./team-record.js";
 import { kickoffCountdown, createRefreshLoop } from "./game-timing.js";
 import { createBallPositionTracker } from "./ball-position.js";
+import { DISPLAY_WIDTH, DISPLAY_HEIGHT, displayScale } from "./display-size.js";
+
+function fitDisplay() {
+  const scale = displayScale(window.innerWidth, window.innerHeight);
+  const stage = document.querySelector(".stage");
+  stage.style.width = `${DISPLAY_WIDTH * scale}px`;
+  stage.style.height = `${DISPLAY_HEIGHT * scale}px`;
+  document.querySelector(".mount").style.transform = `scale(${scale})`;
+}
+
+fitDisplay();
+window.addEventListener("resize", fitDisplay);
 
 let lastPayload = null;
 let displayedGame = null;
@@ -592,22 +604,20 @@ async function refreshScoreboard() {
 }
 
 async function startDriveDemo() {
-  const { createDemoFrames } = await import("./demo.js");
-  const frames = createDemoFrames();
+  let frames = [];
   let index = 0;
-  let paused = false;
+  let paused = true;
   let timer;
+  let loadId = 0;
   const controls = document.querySelector("#demo-controls");
   const toggle = document.querySelector("#demo-toggle");
   const next = document.querySelector("#demo-next");
+  const previous = document.querySelector("#demo-previous");
+  const gameSelect = document.querySelector("#demo-game");
   const speed = document.querySelector("#demo-speed");
   controls.hidden = false;
   elements.refreshButton.hidden = true;
-  updateBrand(frames[0]);
-  document.title = `Drive Demo · ${frames[0].team.name} Football Scoreboard`;
-  document.querySelector("#season-year").textContent = "DEMO";
   elements.panel.setAttribute("aria-busy", "false");
-  let tracker = createHighlightTracker();
 
   function schedule() {
     clearTimeout(timer);
@@ -618,27 +628,52 @@ async function startDriveDemo() {
     hideHighlight();
     const frame = frames[index];
     updateGame(frame.spotlight, null);
-    // Replays and manual stepping must still establish a fresh tracker baseline.
-    if (index === 0) tracker = createHighlightTracker();
-    const event = tracker.observe(frame, index * 5_000);
-    if (event) showHighlight(event, frame.spotlight, true, 3_200 / Number(speed.value));
-    document.querySelectorAll(".team-record").forEach((record) => { record.textContent = "SIMULATED GAME"; });
-    elements.gameLabel.textContent = "DRIVE DEMO";
-    elements.gameStatusText.textContent = "DEMO";
+    if (frame.event) showHighlight(frame.event, frame.spotlight, true, 3_200 / Number(speed.value));
+    document.querySelector(".next-game").hidden = false;
+    document.querySelector("#game-leaders").hidden = true;
+    elements.gameStatusText.textContent = "REPLAY";
     elements.gameStatus.classList.remove("is-live");
-    elements.gameDetail.textContent = "SIMULATED GAME";
-    elements.feedLabel.textContent = "OFFLINE DEMO · FICTIONAL PLAYS";
-    elements.nextOpponent.textContent = "TD + XP · FIELD GOAL · PUNT · BLOCKED PUNT";
-    elements.nextDetail.textContent = "Accelerated playback · 5 seconds per step at 1×";
-    document.querySelector("#next-predictor").textContent = "Home offense moves left · Away offense moves right";
-    if (!frame.spotlight.ball) document.querySelector("#ball-detail").textContent = "Between plays · simulated game";
-    document.querySelector("#demo-step").textContent = `${index + 1} / ${frames.length} · ${frame.caption}`;
+    elements.feedLabel.textContent = "RECORDED GAME · NOT LIVE";
+    elements.nextOpponent.textContent = gameSelect.selectedOptions[0].textContent;
+    elements.nextDetail.textContent = "Historical play-by-play · 5 seconds per play at 1×";
+    document.querySelector("#next-predictor").textContent = "Field position is inferred from each recorded play, not a saved live feed";
+    document.querySelector("#demo-step").textContent = `Play ${index + 1} / ${frames.length} · ${frame.caption}`;
     document.querySelector("#demo-progress").max = frames.length;
     document.querySelector("#demo-progress").value = index + 1;
     if (index === frames.length - 1) paused = true;
     toggle.textContent = paused ? "Play" : "Pause";
     toggle.disabled = next.disabled = index === frames.length - 1;
+    previous.disabled = index === 0;
     schedule();
+  }
+
+  async function loadGame() {
+    const requestId = ++loadId;
+    clearTimeout(timer);
+    paused = true;
+    hideHighlight();
+    toggle.disabled = next.disabled = previous.disabled = true;
+    document.querySelector("#demo-step").textContent = "Loading recorded game…";
+    const key = gameSelect.value;
+    try {
+      const response = await fetch(`/api/demo?game=${key}`);
+      if (!response.ok) throw new Error("Replay unavailable");
+      const loaded = await response.json();
+      if (requestId !== loadId) return;
+      frames = loaded;
+      index = 0;
+      driveGameId = null;
+      selectedDriveId = null;
+      renderedDriveId = null;
+      updateBrand(frames[0]);
+      document.title = `Game Replay · ${frames[0].team.name} Football Scoreboard`;
+      document.querySelector("#season-year").textContent = frames[0].season;
+      render();
+    } catch {
+      if (requestId !== loadId) return;
+      document.querySelector("#demo-step").textContent = "Replay unavailable. Choose a game to retry.";
+      elements.feedLabel.textContent = "RECORDED GAME UNAVAILABLE";
+    }
   }
 
   toggle.addEventListener("click", () => {
@@ -646,14 +681,28 @@ async function startDriveDemo() {
     toggle.textContent = paused ? "Play" : "Pause";
     schedule();
   });
+  previous.addEventListener("click", () => {
+    paused = true;
+    index = Math.max(0, index - 1);
+    selectedDriveId = null;
+    render();
+  });
   next.addEventListener("click", () => {
     paused = true;
     index = Math.min(index + 1, frames.length - 1);
+    selectedDriveId = null;
     render();
   });
-  document.querySelector("#demo-restart").addEventListener("click", () => { index = 0; paused = false; render(); });
+  document.querySelector("#demo-restart").addEventListener("click", () => { if (!frames.length) return; index = 0; paused = true; selectedDriveId = null; render(); });
   speed.addEventListener("change", schedule);
-  render();
+  gameSelect.addEventListener("change", () => {
+    const url = new URL(location.href);
+    url.searchParams.set("game", gameSelect.value);
+    history.replaceState(null, "", url);
+    loadGame();
+  });
+  gameSelect.value = new URLSearchParams(location.search).get("game") === "college" ? "college" : "nfl";
+  loadGame();
 }
 
 if (new URLSearchParams(location.search).get("demo") === "drive") {

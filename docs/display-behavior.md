@@ -4,6 +4,11 @@
 
 ## Games and updates
 
+The display is laid out at a fixed **1920 × 1200 pixels (landscape)**.
+It does not grow to fill a larger window or change layout at browser breakpoints.
+In a smaller window, the entire canvas scales down uniformly to fit for preview;
+its internal spacing and typography remain based on the 1920 × 1200 design.
+
 The app prioritizes a live game for the selected team. Between games, it shows
 the most recent final and previews the next matchup. **24 hours before kickoff**,
 the upcoming matchup replaces the final and shows a ticking **HH:MM:SS** countdown

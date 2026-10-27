@@ -2,9 +2,11 @@ import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gunzipSync } from "node:zlib";
 import { getScoreboard } from "./src/espn.js";
 import { loadConfig } from "./src/config.js";
 import { createScoreboardCache } from "./src/scoreboard-cache.js";
+import { createReplayFrames, REPLAY_GAMES } from "./src/replay.js";
 
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC_DIR = join(ROOT, "public");
@@ -20,6 +22,20 @@ const MIME_TYPES = {
 };
 
 const loadScoreboard = createScoreboardCache(() => getScoreboard({ config }));
+const replayCache = new Map();
+
+async function loadReplay(key) {
+  if (!replayCache.has(key)) {
+    const option = REPLAY_GAMES[key];
+    const file = join(ROOT, "test/fixtures/games", option.file);
+    replayCache.set(key, readFile(file).then((content) =>
+      createReplayFrames(JSON.parse(gunzipSync(content)), option)).catch((error) => {
+      replayCache.delete(key);
+      throw error;
+    }));
+  }
+  return replayCache.get(key);
+}
 
 function sendJson(response, statusCode, value) {
   response.writeHead(statusCode, {
@@ -31,7 +47,7 @@ function sendJson(response, statusCode, value) {
 
 async function serveStatic(pathname, response) {
   const asset = pathname === "/" ? "index.html" : pathname.slice(1);
-  if (!new Set(["index.html", "app.js", "game-timing.js", "ball-position.js", "highlights.js", "field-branding.js", "possession-branding.js", "team-record.js", "demo.js", "styles.css", "assets/arkansas.png", "assets/vanderbilt.png", "assets/cowboys.png", "assets/eagles.png", "assets/fonts/Graduate-Regular.ttf"]).has(asset)) {
+  if (!new Set(["index.html", "app.js", "display-size.js", "game-timing.js", "ball-position.js", "highlights.js", "field-branding.js", "possession-branding.js", "team-record.js", "styles.css", "assets/arkansas.png", "assets/vanderbilt.png", "assets/cowboys.png", "assets/eagles.png", "assets/fonts/Graduate-Regular.ttf"]).has(asset)) {
     response.writeHead(404);
     response.end("Not found");
     return;
@@ -52,7 +68,8 @@ async function serveStatic(pathname, response) {
 }
 
 const server = createServer(async (request, response) => {
-  const pathname = new URL(request.url, "http://localhost").pathname;
+  const url = new URL(request.url, "http://localhost");
+  const pathname = url.pathname;
 
   if (request.method !== "GET") {
     response.writeHead(405, { allow: "GET" });
@@ -68,6 +85,20 @@ const server = createServer(async (request, response) => {
         error: "The game feed is unavailable right now.",
         detail: error.message,
       });
+    }
+    return;
+  }
+
+  if (pathname === "/api/demo") {
+    const key = url.searchParams.get("game");
+    if (!Object.hasOwn(REPLAY_GAMES, key)) {
+      sendJson(response, 400, { error: "Unknown replay game" });
+      return;
+    }
+    try {
+      sendJson(response, 200, await loadReplay(key));
+    } catch {
+      sendJson(response, 503, { error: "Replay game unavailable" });
     }
     return;
   }

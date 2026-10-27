@@ -22,7 +22,7 @@ physically validated.
 | Raspberry Pi | [Pi 4 Model B](https://www.raspberrypi.com/products/raspberry-pi-4-model-b/), 2 GB RAM or more. A compatible Pi already on hand is fine. |
 | Power supply | [Official Pi 4 15 W USB-C supply](https://www.raspberrypi.com/products/type-c-power-supply/) or a suitable equivalent for your model. |
 | Storage | Genuine 32 GB or larger microSD card, preferably high-endurance, and a card reader. |
-| Display | [7-inch Touch Display 2](https://www.raspberrypi.com/products/touch-display-2/), rotated to landscape. Its native orientation is 720×1280 portrait. |
+| Display | A 1920×1200 landscape display for the intended layout. The [7-inch Touch Display 2](https://www.raspberrypi.com/products/touch-display-2/) is a smaller alternative; its native orientation is 720×1280 portrait. |
 | Display connections | Pi 4-compatible DSI ribbon and the display's GPIO power lead. Check bundle contents and the [official connection guide](https://www.raspberrypi.com/documentation/accessories/touch-display-2.html#connect-to-raspberry-pi); Pi 5 uses a different DSI connector/cable. |
 | Cooling | Pi-compatible heatsink and a ventilated mounting arrangement; allow space for a fan if needed after thermal testing. |
 | Enclosure | Deep shadow box, custom frame, or compact desktop enclosure with a removable back and ventilation. |
@@ -45,8 +45,9 @@ cable. Follow the monitor's own power requirements; do not assume the Pi can
 power it over USB. Avoid a bare LCD panel unless you also understand its
 controller and power requirements.
 
-A 7-inch screen suits a desk or close-viewing shelf. Choose a larger monitor
-and enclosure for across-the-room readability. If substituting a Pi 5, choose
+A 7-inch screen scales the fixed 1920×1200 layout down to 60% at 1280×720;
+check readability before choosing it. A native 1920×1200 screen shows the
+intended pixel size. If substituting a Pi 5, choose
 its matching supply, cooling, and display cable rather than reusing the Pi 4
 list unchanged.
 

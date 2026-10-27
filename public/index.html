@@ -10,6 +10,7 @@
     <script src="/app.js" type="module"></script>
   </head>
   <body>
+    <div class="stage">
     <main class="mount" aria-label="Football scoreboard">
 
       <section class="display">
@@ -21,12 +22,14 @@
           <div class="season-chip"><span id="league-name">—</span><span>•</span> <span id="season-year">—</span></div>
         </header>
 
-        <section id="demo-controls" class="demo-controls" aria-label="Drive demo playback" hidden>
-          <div><strong>DRIVE DEMO · SIMULATED GAME</strong><p id="demo-step" aria-live="polite"></p></div>
+        <section id="demo-controls" class="demo-controls" aria-label="Game replay controls" hidden>
+          <div><strong>FULL GAME REPLAY · RECORDED ESPN PLAYS</strong><p id="demo-step" aria-live="polite">Loading replay…</p></div>
           <div class="demo-buttons">
-            <button id="demo-toggle" type="button">Pause</button>
+            <label>Game <select id="demo-game" aria-label="Replay game"><option value="nfl">NFL · Cowboys vs Eagles</option><option value="college">NCAAF · Texas vs Ole Miss</option></select></label>
+            <button id="demo-toggle" type="button">Play</button>
+            <button id="demo-previous" type="button">Last play</button>
             <button id="demo-next" type="button">Next play</button>
-            <button id="demo-restart" type="button">Replay</button>
+            <button id="demo-restart" type="button">Start over</button>
             <label>Speed <select id="demo-speed"><option value="1">1×</option><option value="2">2×</option></select></label>
             <a href="/">Live scoreboard</a>
           </div>
@@ -188,5 +191,6 @@
         </footer>
       </section>
     </main>
+    </div>
   </body>
 </html>

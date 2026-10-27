@@ -16,9 +16,8 @@
 
 ![Animated Dallas Cowboys scoreboard demo showing ball movement, first downs, a touchdown, extra point, field goal, punt, and blocked punt.](docs/images/cowboys-drive-demo.gif)
 
-*A fictional Cowboys–Eagles game recorded from the running app at 2× speed.
-The football follows each reported spot; scores and possession update as the
-plays unfold. [Run the interactive demo locally](http://localhost:4173/?demo=drive).*
+*An earlier fictional Cowboys–Eagles demo recording (the current replay uses
+recorded game plays instead). [Try the full-game replay locally](http://localhost:4173/?demo=drive).*
 
 ## About
 
@@ -75,10 +74,13 @@ for game data and team artwork.
 
 No `npm install` is needed: the app uses only Node.js built-in modules.
 
-**See it in action:** open [the animated drive demo](http://localhost:4173/?demo=drive)
-to watch ball movement, first downs, a touchdown, an extra point, and a field
-goal, plus punts and blocked punts. This fictional Cowboys–Eagles game works
-without the ESPN feed and has pause, next-play, replay, and speed controls.
+**See it in action:** open [the full-game replay](http://localhost:4173/?demo=drive)
+to step through every recorded play of Cowboys–Eagles (NFL) or Texas–Ole Miss
+(college football). Select a game, use **Last play** and **Next play** to test
+scores, penalties, and field position, or play automatically at 1× or 2×.
+The recorded summaries are bundled locally; replay does not poll ESPN. Historical
+play data is not a recording of the live feed, so field position is inferred
+from each play rather than a saved live game situation.
 
 ### Choose your team
 

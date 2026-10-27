@@ -6,6 +6,10 @@ and play, scoring plays, team data, box scores, and all other returned fields.
 `manifest.json` records source/game URLs, capture times, SHA-256 hashes of the
 uncompressed responses, final scores, drive/play counts, periods, and play types.
 
+The Cowboys–Eagles game (`nfl/401873009.json.gz`, 187 plays, Dallas 38–21
+Philadelphia) is a separate bundled replay source. It is intentionally not in
+the ten-game test corpus manifest; `test/replay.test.js` validates its replay.
+
 ## Saved games
 
 NFL (2026):
