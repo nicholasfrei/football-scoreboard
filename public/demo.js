@@ -1,5 +1,5 @@
 // An offline, fictional NFL game. Yardage is measured from Dallas's goal
-// line: home drives right, away drives left, just like the live field renderer.
+// line: home drives left, away drives right, just like the live field renderer.
 const cowboys = {
   id: "6", name: "Dallas Cowboys", shortName: "Dallas", location: "Dallas",
   abbreviation: "DAL", mascot: "Cowboys", color: "#002A5C", alternateColor: "#B0B7BC", logo: "/assets/cowboys.png",
@@ -68,9 +68,9 @@ export function createDemoFrames() {
         selectedTeam: { ...cowboys, score: step.home ?? 0 }, opponent: { ...eagles, score: step.away ?? 0 },
         possessionTeamId: step.spot == null ? null : offense.id,
         ball: step.spot == null ? null : {
-          percent: step.spot, possession: offense.shortName, direction: step.awayBall ? "left" : "right",
+          percent: 100 - step.spot, possession: offense.shortName, direction: step.awayBall ? "right" : "left",
           label: step.spot === 50 ? "50-yard line" : step.spot < 50 ? `DAL ${step.spot}` : `PHI ${100 - step.spot}`,
-          downDistance: step.down, firstDownPercent: step.gain ?? null, source: "simulated position",
+          downDistance: step.down, firstDownPercent: step.gain == null ? null : 100 - step.gain, source: "simulated position",
         },
         highlights: [...highlights], latestPlaySequence: index, plays: plays.slice(0, 5),
       },

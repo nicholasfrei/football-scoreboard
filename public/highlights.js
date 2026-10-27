@@ -5,7 +5,10 @@ const MAX_POLL_GAP_MS = 90_000;
 export const HIGHLIGHT_LABELS = {
   touchdown: "TOUCHDOWN",
   interception: "INTERCEPTION",
-  fumble: "FUMBLE",
+  fumble: "FUMBLE RECOVERY",
+  sack: "SACK",
+  "tackle-for-loss": "TACKLE FOR LOSS",
+  penalty: "PENALTY",
   "field-goal": "FIELD GOAL",
   safety: "SAFETY",
   "first-down": "FIRST DOWN",
@@ -15,15 +18,19 @@ export const HIGHLIGHT_LABELS = {
 };
 
 export function highlightDuration(kind) {
-  return ["first-down", "punt"].includes(kind) ? 4_000 : kind === "extra-point" ? 6_000 : HIGHLIGHT_DURATION_MS;
+  if (kind === "touchdown") return 5 * 60_000;
+  if (kind === "first-down") return 25_000;
+  return kind === "punt" ? 4_000 : kind === "extra-point" ? 6_000 : HIGHLIGHT_DURATION_MS;
 }
 
 export function highlightDetail(event, game) {
+  if (event.kind === "penalty") return Number.isFinite(event.penaltyYards) ? `${event.penaltyYards} YDS` : "";
   if (event.kind === "touchdown") {
     const { selectedTeam, opponent } = game;
     return `${selectedTeam.abbreviation} ${selectedTeam.score ?? "—"}-${opponent.score ?? "—"} ${opponent.abbreviation}`;
   }
-  const labels = { interception: "INTERCEPTED BY", fumble: "RECOVERED BY", punt: "PUNTING TEAM", "blocked-punt": "BLOCKED BY" };
+  const labels = { interception: "INTERCEPTED BY", fumble: "RECOVERED BY", sack: "SACK BY",
+    "tackle-for-loss": "STOPPED BY", punt: "PUNTING TEAM", "blocked-punt": "BLOCKED BY" };
   if (Object.hasOwn(labels, event.kind)) {
     return [game.selectedTeam, game.opponent].some((team) => team.id === event.teamId)
       ? labels[event.kind] : "TEAM NOT CONFIRMED";

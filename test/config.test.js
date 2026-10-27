@@ -87,7 +87,7 @@ test("NFL abbreviation selects Dallas across scores, field position, predictor, 
   assert.equal(result.spotlight.selectedTeam.record.overall, "3-2-1");
   assert.equal(result.spotlight.selectedTeam.conferenceName, "NFC");
   assert.equal(result.spotlight.selectedTeam.rank, null);
-  assert.equal(result.spotlight.ball.percent, 25);
+  assert.equal(result.spotlight.ball.percent, 75);
   assert.equal(result.spotlight.matchupPredictor.selectedTeam, 60);
   assert.equal(result.spotlight.highlights[0].teamId, "6");
   assert.ok(calls.some((url) => url.includes("/nfl/teams/dal/schedule")));

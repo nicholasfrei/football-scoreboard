@@ -1,5 +1,6 @@
 // Include dark forest greens and green-teals, which also blend into the turf.
 function isGreen(color) {
+  if (!/^#[0-9a-f]{6}$/i.test(color ?? "")) return false;
   const [r, g, b] = color.slice(1).match(/../g).map((channel) => parseInt(channel, 16) / 255);
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);

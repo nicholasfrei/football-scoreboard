@@ -4,11 +4,11 @@ import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { getScoreboard } from "./src/espn.js";
 import { loadConfig } from "./src/config.js";
+import { createScoreboardCache } from "./src/scoreboard-cache.js";
 
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC_DIR = join(ROOT, "public");
 const PORT = Number(process.env.PORT ?? 4173);
-const CACHE_TTL_MS = 20_000;
 const config = await loadConfig(process.env.SCOREBOARD_CONFIG ?? join(ROOT, "config.json"));
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -19,31 +19,7 @@ const MIME_TYPES = {
   ".ttf": "font/ttf",
 };
 
-let cache = null;
-let cacheExpiresAt = 0;
-let refreshPromise = null;
-
-async function loadScoreboard() {
-  if (cache && Date.now() < cacheExpiresAt) return { ...cache, stale: false };
-
-  if (!refreshPromise) {
-    refreshPromise = getScoreboard({ config })
-      .then((scoreboard) => {
-        cache = { ...scoreboard, refreshedAt: new Date().toISOString() };
-        cacheExpiresAt = Date.now() + CACHE_TTL_MS;
-        return { ...cache, stale: false };
-      })
-      .catch((error) => {
-        if (cache) return { ...cache, stale: true, warning: error.message };
-        throw error;
-      })
-      .finally(() => {
-        refreshPromise = null;
-      });
-  }
-
-  return refreshPromise;
-}
+const loadScoreboard = createScoreboardCache(() => getScoreboard({ config }));
 
 function sendJson(response, statusCode, value) {
   response.writeHead(statusCode, {
@@ -55,7 +31,7 @@ function sendJson(response, statusCode, value) {
 
 async function serveStatic(pathname, response) {
   const asset = pathname === "/" ? "index.html" : pathname.slice(1);
-  if (!new Set(["index.html", "app.js", "highlights.js", "field-branding.js", "possession-branding.js", "team-record.js", "demo.js", "styles.css", "assets/arkansas.png", "assets/vanderbilt.png", "assets/cowboys.png", "assets/eagles.png", "assets/fonts/Graduate-Regular.ttf"]).has(asset)) {
+  if (!new Set(["index.html", "app.js", "game-timing.js", "ball-position.js", "highlights.js", "field-branding.js", "possession-branding.js", "team-record.js", "demo.js", "styles.css", "assets/arkansas.png", "assets/vanderbilt.png", "assets/cowboys.png", "assets/eagles.png", "assets/fonts/Graduate-Regular.ttf"]).has(asset)) {
     response.writeHead(404);
     response.end("Not found");
     return;

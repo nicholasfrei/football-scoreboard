@@ -36,9 +36,11 @@ a small screen in a shadow box for an always-on game-day scoreboard.
 - **Make it yours:** choose an ESPN team page and time zone in one configuration file.
 
 The app is a small Node.js server and a browser-based display, with no third-party
-packages or build step. It refreshes every 30 seconds; it is not a video stream
+packages or build step. It refreshes every 15 seconds from five minutes before
+kickoff through the game, and every 30 seconds otherwise; it is not a video stream
 or real-time player tracker. Between games, it shows the most recent result and
-previews the next matchup.
+previews the next matchup. In the final 24 hours before kickoff, that matchup
+takes over with a ticking `HH:MM:SS` countdown in place of the score.
 
 > [!IMPORTANT]
 > This is an independent project, not affiliated with ESPN, the NFL, the NCAA,
@@ -129,7 +131,10 @@ No soldering, LED matrix, or physical moving ball is required.
 
 ## Developing
 
-Run the tests with `npm test`. They cover configuration, game selection, and
-feed normalization without calling ESPN. The server entry point is `server.js`,
+Run the tests with `npm test`. They cover configuration, countdowns, refresh timing,
+game selection, and feed normalization without calling ESPN. Ten complete game
+fixtures (five NFL and five NCAAF) replay all 1,849 plays from both teams' perspectives;
+see [fixture provenance and replay limits](test/fixtures/games/README.md).
+The server entry point is `server.js`,
 the data adapters and normalization live in `src/`, and the display lives in
 `public/`. See the [code map](docs/README.md#code-map) for more detail.

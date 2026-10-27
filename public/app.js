@@ -2,14 +2,22 @@ import { createHighlightTracker, highlightDetail, highlightDuration, HIGHLIGHT_L
 import { endzoneTextLayout, fieldBranding } from "./field-branding.js";
 import { possessionBranding } from "./possession-branding.js";
 import { teamRecordLabel } from "./team-record.js";
+import { kickoffCountdown, createRefreshLoop } from "./game-timing.js";
+import { createBallPositionTracker } from "./ball-position.js";
 
-const POLL_INTERVAL_MS = 30_000;
+let lastPayload = null;
+let displayedGame = null;
 let timeZone = "America/Chicago";
 let selectedTeamId = null;
 const highlightTracker = createHighlightTracker();
+const ballPositionTracker = createBallPositionTracker();
 let highlightTimer;
 let activeHighlight = null;
 let previewPending = new URLSearchParams(location.search).get("preview");
+let driveGameId = null;
+let selectedDriveId = null; // null follows the newest drive through live updates.
+let renderedDriveId = null;
+let renderedLastPlayId = null;
 
 function hideHighlight() {
   clearTimeout(highlightTimer);
@@ -26,14 +34,16 @@ function showHighlight(event, game, demo = false, duration = highlightDuration(e
   const team = [game.selectedTeam, game.opponent].find((team) => team.id === event.teamId);
   const overlay = document.querySelector("#highlight");
   overlay.dataset.kind = event.kind;
-  document.querySelector("#highlight-context").textContent = demo ? "DEMO · NOT A LIVE PLAY" : "BIG PLAY";
-  document.querySelector("#highlight-title").textContent = HIGHLIGHT_LABELS[event.kind];
+  document.querySelector("#highlight-context").textContent = event.kind === "penalty"
+    ? demo ? "PENALTY · DEMO" : "PENALTY" : demo ? "DEMO · NOT A LIVE PLAY" : "BIG PLAY";
+  document.querySelector("#highlight-title").textContent = event.kind === "penalty"
+    ? event.penaltyType ?? event.detail?.split(/\s+·\s+/)[0] ?? "Penalty" : HIGHLIGHT_LABELS[event.kind];
   document.querySelector("#highlight-team").textContent = team?.location.toUpperCase() ?? "";
   document.querySelector("#highlight-detail").textContent = highlightDetail(event, game);
   const logo = document.querySelector("#highlight-logo");
   logo.replaceChildren();
   if (team) setTeamLogo(logo, team);
-  overlay.style.setProperty("--event-color", team?.color ?? "#454545");
+  overlay.style.setProperty("--event-color", event.kind === "penalty" ? "#efc744" : team?.color ?? "#454545");
   overlay.style.setProperty("--event-duration", `${duration}ms`);
   overlay.hidden = false;
   overlay.classList.remove("is-animating");
@@ -48,7 +58,8 @@ function showHighlight(event, game, demo = false, duration = highlightDuration(e
   for (const selector of [".score-topline", ".matchup", ".game-meta"]) {
     document.querySelector(selector).setAttribute("aria-hidden", "true");
   }
-  activeHighlight = { ...event, gameId: game.id, league: game.league, demo };
+  activeHighlight = { ...event, gameId: game.id, league: game.league, demo,
+    ballPercent: game.ball?.percent ?? null, possessionTeamId: game.possessionTeamId ?? null };
   highlightTimer = setTimeout(hideHighlight, duration);
 }
 
@@ -58,7 +69,9 @@ function updateHighlights(payload) {
     const stillValid = !payload.stale && !payload.gamecastUnavailable && game?.state === "live"
       && game.id === activeHighlight.gameId && game.league === activeHighlight.league && game.highlights?.some((event) =>
         event.id === activeHighlight.id && event.kind === activeHighlight.kind && event.teamId === activeHighlight.teamId);
-    if (!stillValid) hideHighlight();
+    const moved = activeHighlight.kind === "touchdown" && game.ball && (
+      game.ball.percent !== activeHighlight.ballPercent || game.possessionTeamId !== activeHighlight.possessionTeamId);
+    if (!stillValid || moved) hideHighlight();
     else if (activeHighlight.kind === "touchdown") {
       document.querySelector("#highlight-detail").textContent = highlightDetail(activeHighlight, game);
     }
@@ -66,9 +79,16 @@ function updateHighlights(payload) {
   const event = highlightTracker.observe(payload);
   if (event) showHighlight(event, game);
   if (previewPending && game) {
-    const kind = previewPending;
+    const noPenaltyYards = previewPending === "penalty-no-yards";
+    const kind = noPenaltyYards ? "penalty" : previewPending;
     previewPending = null;
-    if (Object.hasOwn(HIGHLIGHT_LABELS, kind)) showHighlight({ kind, teamId: game.selectedTeam.id, detail: `Score returns after ${highlightDuration(kind) / 1000} seconds` }, game, true);
+    if (Object.hasOwn(HIGHLIGHT_LABELS, kind)) {
+      const event = kind === "penalty"
+        ? { kind, teamId: null, penaltyType: noPenaltyYards ? "False Start" : "Defensive Pass Interference",
+          penaltyYards: noPenaltyYards ? null : 15 }
+        : { kind, teamId: game.selectedTeam.id, detail: `Score returns after ${highlightDuration(kind) / 1000} seconds` };
+      showHighlight(event, game, true);
+    }
   }
 }
 
@@ -161,12 +181,13 @@ function updateField(game) {
   const home = game.homeAway === "home" ? game.selectedTeam : game.opponent;
   const away = game.homeAway === "home" ? game.opponent : game.selectedTeam;
   const field = document.querySelector(".field-wrap");
-  const branding = fieldBranding(home);
-  field.style.setProperty("--home-color", branding.color);
-  field.style.setProperty("--endzone-ink", branding.ink);
-  document.querySelector("#field-home").textContent = `${home.location.toUpperCase()} · ${game.neutralSite ? "DESIGNATED HOME" : "HOME"}`;
-  document.querySelector("#field-venue").textContent = game.venue ?? "VENUE TBD";
-  for (const [selector, text] of [["#endzone-school", home.location], ["#endzone-mascot", home.mascot]]) {
+  const homeBranding = fieldBranding(home);
+  const awayBranding = fieldBranding(away);
+  field.style.setProperty("--home-color", homeBranding.color);
+  field.style.setProperty("--away-color", awayBranding.color);
+  field.style.setProperty("--home-ink", homeBranding.ink);
+  field.style.setProperty("--away-ink", awayBranding.ink);
+  for (const [selector, text] of [["#endzone-school", away.mascot], ["#endzone-mascot", home.mascot]]) {
     const label = document.querySelector(selector);
     label.textContent = text.toUpperCase();
   }
@@ -185,6 +206,11 @@ function updateField(game) {
 
   const marker = document.querySelector("#ball-marker");
   const lineToGain = document.querySelector("#first-down-marker");
+  const redzone = document.querySelector("#redzone-tint");
+  const inRedzone = Boolean(game.ball && ((game.ball.direction === "left" && game.ball.percent <= 20)
+    || (game.ball.direction === "right" && game.ball.percent >= 80)));
+  redzone.setAttribute("visibility", inRedzone ? "visible" : "hidden");
+  redzone.setAttribute("x", game.ball?.direction === "left" ? "104" : "737.6");
   const hasLineToGain = game.ball && Number.isFinite(game.ball.firstDownPercent);
   lineToGain.setAttribute("visibility", hasLineToGain ? "visible" : "hidden");
   if (hasLineToGain) lineToGain.style.transform = `translateX(${104 + game.ball.firstDownPercent * 7.92}px)`;
@@ -199,25 +225,83 @@ function updateField(game) {
     down.textContent = game.ball.downDistance?.split(/\s+at\s+/i)[0] ?? "Ball position";
     down.classList.toggle("is-fourth-down", /^4th\b/i.test(down.textContent));
     const position = game.ball.label ?? (game.ball.percent === 50 ? "50-yard line"
-      : game.ball.percent < 50 ? `${home.abbreviation} ${game.ball.percent}` : `${away.abbreviation} ${100 - game.ball.percent}`);
-    const qualifier = game.ball.source === "last reported play" ? " · last reported play" : "";
-    document.querySelector("#ball-detail").replaceChildren(possession, " · ", down, ` · ${position}${qualifier}`);
+      : game.ball.percent < 50 ? `${away.abbreviation} ${game.ball.percent}` : `${home.abbreviation} ${100 - game.ball.percent}`);
+    const pause = game.ballHeld && /timeout/i.test(game.fieldContext?.lastPlayType ?? "") ? "TIMEOUT · " : "";
+    document.querySelector("#ball-detail").replaceChildren(pause, possession, " · ", down, ` · ${position}`);
   } else {
     document.querySelector("#ball-detail").textContent = game.state === "live"
-      ? "Ball position unavailable · waiting for the feed"
+      ? game.fieldContext?.scoring
+        ? `${/touchdown/i.test(game.fieldContext.lastPlayType) ? "TOUCHDOWN" : "SCORING PLAY"} · awaiting next play`
+        : "TIMEOUT · awaiting ball position"
        : game.state === "final" ? "FINAL" : "Ball position appears during play";
   }
 
-  document.querySelector("#plays-heading").textContent = game.state === "final" ? "LAST PLAYS · COMPLETED GAME" : "RECENT PLAYS";
+}
+
+function renderDrives(game) {
+  const key = `${game.league}:${game.id}`;
+  if (key !== driveGameId) { driveGameId = key; selectedDriveId = null; }
+  const drives = game.drives ?? [];
+  if (selectedDriveId && !drives.some((drive) => drive.id === selectedDriveId)) selectedDriveId = null;
+  const selected = drives.find((drive) => drive.id === selectedDriveId) ?? drives.at(-1);
+  const index = drives.indexOf(selected);
+  const history = document.querySelector("#drive-history");
+  const driveList = document.querySelector("#drive-list");
+  history.hidden = drives.length === 0;
+  driveList.replaceChildren();
+  document.querySelector("#drive-count").textContent = drives.length ? `· ${drives.length}` : "";
+  for (const [position, drive] of drives.entries()) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.driveId = drive.id;
+    button.className = "drive-item";
+    button.setAttribute("aria-pressed", String(drive.id === selected?.id));
+    const title = document.createElement("strong");
+    title.textContent = `${drive.team} · ${drive.result ?? (position === drives.length - 1 && game.state === "live" ? "IN PROGRESS" : "DRIVE")}`;
+    const detail = document.createElement("span");
+    detail.textContent = drive.description ?? `${drive.plays.length} reported plays`;
+    button.append(title, detail);
+    driveList.prepend(button);
+  }
+  document.querySelector("#drive-current").hidden = !selected || index === drives.length - 1;
+  document.querySelector("#plays-heading").textContent = selected
+    ? index === drives.length - 1 ? (game.state === "live" ? "CURRENT DRIVE" : "LAST DRIVE") : "PREVIOUS DRIVE"
+    : game.state === "final" ? "LAST PLAYS · COMPLETED GAME" : "RECENT PLAYS";
+  const title = document.querySelector("#drive-title");
+  title.hidden = !selected || index === drives.length - 1;
+  title.textContent = title.hidden ? "" : `${selected.team} · ${selected.result ?? "DRIVE"}`;
+  document.querySelector("#drive-summary").textContent = selected
+    ? selected.description ?? [
+      `${selected.plays.length} reported plays`,
+      selected.yards == null ? null : `${selected.yards} yards`, selected.time,
+    ].filter(Boolean).join(" · ") : "";
   const list = document.querySelector("#recent-plays");
+  const content = document.querySelector("#drive-content");
+  const sameDrive = selected?.id === renderedDriveId;
+  const oldScroll = content.scrollTop;
+  const browsingHistory = oldScroll > Math.max(0, list.offsetTop + list.offsetHeight - content.clientHeight) + 12;
+  const newPlay = selected?.plays.at(-1)?.id !== renderedLastPlayId;
   list.replaceChildren();
-  for (const play of game.plays ?? []) {
+  for (const play of selected ? [...selected.plays].reverse() : game.plays ?? []) {
     const item = document.createElement("li");
+    item.dataset.playId = play.id;
     const time = document.createElement("span");
     time.textContent = `${play.period > 4 ? `OT${play.period - 4}` : `Q${play.period ?? "—"}`} · ${play.clock ?? "—"}`;
     const text = document.createElement("span");
-    text.textContent = play.text;
+    text.textContent = /^END QUARTER 2\.?$/i.test(play.text.trim()) ? "HALFTIME" : play.text;
+    if (play.penalty) {
+      const badge = document.createElement("b");
+      badge.className = "penalty-badge";
+      badge.textContent = `FLAG · ${play.penalty}`;
+      text.prepend(badge);
+      item.classList.add("penalty-play");
+    }
     item.classList.toggle("scoring-play", play.scoring);
+    const scoringTeam = [game.selectedTeam, game.opponent].find((team) => team.id === play.scoringTeamId);
+    if (scoringTeam) {
+      item.style.setProperty("--scoring-color", scoringTeam.color);
+      item.classList.add("has-scoring-team");
+    }
     item.append(time, text);
     list.append(item);
   }
@@ -226,7 +310,21 @@ function updateField(game) {
     item.textContent = game.state === "scheduled" ? "Play-by-play begins at kickoff." : "Play-by-play unavailable. Scores will continue updating.";
     list.append(item);
   }
+  content.scrollTop = sameDrive && (selectedDriveId || !newPlay || browsingHistory) ? oldScroll : 0;
+  renderedDriveId = selected?.id ?? null;
+  renderedLastPlayId = selected?.plays.at(-1)?.id ?? null;
 }
+
+document.querySelector("#drive-current").addEventListener("click", () => {
+  selectedDriveId = null;
+  if (displayedGame) renderDrives(displayedGame);
+});
+document.querySelector("#drive-list").addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-drive-id]");
+  if (!button || !displayedGame?.drives?.some((drive) => drive.id === button.dataset.driveId)) return;
+  selectedDriveId = button.dataset.driveId === displayedGame.drives.at(-1).id ? null : button.dataset.driveId;
+  renderDrives(displayedGame);
+});
 
 function updatePossession(game) {
   const branding = possessionBranding(game);
@@ -287,34 +385,122 @@ function renderNextDetails(game) {
   predictor.textContent = `Win chance: ${game.selectedTeam.abbreviation} ${model.selectedTeam.toFixed(1)}% · ${game.opponent.abbreviation} ${model.opponent.toFixed(1)}% · ${model.source}`;
 }
 
+function renderLeaders(game) {
+  const live = game?.state === "live";
+  document.querySelector(".next-game").hidden = live;
+  const section = document.querySelector("#game-leaders");
+  section.hidden = !live;
+  const list = document.querySelector("#leader-list");
+  list.replaceChildren();
+  if (!live) return;
+  const away = game.homeAway === "home" ? game.opponent : game.selectedTeam;
+  const home = game.homeAway === "home" ? game.selectedTeam : game.opponent;
+  const teams = document.createElement("div");
+  teams.className = "leader-teams";
+  for (const [index, team] of [away, home].entries()) {
+    const side = document.createElement("div");
+    side.className = "leader-team";
+    const name = document.createElement("strong");
+    name.textContent = team.abbreviation;
+    const logo = document.createElement("span");
+    logo.className = "leader-team-logo";
+    setTeamLogo(logo, team);
+    if (index === 0) side.append(logo, name);
+    else side.append(name, logo);
+    teams.append(side);
+  }
+  list.append(teams);
+  for (const { category, leaders } of game.leaders ?? []) {
+    const row = document.createElement("div");
+    row.className = "leader-row";
+    const label = document.createElement("strong");
+    label.className = "leader-category";
+    label.textContent = { passingYards: "Passing Yards", rushingYards: "Rushing Yards",
+      receivingYards: "Receiving Yards" }[category] ?? category;
+    for (const [side, team] of [away, home].entries()) {
+      const leader = leaders.find((item) => item.teamId === team.id);
+      const cell = document.createElement("div");
+      cell.className = "leader-cell";
+      const portrait = document.createElement("span");
+      portrait.className = "leader-portrait";
+      portrait.textContent = leader?.name?.[0] ?? "—";
+      if (leader?.headshot) {
+        const image = document.createElement("img");
+        image.alt = "";
+        image.src = leader.headshot;
+        image.onerror = () => image.remove();
+        portrait.append(image);
+      }
+      const name = document.createElement("div");
+      name.className = "leader-name";
+      name.textContent = leader?.shortName ?? "Stats unavailable";
+      if (leader?.position) {
+        const position = document.createElement("span");
+        position.textContent = ` ${leader.position}`;
+        name.append(position);
+      }
+      const attempts = document.createElement("span");
+      attempts.className = "leader-metric";
+      attempts.textContent = leader?.attempts ?? "—";
+      const yards = document.createElement("span");
+      yards.className = "leader-metric";
+      yards.textContent = `${leader?.yards ?? leader?.value?.match(/\b(\d+)\s+YDS?\b/i)?.[1] ?? "—"} YDS`;
+      const touchdowns = document.createElement("span");
+      touchdowns.className = "leader-metric";
+      touchdowns.textContent = `${leader?.touchdowns ?? "—"} TD`;
+      const extras = document.createElement("span");
+      extras.className = "leader-extras";
+      extras.textContent = [leader?.interceptions > 0 ? `${leader.interceptions} INT` : null,
+        leader?.fumbles > 0 ? `${leader.fumbles} FUM` : null].filter(Boolean).join(" · ");
+      if (side === 0) cell.append(portrait, name, attempts, yards, touchdowns, extras);
+      else cell.append(extras, attempts, yards, touchdowns, name, portrait);
+      row.append(cell);
+    }
+    row.insertBefore(label, row.children[1]);
+    list.append(row);
+  }
+}
+
 function updateGame(game, nextGame) {
+  displayedGame = game;
+  updateCountdown();
   lastGameState = game?.state ?? null;
   elements.gameClock.hidden = true;
   elements.gameClock.textContent = "";
   updatePossession(game);
   renderNextDetails(nextGame);
+  renderLeaders(game);
   if (!game) {
+    elements.gameDetail.hidden = true;
+    driveGameId = null;
+    selectedDriveId = null;
+    renderedDriveId = null;
+    renderedLastPlayId = null;
+    document.querySelector("#drive-history").hidden = true;
+    document.querySelector("#recent-plays").replaceChildren();
     elements.gameLabel.textContent = "SEASON SCHEDULE";
-    elements.gameDetail.textContent = "No game is currently available.";
-    elements.gameVenue.textContent = "Schedule feed is empty";
+    elements.gameVenue.textContent = "No game is currently available";
     return;
   }
 
   const upcoming = game.state === "scheduled";
+  elements.gameDetail.hidden = true;
   const isHome = game.homeAway === "home";
 
-  elements.gameLabel.textContent = upcoming ? "NEXT GAME" : game.state === "live" ? "GAME IN PROGRESS" : "MOST RECENT GAME";
+  elements.gameLabel.textContent = kickoffText(game);
   renderTeam("away", isHome ? game.opponent : game.selectedTeam, game.league);
   renderTeam("home", isHome ? game.selectedTeam : game.opponent, game.league);
   updateField(game);
+  renderDrives(game);
   elements.gameVenue.textContent = game.venue ?? "VENUE TBD";
   document.querySelector("#game-broadcast").textContent = game.broadcasts?.join(" / ") || "TBD";
 
   if (game.state === "live") {
-    const quarter = game.period > 4 ? `OT${game.period - 4}` : game.period ? `Q${game.period}` : "LIVE";
-    elements.gameClock.textContent = `${quarter}${game.clock ? ` · ${game.clock}` : ""}`;
+    const quarter = game.period === 2 && /end (?:of )?(?:quarter )?2|halftime|end of (?:the )?(?:2nd|second) quarter|end of half/i.test(game.status)
+      ? "HALFTIME" : game.period > 4 ? `OT${game.period - 4}` : game.period ? `Q${game.period}` : "LIVE";
+    elements.gameClock.textContent = `${quarter}${quarter !== "HALFTIME" && game.clock ? ` · ${game.clock}` : ""}`;
     elements.gameClock.hidden = false;
-    elements.gameDetail.textContent = formatDate(game.kickoffAt);
+    elements.gameDetail.textContent = "";
   } else if (upcoming) {
     elements.gameDetail.textContent = kickoffText(game);
   } else {
@@ -334,6 +520,15 @@ function updateGame(game, nextGame) {
     elements.nextOpponent.textContent = "NO NEXT GAME LISTED";
     elements.nextDetail.textContent = "Waiting for schedule updates";
   }
+}
+
+function updateCountdown() {
+  const countdown = kickoffCountdown(displayedGame);
+  const container = document.querySelector("#kickoff-countdown");
+  container.hidden = countdown === null;
+  document.querySelector(".score-readout").hidden = countdown !== null;
+  // The surrounding score panel is a live region; do not announce every second.
+  if (countdown !== null) document.querySelector("#kickoff-countdown-value").textContent = countdown;
 }
 
 function setFeedState(state, refreshedAt) {
@@ -360,8 +555,9 @@ async function refreshScoreboard() {
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error ?? "Score feed request failed");
 
+    lastPayload = payload;
     updateBrand(payload);
-    updateGame(payload.spotlight, payload.nextGame);
+    updateGame(ballPositionTracker.observe(payload), payload.nextGame);
     updateHighlights(payload);
     document.querySelector("#season-year").textContent = payload.season ?? "";
     setFeedState(payload.stale ? "stale" : "fresh", payload.refreshedAt);
@@ -376,6 +572,7 @@ async function refreshScoreboard() {
       elements.gameStatus.classList.remove("is-live");
     }
   } catch {
+    ballPositionTracker.reset();
     elements.gameClock.hidden = true;
     hideHighlight();
     highlightTracker.observe(null);
@@ -433,7 +630,7 @@ async function startDriveDemo() {
     elements.feedLabel.textContent = "OFFLINE DEMO · FICTIONAL PLAYS";
     elements.nextOpponent.textContent = "TD + XP · FIELD GOAL · PUNT · BLOCKED PUNT";
     elements.nextDetail.textContent = "Accelerated playback · 5 seconds per step at 1×";
-    document.querySelector("#next-predictor").textContent = "Home offense moves right · Away offense moves left";
+    document.querySelector("#next-predictor").textContent = "Home offense moves left · Away offense moves right";
     if (!frame.spotlight.ball) document.querySelector("#ball-detail").textContent = "Between plays · simulated game";
     document.querySelector("#demo-step").textContent = `${index + 1} / ${frames.length} · ${frame.caption}`;
     document.querySelector("#demo-progress").max = frames.length;
@@ -462,7 +659,11 @@ async function startDriveDemo() {
 if (new URLSearchParams(location.search).get("demo") === "drive") {
   startDriveDemo();
 } else {
-  elements.refreshButton.addEventListener("click", refreshScoreboard);
-  refreshScoreboard();
-  window.setInterval(refreshScoreboard, POLL_INTERVAL_MS);
+  const polling = createRefreshLoop({ refresh: refreshScoreboard, getPayload: () => lastPayload });
+  elements.refreshButton.addEventListener("click", polling.refreshNow);
+  polling.start();
+  window.setInterval(updateCountdown, 1000);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) { updateCountdown(); polling.refreshNow(); }
+  });
 }

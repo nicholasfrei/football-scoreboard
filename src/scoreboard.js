@@ -1,6 +1,7 @@
 import { teamBrand } from "./branding.js";
 import { teamStats } from "./team-stats.js";
 import { broadcastNetworks } from "./game-details.js";
+import { kickoffCountdown, PREGAME_WINDOW_MS } from "../public/game-timing.js";
 
 function scoreValue(competitor) {
   const raw = competitor?.score;
@@ -77,8 +78,9 @@ function byKickoffAscending(a, b) {
 
 /**
  * Convert the provider payload into the small model the display needs.
- * The spotlight is live first, then the latest completed game, then the
- * next scheduled game. Selection uses the provider's status instead of the
+ * The spotlight is live/interrupted first, then the next game's final 24-hour
+ * countdown, then the latest final, then the next scheduled game.
+ * Selection uses the provider's status instead of the
  * device clock so a delayed feed does not mistake an in-progress game.
  */
 export function selectScoreboard(payload, now = new Date(), { teamId = "8", league = "college-football" } = {}) {
@@ -92,7 +94,13 @@ export function selectScoreboard(payload, now = new Date(), { teamId = "8", leag
   const latestFinal = completedGames.at(-1) ?? null;
   const upcomingGames = games.filter((game) => game.state === "scheduled");
   const nextGame = upcomingGames[0] ?? null;
-  const spotlight = liveGame ?? latestFinal ?? nextGame;
+  // Keep a weather delay/suspension in view rather than reverting to last week.
+  // Old unresolved interruptions must not displace a more recent completed game.
+  const interruptedGame = games.filter((game) => game.state === "unknown" && /delay|suspend/i.test(game.status)
+    && Date.parse(game.kickoffAt) <= now.getTime() + PREGAME_WINDOW_MS
+    && (!latestFinal || byKickoffAscending(game, latestFinal) > 0)).at(-1) ?? null;
+  const countdownGame = kickoffCountdown(nextGame, now) !== null ? nextGame : null;
+  const spotlight = liveGame ?? interruptedGame ?? countdownGame ?? latestFinal ?? nextGame;
 
   return {
     team: {
@@ -104,7 +112,7 @@ export function selectScoreboard(payload, now = new Date(), { teamId = "8", leag
     },
     league,
     spotlight,
-    nextGame: liveGame || latestFinal ? nextGame : upcomingGames[1] ?? null,
+    nextGame: upcomingGames.find((game) => game.id !== spotlight?.id) ?? null,
     season: payload?.season?.year ?? now.getUTCFullYear(),
     refreshedAt: now.toISOString(),
     source: "ESPN public schedule feed",

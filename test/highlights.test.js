@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { gameHighlights } from "../src/highlights.js";
-import { createHighlightTracker, highlightDetail } from "../public/highlights.js";
+import { createHighlightTracker, highlightDetail, highlightDuration } from "../public/highlights.js";
+
+test("touchdowns remain visible until the next spot or five minutes; first downs show for 25 seconds", () => {
+  assert.equal(highlightDuration("touchdown"), 300_000);
+  assert.equal(highlightDuration("first-down"), 25_000);
+});
 
 const now = Date.parse("2026-10-31T23:55:00Z");
 
@@ -23,6 +28,9 @@ test("other highlight details retain their labels and unknown-team safeguards", 
     assert.equal(highlightDetail({ kind, teamId: null }, game), "TEAM NOT CONFIRMED");
   }
   assert.equal(highlightDetail({ kind: "extra-point", detail: "IT’S GOOD · +1" }, game), "IT’S GOOD · +1");
+  assert.equal(highlightDetail({ kind: "penalty", penaltyType: "Defensive Pass Interference", penaltyYards: 15 }, game), "15 YDS");
+  assert.equal(highlightDetail({ kind: "penalty", penaltyType: "False Start", penaltyYards: null }, game), "");
+  assert.equal(highlightDetail({ kind: "penalty", penaltyType: "Offsides" }, game), "");
 });
 
 function play(overrides = {}) {
@@ -65,6 +73,37 @@ test("own and opponent fumble recoveries are identified without inventing a turn
     assert.equal(event.kind, "fumble");
     assert.equal(event.teamId, "8");
   }
+  assert.deepEqual(classify(play({ type: { text: "Fumble" }, scoringPlay: false })), []);
+});
+
+test("sacks and negative rushes credit the defense, without flagging ordinary stops or nullified plays", () => {
+  const rush = play({ type: { text: "Rush" }, scoringPlay: false,
+    start: { team: { id: "8" }, yardsToEndzone: 70 },
+    end: { team: { id: "8" }, yardsToEndzone: 73 } });
+  assert.equal(classify(rush)[0].kind, "tackle-for-loss");
+  assert.equal(classify(rush)[0].teamId, "238");
+  const sack = { ...rush, type: { text: "Sack" } };
+  assert.equal(classify(sack)[0].kind, "sack");
+  assert.equal(classify(sack)[0].teamId, "238");
+  for (const value of [
+    { ...rush, end: { ...rush.end, yardsToEndzone: 70 } },
+    { ...rush, end: { ...rush.end, team: { id: "238" } } },
+    { ...rush, text: "Penalty, no play" },
+  ]) assert.deepEqual(classify(value), []);
+  assert.equal(classify({ ...sack, start: undefined })[0].teamId, null);
+});
+
+test("accepted penalties alert without guessing the penalized team; declined and offsetting ones do not", () => {
+  const penalty = play({ type: { text: "Penalty" }, scoringPlay: false, text: "Holding - No Play",
+    penalty: { status: { slug: "accepted" }, type: { text: "Offensive Holding" }, yards: 10 } });
+  assert.deepEqual(classify(penalty).map(({ kind, teamId, detail }) => ({ kind, teamId, detail })), [
+    { kind: "penalty", teamId: null, detail: "Offensive Holding · 10 YDS" },
+  ]);
+  assert.equal(classify(penalty)[0].penaltyType, "Offensive Holding");
+  assert.equal(classify(penalty)[0].penaltyYards, 10);
+  for (const slug of ["declined", "offsetting"]) assert.deepEqual(classify({ ...penalty, penalty: {
+    ...penalty.penalty, status: { slug },
+  } }), []);
 });
 
 test("made field goals and extra points qualify but misses and nullified plays do not", () => {

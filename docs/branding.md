@@ -53,8 +53,8 @@ Every team in the displayed and next matchup is resolved by ESPN team ID using
 `/apis/site/v2/sports/football/{league}/teams/{id}`, where `{league}` is `nfl`
 or `college-football`. College lookups include FBS and FCS opponents; there is
 no conference, opponent-name, or season allowlist.
-The canonical `displayName`, `location`, and `name` supply the scoreboard name,
-location-name end zone, and mascot end zone respectively. This avoids guessing a
+The canonical `displayName` and `name` supply the scoreboard name and
+mascot end zone respectively. This avoids guessing a
 mascot from shortened schedule labels. College metadata is cached for 24 hours;
 NFL metadata for one minute to refresh division standings. Failures
 retain available event data or cached metadata and retry after one minute.
@@ -70,19 +70,19 @@ needed, without adding opponent-specific fetching logic.
 
 ## Field behavior
 
-Both end zones use the **designated home team's primary color**, or its alternate
-color when the primary is green, with its location name in one and mascot in the
-other. White Graduate lettering fits inside a centered 320 × 50 area within
+The left end zone uses the away team's color and mascot; the right uses the
+designated home team's color and mascot. A green primary uses the team's alternate
+color when available so it stands out from the turf. White Graduate lettering fits inside a centered 320 × 50 area within
 each 416 × 92 end zone, with clear margins. Both names share one uniform scale
 that preserves the font's natural proportions. Short names keep their natural
 length rather than stretching; long names shrink both labels to keep them consistent.
-Bright colors such as Packers gold keep white text; a dark outline separates it
+Bright colors keep white text; a dark outline separates it
 from light paint.
 Glyph bounds are fitted after the local font loads so long team names stay inside
 the end zones. The same team's logo occupies midfield.
-For neutral-site games the heading explicitly says “designated home.” The
+For neutral-site games the home team is the designated home team. The
 field is a schematic, not a replica of the stadium's painted surface.
-The fixed orientation is home offense → and away offense ←; it does not simulate
+The fixed orientation is home offense ← and away offense →; it does not simulate
 real-world quarter-by-quarter changes of end.
 The caption below the score displays possession, down/distance, and the yard-line
 spot during play, and FINAL for completed games.
