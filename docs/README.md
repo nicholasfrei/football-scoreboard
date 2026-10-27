@@ -47,7 +47,7 @@ There is no frontend build step or third-party runtime dependency.
   reconstructs the NFL replay's player totals. `public/field-branding.js` keeps
   each team's primary end-zone color, including green teams.
 - `test/` contains network-independent tests; run them with `npm test`.
-- `test/fixtures/games/` holds ten complete compressed ESPN summaries and their
+- `test/fixtures/games/` holds fifty complete compressed ESPN summaries and their
   provenance manifest; `scripts/capture-game-fixtures.js` explicitly refreshes them.
 
 ## Before deploying

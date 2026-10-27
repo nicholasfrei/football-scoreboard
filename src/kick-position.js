@@ -42,6 +42,9 @@ export function kickPosition(play, league, home, away, season) {
   let spot = endId === receiver.id ? namedSpot(end.possessionText, home, away) : null;
   if (spot && (spot.percent === 0 || spot.percent === 100)) spot = null;
   const caught = fairCatch ? catchSpot(text, home, away) : null;
+  // A college kickoff fair catch inside the 25 is brought out to the 25 even
+  // when ESPN's end spot contains a contradictory non-end-zone placeholder.
+  if (kickoff && league === "college-football" && caught) spot = caught;
   if (!spot && !touchback) spot = caught;
 
   let ownYards = spot ? receiver.id === home.id ? 100 - spot.percent : spot.percent : null;

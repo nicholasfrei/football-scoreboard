@@ -9,6 +9,7 @@ const manifest = JSON.parse(await readFile(new URL("manifest.json", root), "utf8
 const kneelIds = [
   "4018730104206", "4018730204202", "401856732438", "401856732441",
   "401856835416", "401856727407", "401856727758", "401856727761",
+  "401856840874", "401856840879", "401856729337",
 ];
 const kneels = new Map();
 for (const entry of manifest) {
@@ -19,9 +20,9 @@ for (const entry of manifest) {
   }
 }
 
-test("all eight recorded voluntary kneels stay silent without changing their rushing yardage", async (t) => {
-  assert.equal(kneels.size, 8);
-  assert.equal(new Set([...kneels.values()].map(({ entry }) => entry.id)).size, 5);
+test("all eleven recorded voluntary kneels stay silent without changing their rushing yardage", async (t) => {
+  assert.equal(kneels.size, 11);
+  assert.equal(new Set([...kneels.values()].map(({ entry }) => entry.id)).size, 7);
   for (const id of kneelIds) {
     await t.test(id, () => {
       const { play, entry } = kneels.get(id);
@@ -31,6 +32,24 @@ test("all eight recorded voluntary kneels stay silent without changing their rus
       assert.deepEqual(play, original, "highlight filtering must not rewrite provider rushing statistics");
     });
   }
+});
+
+test("all 68 kneels in the expanded corpus avoid defensive tackle-for-loss alerts", async () => {
+  let checked = 0;
+  for (const entry of manifest) {
+    const summary = JSON.parse(gunzipSync(await readFile(new URL(entry.file, root))));
+    const plays = [...new Map([...(summary.drives?.previous ?? []), summary.drives?.current].filter(Boolean)
+      .flatMap((drive) => drive.plays ?? []).map((play) => [play.id, play])).values()];
+    for (const play of plays.filter((item) => item.type?.text === "Rush"
+        && /\b(?:kneel\w*|knelt|(?:takes?|taking|took)\s+a\s+knee)\b/i.test(item.text ?? ""))) {
+      assert.ok(play.statYardage < 0, play.id);
+      const event = gameHighlights([play], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId])[0];
+      assert.notEqual(event?.kind, "tackle-for-loss", play.id);
+      assert.ok(!event || event.kind === "turnover-on-downs", `${play.id}: only a confirmed fourth-down takeover may alert`);
+      checked++;
+    }
+  }
+  assert.equal(checked, 68);
 });
 
 function rush(overrides = {}) {

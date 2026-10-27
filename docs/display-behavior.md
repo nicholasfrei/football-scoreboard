@@ -111,6 +111,9 @@ spot, or derive a spot when the outcome and team are unambiguous. College
 kickoff touchbacks and fair catches inside the 25 use the 25; punt touchbacks
 use the 20 in both leagues. NFL kickoff touchbacks depend on the season and
 how the kick lands; the adapter does not guess when that information is missing.
+The explicit college fair-catch spot takes precedence over a contradictory
+endpoint. Interception touchbacks start at the receiving team's 20 in either
+league when the outcome and team are confirmed.
 Punt fair catches remain at the catch spot. A reported live situation takes
 priority, including penalty enforcement; ambiguous or penalized kicks do not
 get a rule-derived spot.
@@ -180,8 +183,9 @@ cable channel numbers.
 
 ## Big-play takeovers
 
-New live interceptions, fumble recoveries, turnovers on downs, sacks, tackles for loss, accepted
-penalties, blocked field goals, and blocked punts briefly replace the main score panel
+New live interceptions, fumble recoveries (including recovered muffed punts),
+turnovers on downs, sacks, tackles for loss, accepted penalties, separately
+recorded defensive two-point conversions, blocked field goals, and blocked punts replace the main score panel
 for **15 seconds**. Penalties use the same dark fade as other takeovers, tinted
 yellow, with the infraction as the headline and enforced yardage below only
 when reported. The app does not guess the penalized team;
@@ -214,6 +218,8 @@ Takeovers use structured ESPN play types, stable play IDs, and ordered play hist
 - Extra points require a separate confirmed made-XP play. Some ESPN feeds bundle
   the kick into the touchdown entry; those produce only the touchdown alert.
   The app does not infer an XP from a score change or touchdown commentary.
+  A separate confirmed defensive PAT return produces its own defensive two-point
+  takeover, credited to the scoring defense even if the play has no wallclock.
 - Interceptions show the player when explicitly named in the play description;
   if the player is unknown, the app does not invent a name. Tackles for loss
   require a negative rushing gain, preferring reported rushing yardage over
@@ -291,7 +297,7 @@ they are not an offline demo. Reload the URL to play one again.
 ## Validation limits
 
 Automated tests cover live situation behavior with synthetic data and replay
-**five full NFL and five full NCAAF games**, with 1,849 saved plays and both
+**25 full NFL and 25 full NCAAF games**, with 9,171 saved plays and both
 teams' perspectives. They exercise penalties, nullified plays, turnovers,
 missed/blocked field goals, bundled conversions, period changes, and overtime.
 The [complete fixtures](../test/fixtures/games/README.md) are historical summary

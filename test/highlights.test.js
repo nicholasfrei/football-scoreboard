@@ -18,6 +18,7 @@ test("every live takeover uses its configured duration", () => {
     "blocked-punt": 15_000,
     "blocked-field-goal": 15_000,
     "extra-point": 6_000,
+    "two-point-conversion": 15_000,
     punt: 10_000,
   };
   assert.deepEqual(Object.keys(expected).sort(), Object.keys(HIGHLIGHT_LABELS).sort());
@@ -171,6 +172,33 @@ test("made field goals and extra points qualify but misses and nullified plays d
     play({ type: { text: "Pass Reception" }, scoringPlay: false, text: "Touchdown overturned" }),
     play({ scoringPlay: false }),
   ]) assert.deepEqual(classify(p), []);
+});
+
+test("a confirmed touchdown survives a NO PLAY on its bundled conversion attempt", () => {
+  const touchdown = play({ text: "Pass for TOUCHDOWN. Pass attempt failed. PENALTY on defense. NO PLAY. Retry failed.",
+    scoringType: { name: "touchdown" } });
+  assert.equal(classify(touchdown, [{ id: "p1", team: { id: "8" } }])[0]?.kind, "touchdown");
+  assert.deepEqual(classify({ ...touchdown, text: "TOUCHDOWN nullified by penalty. NO PLAY" }, []), []);
+});
+
+test("a separate defensive two-point conversion credits the scoring defense", () => {
+  const conversion = play({ type: { text: "Defensive 2pt Conversion" },
+    scoringType: { name: "defensive-two-point-conversion" },
+    text: "Defensive PAT Conversion", wallclock: undefined,
+    start: { team: { id: "8" } }, end: { team: { id: "238" } } });
+  const event = classify(conversion, [{ id: "p1", team: { id: "238" } }])[0];
+  assert.equal(event?.kind, "two-point-conversion");
+  assert.equal(event.teamId, "238");
+  assert.equal(event.occurredAt, null);
+  assert.equal(highlightDuration(event.kind), 15_000);
+});
+
+test("a confirmed muffed punt recovered by the other team triggers one fumble recovery", () => {
+  const muff = play({ type: { text: "Muffed Punt Recovery (Opponent)" },
+    scoringPlay: false, text: "Punt muffed, recovered by the kicking team",
+    start: { team: { id: "8" } }, end: { team: { id: "8" } } });
+  assert.equal(classify(muff)[0]?.kind, "fumble");
+  assert.equal(classify(muff)[0]?.teamId, "8");
 });
 
 test("blocked field goals credit the blocking team, independently of recovery", () => {

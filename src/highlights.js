@@ -56,14 +56,21 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
   return plays.flatMap((play) => {
     const type = play.type?.text ?? "";
     const acceptedPenalty = interpretPenalty(play);
-    if (/no play|nullified/i.test(play.text ?? "") && !acceptedPenalty) return [];
+    const confirmedBundledConversion = play.scoringPlay && play.scoringType?.name === "touchdown"
+      && scoringTeams.has(String(play.id))
+      && /\bTOUCHDOWN\b[^]*\b(?:kick|pass|rush) attempt\b[^]*\bNO PLAY\b/i.test(play.text ?? "")
+      && !/\bTOUCHDOWN\s+nullified\b/i.test(play.text ?? "");
+    if (/no play|nullified/i.test(play.text ?? "") && !acceptedPenalty && !confirmedBundledConversion) return [];
     let kind;
     if (play.scoringPlay && (play.scoringType?.name === "touchdown" || /touchdown/i.test(type))) kind = "touchdown";
+    else if (acceptedPenalty && /^Fumble Recovery \(Own\)$/i.test(type)) kind = "penalty";
     else if (/interception/i.test(type) && !/touchdown/i.test(type)) kind = "interception";
-    else if (/fumble recovery/i.test(type) && !/touchdown/i.test(type)) kind = "fumble";
+    else if (/(?:fumble recovery|muffed punt recovery)/i.test(type) && !/touchdown/i.test(type)) kind = "fumble";
     else if (play.scoringPlay && (play.scoringType?.name === "field-goal" || /field goal good/i.test(type))) kind = "field-goal";
     else if (play.scoringPlay && /safety/i.test(type)) kind = "safety";
     else if (play.scoringPlay && (play.scoringType?.name === "extra-point" || /^Extra Point Good$/i.test(type))) kind = "extra-point";
+    else if (play.scoringPlay && (play.scoringType?.name === "defensive-two-point-conversion"
+      || /^Defensive 2pt Conversion$/i.test(type))) kind = "two-point-conversion";
     else if (acceptedPenalty) kind = "penalty";
     else if (/\b(?:blocked field goal|field goal blocked)\b/i.test(type)
       || (/field goal/i.test(type) && /\bblocked\b/i.test(play.text ?? ""))) kind = "blocked-field-goal";

@@ -108,7 +108,7 @@ test("live situations, penalty enforcement and fourth-down possession changes re
   assert.equal(turnover.ball.direction, "left");
 });
 
-test("all 218 ordinary incompletions in the ten-game corpus stay at their scrimmage spot", async () => {
+test("all 1,110 ordinary incompletions with trustworthy starts stay at their scrimmage spot", async () => {
   const root = new URL("fixtures/games/", import.meta.url);
   const manifest = JSON.parse(await readFile(new URL("manifest.json", root), "utf8"));
   let checked = 0;
@@ -124,6 +124,12 @@ test("all 218 ordinary incompletions in the ten-game corpus stay at their scrimm
     for (const play of plays) {
       if (play.type.text !== "Pass Incompletion" || play.scoringPlay || play.isPenalty || play.penalty
           || /\b(?:penalty|no play|nullified|overturned)\b/i.test(play.text)) continue;
+      if (play.id === "401858274811") {
+        assert.equal(play.start.possessionText, "MIA 5");
+        assert.equal(play.start.yardsToEndzone, 0, "contradictory goal-line coordinate cannot confirm a spot");
+        assert.equal(replay.get(play.id).ball, null);
+        continue;
+      }
       // Independent football invariant: an ordinary incompletion cannot move
       // the line of scrimmage. Do not copy the provider's end coordinate as
       // the expected result, which is exactly how this bug escaped the audit.
@@ -142,5 +148,5 @@ test("all 218 ordinary incompletions in the ten-game corpus stay at their scrimm
       checked++;
     }
   }
-  assert.equal(checked, 218);
+  assert.equal(checked, 1110);
 });

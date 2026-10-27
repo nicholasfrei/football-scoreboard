@@ -101,6 +101,7 @@ test("kick touchbacks and fair catches use the receiving team's correct spot", (
       ["nfl", "Kickoff", "Kickoff fair catch at ARK04", null, 4],
       ["college-football", "Kickoff", "Kickoff fair catch at ARK04", null, 25],
       ["college-football", "Kickoff", "Kickoff fair catch at ARK24", null, 25],
+      ["college-football", "Kickoff", "Kickoff fair catch at ARK23", "ARK 33", 25],
       ["college-football", "Kickoff", "Kickoff fair catch at ARK26", null, 26],
       ["college-football", "Punt", "Punt fair catch at ARK17", null, 17],
       ["nfl", "Punt", "Punt fair catch at ARK17", null, 17],
@@ -115,6 +116,25 @@ test("kick touchbacks and fair catches use the receiving team's correct spot", (
       assert.equal(result.possessionTeamId, "8");
       assert.equal(result.ball.direction, arkHome ? "left" : "right");
       assert.equal(result.ball.firstDownPercent, expected(yards) + (arkHome ? -10 : 10));
+    }
+  }
+});
+
+test("interception touchbacks start the confirmed receiving team at its own 20", () => {
+  for (const league of ["nfl", "college-football"]) {
+    for (const arkHome of [false, true]) {
+      const pick = { id: "touchback", sequenceNumber: "1", type: { text: "Interception" },
+        text: "Pass intercepted by the defense at ARK 0, Touchback",
+        start: { team: { id: "238" } }, end: { team: { id: "8" },
+          possessionText: "ARK 0", down: 1, distance: 10, yardsToEndzone: 100 } };
+      const frame = summary({ arkHome, current: { id: "drive", team: { id: "238" }, plays: [pick] } });
+      const result = enrichGame({ ...game, league }, frame);
+      assert.equal(result.ball?.label, "ARK 20");
+      assert.equal(result.ball?.percent, arkHome ? 80 : 20);
+      assert.equal(result.ball?.source, "touchback rule");
+      assert.equal(result.possessionTeamId, "8");
+      frame.situation = { possession: "8", possessionText: "ARK 25", down: 1, distance: 10 };
+      assert.equal(enrichGame({ ...game, league }, frame).ball?.label, "ARK 25", "live situation still wins");
     }
   }
 });

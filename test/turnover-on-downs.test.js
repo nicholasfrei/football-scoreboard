@@ -11,9 +11,12 @@ const expectedIds = new Set([
   "401873010224", "4018730122836", "4018730123724", "4018730201680",
   "4018730203025", "4018730203808", "4018730223780", "401856835682",
   "401856835858", "401858496719", "401856731581", "401856731728",
+  "4018730131386", "401873014129", "4018730182889", "4018730183549",
+  "4018730183687", "4018730193495", "4018730194791", "401856840823",
+  "401856728785", "401858500716", "401858500734", "401858500802",
 ]);
 
-test("all 12 audited fourth-down takeovers credit the gaining team, despite isTurnover false", async () => {
+test("all 24 audited fourth-down takeovers credit the gaining team, despite isTurnover false", async () => {
   const found = new Set();
   for (const entry of manifest) {
     const summary = JSON.parse(gunzipSync(await readFile(new URL(entry.file, root))));
@@ -30,6 +33,26 @@ test("all 12 audited fourth-down takeovers credit the gaining team, despite isTu
     }
   }
   assert.deepEqual(found, expectedIds);
+});
+
+test("all 75 recorded fourth-down takeovers in the expanded corpus credit the gaining team", async () => {
+  let checked = 0;
+  for (const entry of manifest) {
+    const summary = JSON.parse(gunzipSync(await readFile(new URL(entry.file, root))));
+    const teamIds = [entry.homeTeamId, entry.awayTeamId];
+    const plays = [...new Map([...(summary.drives?.previous ?? []), summary.drives?.current].filter(Boolean)
+      .flatMap((drive) => drive.plays ?? []).map((play) => [play.id, play])).values()];
+    for (const play of plays) {
+      const event = gameHighlights([play], summary.scoringPlays, teamIds)[0];
+      if (event?.kind !== "turnover-on-downs") continue;
+      assert.equal(play.start.down, 4, play.id);
+      assert.equal(play.end.down, 1, play.id);
+      assert.notEqual(String(play.start.team.id), String(play.end.team.id), play.id);
+      assert.equal(event.teamId, String(play.end.team.id), play.id);
+      checked++;
+    }
+  }
+  assert.equal(checked, 75);
 });
 
 function play(overrides = {}) {

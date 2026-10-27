@@ -87,10 +87,11 @@ export function fallbackPlayEnd(play, plays, home, away) {
   const status = play.penalty?.status?.slug;
   // Structured acceptance can describe one enforced foul alongside another
   // declined foul in the same description. Do not lose that enforcement.
-  const unenforced = status ? status !== "accepted" : /\b(?:declined|offsetting|offset)\b/i.test(text);
+  const reported = status ? null : reportedEnforcement(play);
+  const unenforced = status ? status !== "accepted" : !reported && /\b(?:declined|offsetting|offset)\b/i.test(text);
   const textEnforcement = /\bpenalty\b/i.test(text) && (/penalty/i.test(play.type?.text ?? "")
     || /\bpenalty\b[^]*\b(?:\d+\s+yards?|enforced|half\s+(?:the\s+)?distance)\b/i.test(text));
-  const enforcement = !unenforced && (status === "accepted" || textEnforcement);
+  const enforcement = !unenforced && (status === "accepted" || reported || textEnforcement);
   // An accepted penalty with an invalid/missing end has an unknown succeeding
   // spot. Reusing the pre-enforcement start would be just another guess.
   if (enforcement) return scrimmageSpot(play.end, home, away);

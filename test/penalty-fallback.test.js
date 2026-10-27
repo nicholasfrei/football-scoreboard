@@ -131,7 +131,7 @@ test("all 54 text-only college penalties alert live and match replay without gue
   for (const { entry, summary, plays } of fixtures) {
     const replay = new Map(createReplayFrames(summary, { ...entry, teamId: entry.awayTeamId })
       .filter((frame) => frame.event).map((frame) => [frame.event.id, frame.event]));
-    for (const play of plays.filter((play) => play.type.text === "Penalty" && !play.penalty)) {
+    for (const play of plays.filter((play) => expectedEnforcement.has(play.id))) {
       seen.add(play.id);
       const expected = expectedEnforcement.get(play.id);
       assert.ok(expected, `missing literal expectation for ${play.id}`);
@@ -146,6 +146,166 @@ test("all 54 text-only college penalties alert live and match replay without gue
   }
   assert.equal(seen.size, 54);
   assert.deepEqual(seen, new Set(expectedEnforcement.keys()));
+});
+
+const addedPenaltyPlays = new Map(`
+401856840188|False Start|5
+401856840290|Face Mask|15
+401856840312|Offside|5
+401856840469|Delay Of Game|5
+401856840705|Pass Interference|15
+401856840737|False Start|5
+401856840829|Delay Of Game|5
+401856729134|False Start|5
+401856729237|False Start|5
+401856729403|Pass Interference|9
+401856729500|False Start|5
+401856729535|Ineligible Downfield on Pass|5
+401856729610|Pass Interference|2
+401856729651|False Start|5
+40185672815|Personal Foul|12
+40185672830|Offside|5
+401856728218|False Start|5
+401856728507|Holding|10
+401856728550|Pass Interference|10
+401856728556|False Start|5
+401856728559|Holding|10
+401856728570|Delay Of Game|5
+401856728723|Holding|10
+401856728822|Offside|5
+401856728826|False Start|5
+401856728846|Illegal Formation|5
+40185849591|False Start|5
+401858495225|False Start|5
+401858495303|False Start|5
+401858495312|Offside|5
+401858495479|Pass Interference|10
+401858495495|Delay Of Game|5
+401858495684|Delay Of Game|5
+40185850036|Pass Interference|15
+401858500163|Personal Foul|15
+401858500258|Face Mask|1
+401858500331|Holding|10
+401858500341|Pass Interference|15
+401858500596|Delay Of Game|6
+`.trim().split("\n").map((row) => {
+  const [id, type, yards] = row.split("|");
+  return [id, { type, yards: Number(yards) }];
+}));
+
+test("all 39 new college Penalty plays retain reported type and yards", () => {
+  const seen = new Set();
+  for (const { entry, summary, plays } of fixtures) {
+    const replay = new Map(createReplayFrames(summary, { ...entry, teamId: entry.awayTeamId })
+      .filter((frame) => frame.event).map((frame) => [frame.event.id, frame.event]));
+    for (const play of plays.filter((item) => addedPenaltyPlays.has(item.id))) {
+      seen.add(play.id);
+      assert.equal(play.type.text, "Penalty", play.id);
+      const expected = addedPenaltyPlays.get(play.id);
+      const event = gameHighlights([play], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId])[0];
+      assert.equal(event?.kind, "penalty", play.id);
+      assert.equal(event.penaltyType, expected.type, play.id);
+      assert.equal(event.penaltyYards, expected.yards, play.id);
+      assert.deepEqual(replay.get(play.id), event, play.id);
+    }
+  }
+  assert.equal(addedPenaltyPlays.size, 39);
+  assert.deepEqual(seen, new Set(addedPenaltyPlays.keys()));
+});
+
+const addedEnforcedOnPlay = new Map(`
+401856840143|Unnecessary Roughness|10
+401856840169|Unnecessary Roughness|15
+401856840215|Holding|10
+401856840252|Holding|10
+401856840597|Holding|10
+401856840670|Illegal Formation|5
+401856840687|Illegal Bat|10
+40185672997|Personal Foul|15
+401856729223|Roughing The Passer|13
+401856729374|Holding|10
+4018567283|Personal Foul|13
+40185672849|Holding|10
+401858495151|Holding|10
+401858495398|Offside|5
+401858495544|Holding|7
+401858500246|Face Mask|4
+401858500420|Personal Foul|15
+`.trim().split("\n").map((row) => {
+  const [id, type, yards] = row.split("|");
+  return [id, { type, yards: Number(yards) }];
+}));
+
+test("all 17 new unambiguous fouls attached to actual plays alert without guessing a team", () => {
+  const seen = new Set();
+  for (const { entry, summary, plays } of fixtures) {
+    const replay = new Map(createReplayFrames(summary, { ...entry, teamId: entry.awayTeamId })
+      .filter((frame) => frame.event).map((frame) => [frame.event.id, frame.event]));
+    for (const play of plays.filter((item) => addedEnforcedOnPlay.has(item.id))) {
+      seen.add(play.id);
+      const expected = addedEnforcedOnPlay.get(play.id);
+      const event = gameHighlights([play], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId])[0];
+      assert.equal(event?.kind, "penalty", play.id);
+      assert.equal(event.teamId, null, play.id);
+      assert.equal(event.penaltyType, expected.type, play.id);
+      assert.equal(event.penaltyYards, expected.yards, play.id);
+      assert.deepEqual(replay.get(play.id), event, play.id);
+    }
+  }
+  assert.equal(addedEnforcedOnPlay.size, 17);
+  assert.deepEqual(seen, new Set(addedEnforcedOnPlay.keys()));
+});
+
+test("an overturned targeting call does not produce a penalty event", () => {
+  const { entry, summary, plays } = fixtures.find(({ entry }) => entry.id === "401856729");
+  const play = plays.find((item) => item.id === "401856729641");
+  assert.match(play.text, /PENALTY.*Targeting.*CALL OVERTURNED/i);
+  assert.deepEqual(gameHighlights([play], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId]), []);
+});
+
+test("new college foul names require a single reported enforcement", () => {
+  for (const [id, type, yards] of [
+    ["401856837397", "Illegal Motion", 5],
+    ["40186090781", "Illegal Use Of Hands", 5],
+    ["401856838487", "Running Into The Kicker", 5],
+    ["401866476461", "Illegal Touch-Pass", 5],
+  ]) {
+    const { entry, summary, plays } = fixtures.find(({ plays }) => plays.some((play) => play.id === id));
+    const play = plays.find((item) => item.id === id);
+    const event = gameHighlights([play], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId])[0];
+    assert.equal(event?.kind, "penalty", id);
+    assert.equal(event.penaltyType, type, id);
+    assert.equal(event.penaltyYards, yards, id);
+    assert.equal(event.teamId, null, id);
+  }
+  for (const [id, description] of [
+    ["401858497450", "missing enforcement"],
+    ["401858497462", "missing enforcement"],
+    ["401862809242", "two different fouls share a net enforcement"],
+    ["401862809622", "missing yardage and succeeding spot"],
+  ]) {
+    const { entry, summary, plays } = fixtures.find(({ plays }) => plays.some((play) => play.id === id));
+    const play = plays.find((item) => item.id === id);
+    assert.deepEqual(gameHighlights([play], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId]), [], `${id}: ${description}`);
+  }
+});
+
+test("a declined foul followed by a separately enforced identical foul retains the enforcement", () => {
+  const { entry, summary, plays } = fixtures.find(({ entry }) => entry.id === "401866476");
+  const play = plays.find((item) => item.id === "401866476434");
+  const next = plays.find((item) => item.id === "401866476440");
+  assert.equal(next.start.possessionText, "CMU 28");
+  const event = gameHighlights([play], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId])[0];
+  assert.equal(event?.kind, "penalty");
+  assert.equal(event.penaltyType, "Holding");
+  assert.equal(event.penaltyYards, 10);
+  assert.equal(event.teamId, null);
+  const replay = createReplayFrames(summary, { ...entry, teamId: entry.awayTeamId })
+    .find((frame) => frame.event?.id === play.id);
+  assert.deepEqual(replay.event, event);
+  assert.equal(replay.spotlight.ball?.label, "CMU 28");
+  assert.deepEqual(gameHighlights([{ ...play, text: play.text.replace("CMU Holding (#4", "UTA Holding (#4") }],
+    summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId]), [], "different teams cannot share this shorthand");
 });
 
 // Transcribed from explicit enforcement statements on plays ESPN labels as

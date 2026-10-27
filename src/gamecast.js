@@ -121,6 +121,17 @@ function missedFieldGoalPosition(play, league, home, away) {
     label: `${side.abbreviation} ${percent > 50 ? 100 - percent : percent}` };
 }
 
+function interceptionTouchbackPosition(play, home, away) {
+  if (!/interception/i.test(play?.type?.text ?? "") || !/\btouchback\b/i.test(play.text ?? "")
+      || play.scoringPlay || play.isPenalty || play.penalty
+      || /\b(?:no play|nullified|penalty)\b/i.test(play.text ?? "")) return null;
+  const receiver = [home, away].find((team) => team.id === String(play.end?.team?.id));
+  if (!receiver || String(play.start?.team?.id) === receiver.id) return null;
+  return { teamId: receiver.id, percent: receiver.id === home.id ? 80 : 20,
+    label: `${receiver.abbreviation} 20`, down: 1, distance: 10,
+    downDistance: `1st & 10 at ${receiver.abbreviation} 20` };
+}
+
 export function enrichGame(game, summary) {
   const competition = summary.header?.competitions?.[0];
   if (!competition || String(summary.header.id) !== game.id) throw new Error("Unexpected game summary");
@@ -224,6 +235,18 @@ export function enrichGame(game, summary) {
     down = end?.down;
     distance = end?.distance;
     positionSource = "kick rule";
+  }
+  const touchback = lastCurrentPlay?.id === latestPlay?.id
+    ? interceptionTouchbackPosition(lastCurrentPlay, home, away) : null;
+  if (touchback && (!situation || position === null)
+      && (!situation?.possession || possessionId === touchback.teamId)) {
+    possessionId = touchback.teamId;
+    position = touchback.percent;
+    positionLabel = touchback.label;
+    downDistance = touchback.downDistance;
+    down = touchback.down;
+    distance = touchback.distance;
+    positionSource = "touchback rule";
   }
 
   const possessionTeam = [home, away].find((team) => team.id === possessionId);

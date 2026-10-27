@@ -14,6 +14,7 @@ export const HIGHLIGHT_LABELS = {
   safety: "SAFETY",
   "first-down": "FIRST DOWN",
   "extra-point": "EXTRA POINT",
+  "two-point-conversion": "DEFENSIVE 2-POINT CONVERSION",
   punt: "PUNT",
   "blocked-punt": "BLOCKED PUNT",
   "blocked-field-goal": "BLOCKED FIELD GOAL",

@@ -142,8 +142,8 @@ No soldering, LED matrix, or physical moving ball is required.
 ## Developing
 
 Run the tests with `npm test`. They cover configuration, countdowns, refresh timing,
-game selection, and feed normalization without calling ESPN. Ten complete game
-fixtures (five NFL and five NCAAF) replay all 1,849 plays from both teams' perspectives;
+game selection, and feed normalization without calling ESPN. Fifty complete game
+fixtures (25 NFL and 25 NCAAF) replay all 9,171 plays from both teams' perspectives;
 see [fixture provenance and replay limits](test/fixtures/games/README.md).
 The server entry point is `server.js`,
 the data adapters and normalization live in `src/`, and the display lives in
