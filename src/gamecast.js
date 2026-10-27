@@ -4,6 +4,8 @@ import { matchupPredictor } from "./game-details.js";
 import { textIntentionalGrounding } from "./penalty.js";
 import { kickPosition } from "./kick-position.js";
 import { comparePlays } from "./play-order.js";
+import { fallbackPlayEnd } from "./play-position.js";
+import { uncertainBlockedFieldGoalSpot } from "./blocked-kick-position.js";
 
 function recentPlays(summary) {
   const drives = [...(summary.drives?.previous ?? []), summary.drives?.current].filter(Boolean);
@@ -160,6 +162,11 @@ export function enrichGame(game, summary) {
   }
   const drives = [...driveMap.values()].filter((drive) => drive.plays.length);
   const isPause = (play) => /Timeout|End Period|End of Half|End of Regulation/i.test(play?.type?.text ?? "");
+  // A provider can attach a new timeout to an old drive. Only recover a spot
+  // when this drive contains the latest actual football event across the feed;
+  // otherwise its old endpoint predates intervening scores or possessions.
+  const lastFootballPlay = plays.findLast((play) => !isPause(play));
+  const lastCurrentPlay = currentIds.has(String(lastFootballPlay?.id)) ? lastFootballPlay : null;
   const situation = summary.situation ?? competition.situation;
   let possessionId = situation?.possession == null ? null : String(situation.possession);
   let position = positionFromText(situation?.possessionText, home, away);
@@ -173,14 +180,15 @@ export function enrichGame(game, summary) {
   // use the latest actual play in this drive, never a previous drive or a play
   // before a score/kickoff. The source stays in the model, not the field caption.
   if (!situation) {
-    const last = currentPlays.findLast((play) => !isPause(play));
-    const end = last?.end;
+    const last = lastCurrentPlay;
+    const end = fallbackPlayEnd(last, currentPlays, home, away);
     possessionId = end?.team?.id == null ? null : String(end.team.id);
     // ESPN can flip yardsToEndzone on a no-gain play while its possessionText
     // still names the correct side of the field. Prefer that named yard line.
     const namedPosition = positionFromText(end?.possessionText, home, away);
     if ((namedPosition !== null || (Number.isFinite(end?.yardsToEndzone) && end.yardsToEndzone >= 0 && end.yardsToEndzone <= 100))
-        && !last.scoringPlay && !/End Period|End of|Timeout|Kickoff|Extra Point/i.test(last.type?.text ?? "")) {
+        && !last.scoringPlay && !uncertainBlockedFieldGoalSpot(last)
+        && !/End Period|End of|Timeout|Kickoff|Extra Point/i.test(last.type?.text ?? "")) {
       position = namedPosition ?? (possessionId === home.id ? end.yardsToEndzone
         : possessionId === away.id ? 100 - end.yardsToEndzone : null);
       downDistance = end.downDistanceText ?? null;
@@ -193,7 +201,6 @@ export function enrichGame(game, summary) {
 
   // A kick's end spot belongs to the receiver, not the kicking team's drive.
   // Prefer a complete live situation, which can include penalty enforcement.
-  const lastCurrentPlay = currentPlays.findLast((play) => !isPause(play));
   const kick = currentIds.has(String(latestPlay?.id))
     ? kickPosition(lastCurrentPlay, updated.league, home, away, summary.header?.season?.year) : null;
   if (kick && (!situation || position === null) && (!situation?.possession || possessionId === kick.teamId)) {
@@ -252,6 +259,8 @@ export function enrichGame(game, summary) {
     possessionTeamId: updated.state === "live" && possessionTeam && (situation || ball) ? possessionTeam.id : null,
     highlights: gameHighlights(plays, summary.scoringPlays, [home.id, away.id]),
     latestPlaySequence: Math.max(0, ...plays.map((play) => Number(play.sequenceNumber)).filter(Number.isFinite)),
+    // Include non-highlights as anchors so clients can reject backfilled events.
+    latestPlayOrder: plays.map((play) => String(play.id)),
     drives,
     leaders: gameLeaders(summary, [home.id, away.id]),
     currentDriveId: drives.some((drive) => drive.id === String(currentDrive?.id))

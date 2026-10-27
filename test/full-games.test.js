@@ -167,18 +167,23 @@ for (const fixture of fixtures) {
         }
         if (game.ball) {
           const positionPlay = frame.drives.current.plays.findLast((play) => !/Timeout|End Period|End of Half|End of Regulation/i.test(play.type.text));
-          const homePossession = positionPlay.end.team.id === entry.homeTeamId;
+          // Independently checked retained spots: an offsetting/nullified TD at
+          // UCF 1 and an incompletion at MISS 27 both have invalid goal-line ends.
+          const restoredSpot = { "401856835462": "UCF 1", "401856732698": "MISS 27" }[positionPlay.id];
+          const positionEnd = restoredSpot ? positionPlay.start : positionPlay.end;
+          if (restoredSpot) assert.equal(game.ball.label, restoredSpot);
+          const homePossession = positionEnd.team.id === entry.homeTeamId;
           const home = base.homeAway === "home" ? base.selectedTeam : base.opponent;
           const away = base.homeAway === "home" ? base.opponent : base.selectedTeam;
-          const spot = /^(.*?)\s+(\d{1,2})$/.exec(positionPlay.end.possessionText ?? "");
+          const spot = /^(.*?)\s+(\d{1,2})$/.exec(positionEnd.possessionText ?? "");
           const named = spot && Number(spot[2]) <= 50 ? spot[1] === home.abbreviation ? 100 - Number(spot[2])
             : spot[1] === away.abbreviation ? Number(spot[2]) : null : null;
           if (game.ball.source !== "kick rule") {
-            assert.equal(game.ball.percent, named ?? (homePossession ? positionPlay.end.yardsToEndzone : 100 - positionPlay.end.yardsToEndzone));
+            assert.equal(game.ball.percent, named ?? (homePossession ? positionEnd.yardsToEndzone : 100 - positionEnd.yardsToEndzone));
           }
           assert.equal(game.ball.direction, homePossession ? "left" : "right");
           assert.ok(["last reported play", "kick rule"].includes(game.ball.source));
-          assert.equal(game.possessionTeamId, String(positionPlay.end.team.id));
+          assert.equal(game.possessionTeamId, String(positionEnd.team.id));
           assert.ok(game.ball.percent >= 0 && game.ball.percent <= 100);
           if (game.ball.firstDownPercent !== null) assert.ok(game.ball.firstDownPercent >= 0 && game.ball.firstDownPercent <= 100);
         }
@@ -218,6 +223,30 @@ test("QB interceptions and QB/RB fumbles come from box scores, not assumed play 
   assert.equal(leader("receivingYards", "Amon-Ra St. Brown").fumbles, null);
 });
 
+test("every newly eligible saved play reaches the browser tracker, independently of sequence reuse", () => {
+  for (const fixture of fixtures) {
+    const { entry, summary, plays } = fixture;
+    const base = gameFromSummary(summary, entry.league, entry.awayTeamId);
+    let previous = enrichGame(base, replaySummary(fixture, 0));
+    for (let index = 1; index < plays.length; index++) {
+      const source = plays[index];
+      const game = enrichGame(base, replaySummary(fixture, index));
+      const tracker = createHighlightTracker();
+      // These are controlled adjacent fresh polls, not claimed historical live
+      // delivery times. Keep source timestamps intact and isolate event identity
+      // from real-game pauses and late provider revisions.
+      const now = Date.parse(source.wallclock);
+      assert.ok(Number.isFinite(now), `${source.id}: this audit requires a recorded timestamp`);
+      tracker.observe({ spotlight: previous }, now - 15_000);
+      const emitted = tracker.observe({ spotlight: game }, now);
+      const expected = gameHighlights([source], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId])[0];
+      assert.equal(emitted?.id ?? null, expected?.id ?? null, `${entry.id}/${source.id}: a distinct eligible play must not be suppressed`);
+      assert.equal(tracker.observe({ spotlight: game }, now + 1), null, `${source.id}: repeated polls stay silent`);
+      previous = game;
+    }
+  }
+});
+
 test("missed field goals use the next possession spot instead of ESPN's line-of-scrimmage placeholder", () => {
   for (const [id, pattern, expected] of [
     ["401873010", /C\.Santos 53 yard field goal is No Good/, "NE 43"],
@@ -245,15 +274,23 @@ test("actual penalties, nullified plays, scoring attribution, turnovers and miss
       types.add(play.type.text);
       if (play.penalty?.type?.text) penaltyTypes.add(play.penalty.type.text);
       const events = gameHighlights([play], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId]);
-      if (/no play|nullified/i.test(play.text) && play.penalty?.status?.slug !== "accepted") {
+      const explicitCollegePenalty = entry.league === "college-football" && play.type.text === "Penalty"
+        && !play.penalty && /\bPENALTY\b/i.test(play.text) && !/\b(?:declined|offsetting)\b/i.test(play.text);
+      if (/no play|nullified/i.test(play.text) && play.penalty?.status?.slug !== "accepted" && !explicitCollegePenalty) {
         nullified++;
         assert.deepEqual(events, [], play.text);
       } else if (/no play|nullified/i.test(play.text)) {
         assert.equal(events.length, 1, play.text);
         assert.equal(events[0].kind, "penalty");
         assert.equal(events[0].teamId, null);
-        assert.equal(events[0].penaltyType, play.penalty.type.text);
-        assert.equal(events[0].penaltyYards, Number.isFinite(play.penalty.yards) ? play.penalty.yards : null);
+        if (play.penalty) {
+          assert.equal(events[0].penaltyType, play.penalty.type.text);
+          assert.equal(events[0].penaltyYards, Number.isFinite(play.penalty.yards) ? play.penalty.yards : null);
+        } else {
+          assert.ok(events[0].penaltyType && play.text.includes(events[0].penaltyType), "the infraction is explicitly reported");
+          assert.ok(Number.isFinite(events[0].penaltyYards), "these college fixtures explicitly report enforcement yardage");
+          assert.match(play.text, new RegExp(`\\b${events[0].penaltyYards}\\s+yards?\\b`, "i"));
+        }
       } else if (/Touchdown/.test(play.type.text) && play.scoringPlay) {
         assert.equal(events.length, 1);
         assert.equal(events[0].kind, "touchdown");

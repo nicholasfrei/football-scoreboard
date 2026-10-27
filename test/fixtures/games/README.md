@@ -51,10 +51,28 @@ availability, polling latency, delivery order, or later provider corrections.
 Some play sequences are duplicated or reset: the Indiana–Michigan overtime end
 marker has sequence `42`, while the preceding OT play is `158`. In Texas–Ole
 Miss, the Q3 14:58 incompletion has a wallclock timestamp from after the quarter.
-The adapter and replay order by period and game clock, then use wallclock for
-ties, without modifying the saved source. End-period entries must not invent a
+The adapter and replay order by period, terminal-marker status, and valid play
+sequence, using wallclock and game clock to break reused-sequence ties without
+modifying the saved source. Entries without valid sequences use a separate
+deterministic fallback group: clock first in regulation and wallclock first in
+overtime. This preserves clock corrections and untimed college overtime, while
+keeping reused-sequence terminal markers last. End-period entries must not invent a
 live ball position. The replay corrects an isolated stale score on a revised
 non-scoring play when both adjacent plays confirm the same score.
+
+Independent regression checks record expected play IDs, succeeding spots, and
+penalty types/yardage instead of deriving all expectations from the production
+sorter or provider endpoints. They cover reused-sequence alerts, all 54 text-only
+college penalties with live/replay parity, all eight voluntary kneels, and all 12
+confirmed turnovers on downs. Invalid nullified results and ambiguous blocked-kick
+endpoints do not establish ball spots. A timeout misattached to an old drive
+cannot revive its earlier possession's endpoint. Controlled adjacent fresh polls
+also verify that every newly classified event actually reaches the browser
+tracker, separately from historical delivery timing and event-age suppression.
+All 218 ordinary incompletions are independently checked against their starting
+scrimmage spot. Texas–Ole Miss play `401856732698` has a bad goal-line endpoint
+and a spurious 70-yard end distance; its valid start confirms MISS 27, and the
+replay must show third-and-three there rather than MISS 0.
 
 To inspect a complete response:
 

@@ -4,24 +4,39 @@ function clockSeconds(play) {
   return Number(match[1]) * 60 + Number(match[2]);
 }
 
-// Clock time is more reliable than an occasionally revised wallclock. Keep
-// wallclock as a tie-breaker, since several plays can share a game clock.
+function orderKey(play) {
+  const period = Number(play.period?.number);
+  const sequence = /^\d+$/.test(String(play.sequenceNumber ?? "")) ? Number(play.sequenceNumber) : NaN;
+  const clock = clockSeconds(play);
+  const time = Date.parse(play.wallclock);
+  const clockKey = clock === null ? Infinity : -clock;
+  const timeKey = Number.isFinite(time) ? time : Infinity;
+  const sequenced = Number.isSafeInteger(sequence);
+  return [
+    Number.isFinite(period) ? period : 0,
+    /^(?:End Period|End of Half|End of Regulation|End of Game)$/i.test(play.type?.text ?? "") ? 1 : 0,
+    sequenced ? 0 : 1,
+    sequenced ? sequence : 0,
+    sequenced || period > 4 ? timeKey : clockKey,
+    sequenced || period > 4 ? clockKey : timeKey,
+    String(play.id ?? ""),
+  ];
+}
+
+// Within a period, sequence survives both clock corrections and revised
+// wallclocks. It is not unique: timeouts often reuse a snap's sequence, so use
+// wallclock before clock to break ties (timeouts can also reset the clock).
+// Terminal markers sometimes reuse an EARLIER sequence and always belong last.
+// Unsequenced entries form a separate fallback group: clock then wallclock in
+// regulation, wallclock then clock in OT, where college clocks are untimed.
+// Do not switch rules based on the pair being compared: mixing sequence and
+// clock comparisons that way can create cycles and input-dependent results.
 export function comparePlays(a, b) {
-  const period = Number(a.period?.number ?? 0) - Number(b.period?.number ?? 0);
-  if (period) return period;
-  const aEnd = /^End Period$/i.test(a.type?.text ?? "");
-  const bEnd = /^End Period$/i.test(b.type?.text ?? "");
-  if (aEnd !== bEnd) return aEnd ? 1 : -1;
-  const aClock = clockSeconds(a);
-  const bClock = clockSeconds(b);
-  if (aClock !== bClock) {
-    if (aClock === null) return 1;
-    if (bClock === null) return -1;
-    return bClock - aClock;
+  const aKey = orderKey(a);
+  const bKey = orderKey(b);
+  for (let index = 0; index < aKey.length; index++) {
+    if (aKey[index] < bKey[index]) return -1;
+    if (aKey[index] > bKey[index]) return 1;
   }
-  const aTime = Date.parse(a.wallclock);
-  const bTime = Date.parse(b.wallclock);
-  if (Number.isFinite(aTime) !== Number.isFinite(bTime)) return Number.isFinite(aTime) ? -1 : 1;
-  return (Number.isFinite(aTime) ? aTime - bTime : 0)
-    || Number(a.sequenceNumber ?? 0) - Number(b.sequenceNumber ?? 0);
+  return 0;
 }

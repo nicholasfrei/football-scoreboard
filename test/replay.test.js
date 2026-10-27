@@ -120,7 +120,7 @@ test("Texas–Ole Miss zero-yard rush is not a tackle for loss", async () => {
   assert.notEqual(frame.event?.kind, "tackle-for-loss");
 });
 
-test("Texas–Ole Miss blocked field goal has an event and keeps the actual result", async () => {
+test("Texas–Ole Miss blocked field goal alerts without mistaking the kick endpoint for the next spot", async () => {
   const option = REPLAY_GAMES.college;
   const summary = JSON.parse(gunzipSync(await readFile(new URL(`fixtures/games/${option.file}`, import.meta.url))));
   const frame = createReplayFrames(summary, option).find((item) => /field goal attempt from 58 yards NO GOOD blocked/i.test(item.caption));
@@ -128,5 +128,5 @@ test("Texas–Ole Miss blocked field goal has an event and keeps the actual resu
   assert.equal(frame.event?.kind, "blocked-field-goal");
   assert.equal(frame.event?.teamId, "251");
   assert.equal(highlightDetail(frame.event, frame.spotlight), "BLOCKED BY #97 A.January");
-  assert.equal(frame.spotlight.ball?.label, "TEX 5");
+  assert.equal(frame.spotlight.ball, null, "the out-of-bounds kick endpoint is not a confirmed succeeding scrimmage spot");
 });

@@ -16,8 +16,9 @@ in the score area, beginning at `24:00:00`. It ticks locally every second withou
 extra feed requests. At zero it waits at `00:00:00` until ESPN confirms play, then
 restores the score. Unknown/TBD, postponed, and canceled kickoffs do not get a
 countdown. If only an upcoming game is available, it can display that game instead.
-The season is fetched
-dynamically; no particular matchup is hard-coded.
+Game Leaders remain beneath the last completed game when its player stats are
+available; the Next Up panel returns when the upcoming matchup takes over for
+the countdown. The season is fetched dynamically; no particular matchup is hard-coded.
 
 The browser polls every **five minutes** normally, switching to **15 seconds**
 starting **five minutes before kickoff**, including while waiting for ESPN's
@@ -121,6 +122,17 @@ kick, a short kick or an ambiguous return; a different reported end spot or a
 live situation takes precedence. See NCAA rule 8-4-2 in the
 [2026 NCAA rulebook](https://ncaaorg.s3.amazonaws.com/championships/sports/football/rules/PRMFB_RulesBook.pdf).
 
+A nullified play's invalid result coordinates cannot move the ball into the end
+zone. A confirmed penalty enforcement can still change the spot; otherwise the
+display uses a defensible unchanged spot or waits for confirmation. On blocked
+field goals, the kick's ending location is not automatically the next scrimmage
+spot. Ambiguous results leave the ball hidden until the feed supplies a reliable
+succeeding spot, rather than inventing a blocked-kick placement rule.
+For an ordinary incomplete pass with an invalid or missing result spot, a valid
+reported start can establish the unchanged line of scrimmage and distance with
+the down advanced. This does not override live situations, penalty enforcement,
+or a confirmed change of possession on fourth down.
+
 During live games and the drive demo, the quarter and game clock are centered
 **above the score**. Kickoff date/time, venue and broadcast share a single row at
 the top left in the same font. Halftime replaces `Q2 · 0:00`. Overtime
@@ -163,12 +175,15 @@ cable channel numbers.
 
 ## Big-play takeovers
 
-New live interceptions, fumble recoveries, sacks, tackles for loss, accepted
+New live interceptions, fumble recoveries, turnovers on downs, sacks, tackles for loss, accepted
 penalties, made and blocked field goals, and safeties briefly replace the main score panel
 for **12 seconds**. Penalties use the same dark fade as other takeovers, tinted
 yellow, with the infraction as the headline and enforced yardage below only
 when reported. The app does not guess the penalized team;
 declined and offsetting penalties do not alert.
+College feeds sometimes omit structured penalty metadata. An explicitly labeled
+penalty play with a reported enforcement can still produce the same alert in
+live mode and replay; ambiguous commentary does not establish an accepted penalty.
 If ESPN explicitly reports intentional grounding in play text without penalty
 status, the app treats it as a penalty unless the text says it was declined or
 offsetting, even when ESPN labels it a sack. It does not infer penalty yardage.
@@ -185,7 +200,7 @@ continue updating underneath. Touchdowns show the current game score instead of
 “+6” (for example, `DAL 20-17 PHI`, selected team first). An active live touchdown
 takeover also updates that score on refresh without restarting its timer.
 
-Takeovers use structured ESPN play types and IDs/sequences:
+Takeovers use structured ESPN play types, stable play IDs, and ordered play history:
 
 - First downs require a confirmed new series on the same possession using
   start/end down metadata for a rush, completed pass, or penalty. Kickoffs,
@@ -197,6 +212,12 @@ Takeovers use structured ESPN play types and IDs/sequences:
   if the player is unknown, the app does not invent a name. Tackles for loss
   require a negative rushing gain, preferring reported rushing yardage over
   potentially inconsistent end-zone coordinates.
+  Explicit kneel-downs do not trigger defensive tackle-for-loss celebrations.
+- Turnovers on downs require a confirmed fourth-down scrimmage play and a change
+  to the other team's possession. They show one **TURNOVER ON DOWNS** takeover for
+  the gaining team, including when the failed fourth-down play was a sack.
+  Kicks, interceptions, fumbles, scores, and nullified plays keep their own rules;
+  an absent provider turnover flag does not hide a confirmed change on downs.
 - Punts identify the punting team from the play's starting possession, while
   the scoreboard football follows the receiving team's possession. Blocked
   punts identify the blocking team as the opponent of the confirmed punting
@@ -208,6 +229,9 @@ Takeovers use structured ESPN play types and IDs/sequences:
 - Loading the page, switching games, recovering from an outage, or returning
   after a polling gap establishes a silent baseline. Old plays are not replayed.
 - Final games never trigger live takeovers. Repeated polls do not restart a timer.
+- Distinct new plays can alert even when the provider reuses or resets numeric
+  sequence values. Play identity and ordering still prevent historical backfills
+  from replaying as new events.
 - If several new events arrive in one poll, only the newest is shown. A newer
   event can replace one already on screen.
 - Events with upstream timestamps older than two minutes are skipped.

@@ -2,20 +2,19 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-test("horizontal white lines stop at the end-zone boundaries", async () => {
+test("yard hashes sit inside the numbers at one-yard intervals", async () => {
   const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
-  const endzones = [...html.matchAll(/<rect class="endzone (?:away|home)-endzone" x="(\d+)"[^>]*width="(\d+)"/g)];
-  assert.equal(endzones.length, 2);
-  const start = Number(endzones[0][1]) + Number(endzones[0][2]);
-  const end = Number(endzones[1][1]);
-  const sidelines = html.match(/<path d="([^"]+)" stroke-opacity="\.28"/);
-  assert.ok(sidelines, "horizontal field lines exist");
-  const segments = [...sidelines[1].matchAll(/M(\d+) (\d+)h(\d+)/g)];
-  assert.equal(segments.length, 2);
-  for (const segment of segments) {
-    assert.equal(Number(segment[1]), start, "line starts after the left end zone");
-    assert.equal(Number(segment[1]) + Number(segment[3]), end, "line ends before the right end zone");
-  }
+  const pattern = html.match(/<pattern id="hash-marks" x="([\d.]+)" width="([\d.]+)" height="\d+" patternUnits="userSpaceOnUse">\s*<path d="M0 ([\d.]+)v([\d.]+) M0 ([\d.]+)v([\d.]+)"/);
+  const hashes = html.match(/<rect x="([\d.]+)" y="12" width="([\d.]+)" height="416" fill="url\(#hash-marks\)"\s*\/>/);
+  assert.ok(pattern, "the hash pattern has two short rows of marks");
+  assert.ok(hashes, "hash marks are drawn on the field");
+  assert.equal(Number(pattern[1]), 111.92, "hashes start one yard past the goal line");
+  assert.equal(Number(pattern[2]), 7.92, "hashes repeat every yard");
+  assert.deepEqual([Number(pattern[3]), Number(pattern[3]) + Number(pattern[4])], [171, 177]);
+  assert.deepEqual([Number(pattern[5]), Number(pattern[5]) + Number(pattern[6])], [263, 269]);
+  assert.equal(Number(hashes[1]), 111.92);
+  assert.equal(Number(hashes[1]) + Number(hashes[2]), 896, "hashes stop at the opposite goal line");
+  assert.doesNotMatch(html, /M104 48h792 M104 392h792/, "the old continuous lines are removed");
 });
 
 test("away end zone is left, home end zone is right, and midfield has the home logo", async () => {

@@ -6,7 +6,7 @@ import { kickoffCountdown, createRefreshLoop } from "./game-timing.js";
 import { createBallPositionTracker } from "./ball-position.js";
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT, displayScale } from "./display-size.js";
 import { scoringNeedsHighlight } from "./scoring-style.js";
-import { leaderCellItems } from "./leader-layout.js";
+import { leaderCellItems, showGameLeaders } from "./leader-layout.js";
 
 function fitDisplay() {
   const scale = displayScale(window.innerWidth, window.innerHeight);
@@ -406,7 +406,7 @@ function renderNextDetails(game) {
 }
 
 function renderLeaders(game, demo = false) {
-  const visible = game?.state === "live" || (demo && game?.league === "nfl");
+  const visible = showGameLeaders(game, demo);
   document.querySelector(".next-game").hidden = visible;
   const section = document.querySelector("#game-leaders");
   section.hidden = !visible;

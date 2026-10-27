@@ -64,14 +64,7 @@ export function createReplayFrames(summary, option) {
     };
     const game = enrichGame(base, snapshot);
     if (leaderTracker) game.leaders = leaderTracker.observe(play);
-    let event = gameHighlights([play], snapshot.scoringPlays, teamIds)[0] ?? null;
-    // College summaries may label a play Penalty but omit structured penalty
-    // metadata. Only use the explicitly reported penalty play as a fallback.
-    if (!event && play.type?.text === "Penalty" && !play.penalty) {
-      const description = play.text.match(/\bPENALTY\s+\S+\s+(.+?)(?:\s*\([^)]*\))?\s+(\d+)\s+yards\b/i);
-      event = { id: String(play.id), kind: "penalty", teamId: null,
-        penaltyType: description?.[1] ?? "Penalty", penaltyYards: description ? Number(description[2]) : null };
-    }
+    const event = gameHighlights([play], snapshot.scoringPlays, teamIds)[0] ?? null;
     return {
       team: game.selectedTeam, league: option.league, season: summary.header.season?.year ?? "REPLAY",
       timeZone: "America/Chicago", caption: play.text, spotlight: game,

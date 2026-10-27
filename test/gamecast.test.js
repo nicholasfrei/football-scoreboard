@@ -249,10 +249,10 @@ test("a summary outage keeps the schedule score and flags missing gamecast", asy
   assert.equal(result.spotlight.ball, undefined);
 });
 
-test("period and play timestamps keep a reused overtime sequence out of the second quarter", () => {
+test("periods and terminal markers keep a reused overtime sequence out of the second quarter", () => {
   const result = enrichGame(game, summary({ previous: [{ plays: [
     { id: "q2", text: "Second quarter", sequenceNumber: "42", period: { number: 2 }, wallclock: "2026-10-17T23:45Z" },
-    { id: "end", text: "End of OT.", sequenceNumber: "42", period: { number: 5 }, wallclock: "2026-10-18T02:35Z" },
+    { id: "end", text: "End of OT.", type: { text: "End of Game" }, sequenceNumber: "42", period: { number: 5 }, wallclock: "2026-10-18T02:35Z" },
     { id: "ot", text: "Overtime play", sequenceNumber: "158", period: { number: 5 }, wallclock: "2026-10-18T02:34Z" },
   ] }] }));
   assert.deepEqual(result.plays.map((play) => play.id), ["end", "ot", "q2"]);

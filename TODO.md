@@ -23,12 +23,12 @@
 - [x] "END QUARTER 2" = HALFTIME - show that in place of Q2 00:00
 
 
-- [ ] sack by shows as empty
-- [ ] we don't have an event for turnover on downs
-- [ ] redzone is orange-ish and not red enough
-- [ ] stats section for the home team is inverted. It should be an exact flip of the left side.
-- [ ] touchdown font in the plays on the right doesn't show in the primary team color
-- [ ] tweak my demo script to be a full script from a real game (e.g. one of the sample games from test/fixtures/games/college-football)
+- [ ] sack by and tackle for loss shows as empty
+- [x] we don't have an event for turnover on downs
+- [x] redzone is orange-ish and not red enough
+- [x] stats section for the home team is inverted. It should be an exact flip of the left side.
+- [x] touchdown font in the plays on the right doesn't show in the primary team color
+- [x] tweak my demo script to be a full script from a real game (e.g. one of the sample games from test/fixtures/games/college-football)
 
 
 - [ ] v2 feat. -  animations like completed pass, incomplete pass, run, TFL, sack, interception, etc.

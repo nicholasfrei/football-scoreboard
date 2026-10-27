@@ -39,7 +39,14 @@ test("server serves every startup module so the dashboard can leave its loading 
   for (const [game, count] of [["nfl", 187], ["college", 215]]) {
     const response = await fetch(`http://127.0.0.1:${port}/api/demo?game=${game}`);
     assert.equal(response.status, 200);
-    assert.equal((await response.json()).length, count);
+    const frames = await response.json();
+    assert.equal(frames.length, count);
+    if (game === "college") {
+      const incompletion = frames.find((frame) => frame.spotlight.fieldContext.lastPlayId === "401856732698");
+      assert.equal(incompletion.spotlight.ball?.label, "MISS 27", "the served replay must not cache an invalid goal-line spot");
+      assert.equal(incompletion.spotlight.ball.downDistance, "3rd & 3 at MISS 27");
+      assert.equal(incompletion.spotlight.ball.firstDownPercent, 30);
+    }
   }
   assert.equal((await fetch(`http://127.0.0.1:${port}/api/demo?game=unknown`)).status, 400);
   const font = await fetch(`http://127.0.0.1:${port}/assets/fonts/Graduate-Regular.ttf`);

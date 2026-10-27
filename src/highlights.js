@@ -1,4 +1,4 @@
-import { textIntentionalGrounding } from "./penalty.js";
+import { acceptedPenalty as interpretPenalty } from "./penalty.js";
 
 /** A new series on the same possession, not a kickoff or a change of possession. */
 function isFirstDown(play) {
@@ -10,6 +10,19 @@ function isFirstDown(play) {
   return start.down > 1 || (Number.isFinite(start.distance) && start.distance > 0
     && Number.isFinite(start.yardsToEndzone) && Number.isFinite(end.yardsToEndzone)
     && start.yardsToEndzone - end.yardsToEndzone >= start.distance);
+}
+
+/** A failed fourth-down snap must give the game's other team a new series. */
+function isTurnoverOnDowns(play, teamIds) {
+  const { start, end } = play;
+  if (start?.down !== 4 || end?.down !== 1 || play.scoringPlay
+      || teamIds.length !== 2 || new Set(teamIds).size !== 2
+      || !/^(Rush|Pass Reception|Pass Completion|Pass Incompletion|Sack)$/i.test(play.type?.text ?? "")
+      || play.penalty?.status?.slug === "accepted"
+      || /\b(?:penalty|fumble\w*|intercept\w*|touchdown|safety|no play|nullified|overturned)\b/i.test(play.text ?? "")) return false;
+  const offense = String(start.team?.id);
+  const defense = String(end.team?.id);
+  return offense !== defense && teamIds.includes(offense) && teamIds.includes(defense);
 }
 
 function playerAtStart(text) {
@@ -28,6 +41,8 @@ function blockingPlayer(text) {
 }
 
 function rushingLoss(play) {
+  // Voluntary kneels count as negative rushing yards, but are not defensive stops.
+  if (/\b(?:kneel(?:s|ed|ing)?(?:[\s-]*down)?|knelt|(?:takes?|taking|took)\s+a\s+knee)\b/i.test(play.text ?? "")) return false;
   if (Number.isFinite(play.statYardage)) return play.statYardage < 0;
   if (/\bfor\s+(?:no gain|0\s+yards?)\b/i.test(play.text ?? "")) return false;
   if (play.start?.possessionText && play.start.possessionText === play.end?.possessionText) return false;
@@ -40,8 +55,7 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
   const scoringTeams = new Map((scoringPlays ?? []).map((play) => [String(play.id), play.team?.id]));
   return plays.flatMap((play) => {
     const type = play.type?.text ?? "";
-    const acceptedPenalty = (play.penalty?.status?.slug === "accepted" && play.penalty.type?.text)
-      || (textIntentionalGrounding(play) && "Intentional Grounding");
+    const acceptedPenalty = interpretPenalty(play);
     if (/no play|nullified/i.test(play.text ?? "") && !acceptedPenalty) return [];
     let kind;
     if (play.scoringPlay && (play.scoringType?.name === "touchdown" || /touchdown/i.test(type))) kind = "touchdown";
@@ -55,6 +69,7 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
       || (/field goal/i.test(type) && /\bblocked\b/i.test(play.text ?? ""))) kind = "blocked-field-goal";
     else if (/\b(?:blocked punt|punt blocked)\b/i.test(type)) kind = "blocked-punt";
     else if (/^Punt(?: Return| Fair Catch| Downed| Out of Bounds| Touchback)?$/i.test(type)) kind = "punt";
+    else if (isTurnoverOnDowns(play, teamIds)) kind = "turnover-on-downs";
     else if (/^Sack$/i.test(type)) kind = "sack";
     else if (/^Rush$/i.test(type) && !play.scoringPlay && !play.isTurnover
       && play.start?.team?.id != null && play.end?.team?.id != null
@@ -63,7 +78,9 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
     if (!kind) return [];
 
     let teamId = scoringTeams.get(String(play.id));
-    if (kind === "punt") {
+    if (kind === "turnover-on-downs") {
+      teamId = play.end.team.id;
+    } else if (kind === "punt") {
       teamId = play.start?.team?.id;
     } else if (kind === "blocked-punt" || kind === "blocked-field-goal") {
       // The blocking team is the opponent of the confirmed kicking team,
@@ -90,11 +107,11 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
       sequence: Number(play.sequenceNumber),
       kind,
       teamId,
-      detail: kind === "penalty" ? `${acceptedPenalty}${Number.isFinite(play.penalty?.yards) ? ` · ${play.penalty.yards} YDS` : ""}` : type,
+      detail: kind === "penalty" ? `${acceptedPenalty.type}${acceptedPenalty.yards !== null ? ` · ${acceptedPenalty.yards} YDS` : ""}` : type,
       player: kind === "interception" ? interceptionPlayer(play.text)
         : kind === "blocked-field-goal" ? blockingPlayer(play.text) : null,
-      penaltyType: kind === "penalty" ? acceptedPenalty : null,
-      penaltyYards: kind === "penalty" && Number.isFinite(play.penalty?.yards) ? play.penalty.yards : null,
+      penaltyType: kind === "penalty" ? acceptedPenalty.type : null,
+      penaltyYards: kind === "penalty" ? acceptedPenalty.yards : null,
       occurredAt: play.wallclock ?? null,
     }];
   }).filter((event) => Number.isFinite(event.sequence)).slice(-20);

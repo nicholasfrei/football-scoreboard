@@ -5,6 +5,13 @@ function clockSeconds(clock) {
   return match && Number(match[2]) < 60 ? Number(match[1]) * 60 + Number(match[2]) : null;
 }
 
+function compareInOrder(order, currentId, previousId) {
+  if (!Array.isArray(order) || currentId == null || previousId == null) return null;
+  const current = order.indexOf(currentId);
+  const previous = order.indexOf(previousId);
+  return current < 0 || previous < 0 ? null : current - previous;
+}
+
 export function createBallPositionTracker() {
   let previous = null;
   return {
@@ -27,7 +34,13 @@ export function createBallPositionTracker() {
       const period = context.lastPlayPeriod;
       const clock = clockSeconds(context.lastPlayClock);
       const previousClock = clockSeconds(previous?.lastPlayClock);
-      const olderPlay = previous?.key === key && (Number.isFinite(period) && Number.isFinite(previous?.lastPlayPeriod) && period !== previous.lastPlayPeriod
+      // Share the adapter's reconciled football order with highlight tracking.
+      // Clocks can be restored or untimed; retain the preceding order so a
+      // shortened feed can still identify an older scoring entry during a gap.
+      const orderedComparison = compareInOrder(game.latestPlayOrder, context.lastPlayId, previous?.lastPlayId)
+        ?? compareInOrder(previous?.playOrder, context.lastPlayId, previous?.lastPlayId);
+      const olderPlay = previous?.key === key && (orderedComparison !== null ? orderedComparison < 0
+        : Number.isFinite(period) && Number.isFinite(previous?.lastPlayPeriod) && period !== previous.lastPlayPeriod
         ? period < previous.lastPlayPeriod
         : clock !== null && previousClock !== null && clock !== previousClock
           ? clock > previousClock
@@ -56,6 +69,8 @@ export function createBallPositionTracker() {
         lastPlaySequence: olderPlay || context.lastPlayId == null ? previous?.lastPlaySequence ?? null : sequence,
         lastPlayPeriod: olderPlay || context.lastPlayId == null ? previous?.lastPlayPeriod ?? null : period,
         lastPlayClock: olderPlay || context.lastPlayId == null ? previous?.lastPlayClock ?? null : context.lastPlayClock,
+        playOrder: olderPlay || context.lastPlayId == null ? previous?.playOrder ?? null
+          : Array.isArray(game.latestPlayOrder) ? [...game.latestPlayOrder] : null,
       };
       return { ...game, ball, possessionTeamId, ballHeld: held };
     },
