@@ -5,6 +5,7 @@ import { teamRecordLabel } from "./team-record.js";
 import { kickoffCountdown, createRefreshLoop } from "./game-timing.js";
 import { createBallPositionTracker } from "./ball-position.js";
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT, displayScale } from "./display-size.js";
+import { scoringNeedsHighlight } from "./scoring-style.js";
 
 function fitDisplay() {
   const scale = displayScale(window.innerWidth, window.innerHeight);
@@ -302,7 +303,10 @@ function renderDrives(game) {
     const time = document.createElement("span");
     time.textContent = `${play.period > 4 ? `OT${play.period - 4}` : `Q${play.period ?? "—"}`} · ${play.clock ?? "—"}`;
     const text = document.createElement("span");
-    text.textContent = /^END QUARTER 2\.?$/i.test(play.text.trim()) ? "HALFTIME" : play.text;
+    const description = document.createElement("span");
+    description.className = "play-description";
+    description.textContent = /^END QUARTER 2\.?$/i.test(play.text.trim()) ? "HALFTIME" : play.text;
+    text.append(description);
     if (play.penalty) {
       const badge = document.createElement("b");
       badge.className = "penalty-badge";
@@ -315,6 +319,7 @@ function renderDrives(game) {
     if (scoringTeam) {
       item.style.setProperty("--scoring-color", scoringTeam.color);
       item.classList.add("has-scoring-team");
+      item.classList.toggle("scoring-needs-highlight", scoringNeedsHighlight(scoringTeam.color));
     }
     item.append(time, text);
     list.append(item);

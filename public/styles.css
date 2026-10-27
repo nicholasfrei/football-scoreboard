@@ -266,12 +266,15 @@ body::before {
 .highlight[data-kind="field-goal"] .kick-art { display: block; }
 .highlight[data-kind="punt"] .punt-art,
 .highlight[data-kind="blocked-punt"] .punt-art,
-.highlight[data-kind="blocked-punt"] .blocked-impact { display: block; }
+.highlight[data-kind="blocked-punt"] .blocked-impact,
+.highlight[data-kind="blocked-field-goal"] .punt-art,
+.highlight[data-kind="blocked-field-goal"] .blocked-impact { display: block; }
 .highlight.is-animating .highlight-headline { animation: highlight-arrive .45s ease-out both; }
 .highlight.is-animating .kick-ball { animation: kick-good 1.8s ease-out both; }
 .punt-flight { transform-origin: 35px 125px; }
 .highlight.is-animating[data-kind="punt"] .punt-flight { animation: punt-flight 1.8s ease-out both; }
-.highlight.is-animating[data-kind="blocked-punt"] .punt-flight { animation: punt-blocked 1.8s ease-out both; }
+.highlight.is-animating[data-kind="blocked-punt"] .punt-flight,
+.highlight.is-animating[data-kind="blocked-field-goal"] .punt-flight { animation: punt-blocked 1.8s ease-out both; }
 .highlight.is-animating .blocked-impact { animation: block-impact 1.8s ease-out both; }
 @keyframes punt-flight { 0% { transform: translate(0, 0) rotate(0); } 50% { transform: translate(65px, -95px) rotate(-90deg); } 100% { transform: translate(130px, -10px) rotate(-180deg); } }
 @keyframes punt-blocked { 0% { transform: translate(0, 0) rotate(0); } 40% { transform: translate(65px, -65px) rotate(-70deg); } 100% { transform: translate(15px, 10px) rotate(150deg); } }
@@ -319,11 +322,13 @@ body::before {
 .drive-content { position: relative; min-height: 0; max-height: 150px; overflow-y: auto; scrollbar-color: #657665 #121914; }
 #recent-plays { list-style: none; margin: 0; padding: 0; }
 #recent-plays li { display: flex; gap: 12px; padding: 6px 0; font-size: 12px; line-height: 1.5; color: #c4cdc0; }
-#recent-plays li span:first-child { flex: 0 0 78px; color: #98b398; font-variant-numeric: tabular-nums; }
+#recent-plays li > span:first-child { flex: 0 0 78px; color: #98b398; font-variant-numeric: tabular-nums; }
 #recent-plays .scoring-play { color: #f6d792; }
-#recent-plays .scoring-play.has-scoring-team span:last-child {
-  padding: 2px 4px; border-radius: 3px;
-  color: var(--scoring-color); background: color-mix(in srgb, var(--scoring-color) 12%, #f4f1e8);
+#recent-plays .scoring-play.has-scoring-team .play-description {
+  color: var(--scoring-color);
+}
+#recent-plays .scoring-play.has-scoring-team.scoring-needs-highlight .play-description {
+  background: #fff; padding: 2px 4px; border-radius: 3px;
   -webkit-box-decoration-break: clone; box-decoration-break: clone;
 }
 #recent-plays .penalty-play { color: #f6d792; }

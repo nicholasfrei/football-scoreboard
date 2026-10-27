@@ -104,7 +104,22 @@ feeds and unavailable game summaries discard held positions; returning online
 without a new spot does not resurrect the old one. A game/league switch, final,
 or reload also clears this browser-only memory. Within a current drive, the
 adapter can recover a real spot before timeout/period markers, but never from
-an earlier drive or across a scoring play/kickoff.
+an earlier drive or across a scoring play. For a touchback or fair catch on
+the latest kickoff or punt, it can also use the receiving team's reported end
+spot, or derive a spot when the outcome and team are unambiguous. College
+kickoff touchbacks and fair catches inside the 25 use the 25; punt touchbacks
+use the 20 in both leagues. NFL kickoff touchbacks depend on the season and
+how the kick lands; the adapter does not guess when that information is missing.
+Punt fair catches remain at the catch spot. A reported live situation takes
+priority, including penalty enforcement; ambiguous or penalized kicks do not
+get a rule-derived spot.
+For a straightforward, unreturned field-goal miss, ESPN sometimes repeats the
+line of scrimmage as a placeholder. College uses the previous spot; the NFL
+uses the kick spot when the reported kick distance establishes it. Both use a
+minimum of the receiving team's 20. The app does not infer a spot for a blocked
+kick, a short kick or an ambiguous return; a different reported end spot or a
+live situation takes precedence. See NCAA rule 8-4-2 in the
+[2026 NCAA rulebook](https://ncaaorg.s3.amazonaws.com/championships/sports/football/rules/PRMFB_RulesBook.pdf).
 
 During live games and the drive demo, the quarter and game clock are centered
 **above the score**. Kickoff date/time, venue and broadcast share a single row at
@@ -137,9 +152,10 @@ provider drive summary, and drive history at the bottom of the same scrolling pl
 a drive in that history to read its plays; a left-side Current drive button appears
 only while browsing an older drive and restores automatic following. Only older
 drives display a small team/result title above the plays/yards/possession-time summary.
-Penalty plays use gold text and a flag. Scoring plays use the scorer's primary
-team color on a light background so dark team colors remain legible; attribution
-comes from ESPN's scoring-play team rather than the drive's offense.
+Penalty plays use gold text and a flag. Scoring play text uses the scorer's
+primary team color; when its contrast against the dark panel is below 4.5:1,
+the text gets a white background. Attribution comes from ESPN's scoring-play
+team rather than the drive's offense.
 
 Broadcast listings also appear beside the displayed game's date and venue.
 Unannounced networks show `TBD`. Listings may change and do not include local
@@ -148,16 +164,19 @@ cable channel numbers.
 ## Big-play takeovers
 
 New live interceptions, fumble recoveries, sacks, tackles for loss, accepted
-penalties, made field goals, and safeties briefly replace the main score panel
+penalties, made and blocked field goals, and safeties briefly replace the main score panel
 for **12 seconds**. Penalties use the same dark fade as other takeovers, tinted
 yellow, with the infraction as the headline and enforced yardage below only
 when reported. The app does not guess the penalized team;
 declined and offsetting penalties do not alert.
+If ESPN explicitly reports intentional grounding in play text without penalty
+status, the app treats it as a penalty unless the text says it was declined or
+offsetting, even when ESPN labels it a sack. It does not infer penalty yardage.
 Touchdowns remain for up to **five minutes**, ending earlier when the confirmed
 ball position changes. **First downs** show for **25 seconds**; **made extra points**
 show a kick through the uprights for **6 seconds**. Made field goals use the
 same kick animation. **Punts** show a football flight for **4 seconds**;
-**blocked punts** show a deflected football for **12 seconds**. The
+**blocked punts and field goals** show a deflected football for **12 seconds**. The
 event uses the scoring/recovering team's logo and color when attribution is
 known. The event and team share a headline (for example, `TOUCHDOWN DALLAS`),
 wrapping when needed on narrow screens or for long team names.
@@ -174,11 +193,17 @@ Takeovers use structured ESPN play types and IDs/sequences:
 - Extra points require a separate confirmed made-XP play. Some ESPN feeds bundle
   the kick into the touchdown entry; those produce only the touchdown alert.
   The app does not infer an XP from a score change or touchdown commentary.
+- Interceptions show the player when explicitly named in the play description;
+  if the player is unknown, the app does not invent a name. Tackles for loss
+  require a negative rushing gain, preferring reported rushing yardage over
+  potentially inconsistent end-zone coordinates.
 - Punts identify the punting team from the play's starting possession, while
   the scoreboard football follows the receiving team's possession. Blocked
   punts identify the blocking team as the opponent of the confirmed punting
   team, independently of which team recovers. Missing attribution stays unknown.
   A punt return or blocked punt scored as a touchdown produces one TD takeover.
+  Blocked field goals similarly credit the blocking team, independently of
+  recovery, and show the blocker when explicitly reported.
 
 - Loading the page, switching games, recovering from an outage, or returning
   after a polling gap establishes a silent baseline. Old plays are not replayed.

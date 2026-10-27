@@ -15,6 +15,7 @@ export const HIGHLIGHT_LABELS = {
   "extra-point": "EXTRA POINT",
   punt: "PUNT",
   "blocked-punt": "BLOCKED PUNT",
+  "blocked-field-goal": "BLOCKED FIELD GOAL",
 };
 
 export function highlightDuration(kind) {
@@ -25,12 +26,14 @@ export function highlightDuration(kind) {
 
 export function highlightDetail(event, game) {
   if (event.kind === "penalty") return Number.isFinite(event.penaltyYards) ? `${event.penaltyYards} YDS` : "";
+  if (event.kind === "interception") return event.player ? `INTERCEPTED BY ${event.player}` : "";
+  if (event.kind === "blocked-field-goal" && event.player) return `BLOCKED BY ${event.player}`;
   if (event.kind === "touchdown") {
     const { selectedTeam, opponent } = game;
     return `${selectedTeam.abbreviation} ${selectedTeam.score ?? "—"}-${opponent.score ?? "—"} ${opponent.abbreviation}`;
   }
-  const labels = { interception: "INTERCEPTED BY", fumble: "RECOVERED BY", sack: "SACK BY",
-    "tackle-for-loss": "STOPPED BY", punt: "PUNTING TEAM", "blocked-punt": "BLOCKED BY" };
+  const labels = { fumble: "RECOVERED BY", sack: "SACK BY",
+    "tackle-for-loss": "STOPPED BY", punt: "PUNTING TEAM", "blocked-punt": "BLOCKED BY", "blocked-field-goal": "BLOCKED BY" };
   if (Object.hasOwn(labels, event.kind)) {
     return [game.selectedTeam, game.opponent].some((team) => team.id === event.teamId)
       ? labels[event.kind] : "TEAM NOT CONFIRMED";

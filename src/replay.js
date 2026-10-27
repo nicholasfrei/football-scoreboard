@@ -1,6 +1,7 @@
 import { normalizeGame } from "./scoreboard.js";
 import { enrichGame } from "./gamecast.js";
 import { gameHighlights } from "./highlights.js";
+import { comparePlays } from "./play-order.js";
 
 export const REPLAY_GAMES = {
   nfl: { id: "401873009", league: "nfl", teamId: "6", file: "nfl/401873009.json.gz", label: "Cowboys vs Eagles" },
@@ -21,13 +22,23 @@ export function createReplayFrames(summary, option) {
   for (const drive of drives) for (const play of drive.plays ?? []) {
     if (play.id && play.text) byId.set(String(play.id), { play, drive });
   }
-  const ordered = [...byId.values()].sort((a, b) =>
-    Number(a.play.period?.number) - Number(b.play.period?.number)
-    || (Date.parse(a.play.wallclock) - Date.parse(b.play.wallclock))
-    || Number(a.play.sequenceNumber) - Number(b.play.sequenceNumber));
+  const ordered = [...byId.values()].sort((a, b) => comparePlays(a.play, b.play));
   const teamIds = competition.competitors.map((team) => String(team.team.id));
   const visible = new Set();
   return ordered.map(({ play, drive }, index) => {
+    const before = ordered[index - 1]?.play;
+    const after = ordered[index + 1]?.play;
+    // A provider revision can attach a later wallclock and score to an earlier
+    // non-scoring play. Correct only an isolated outlier surrounded by the same
+    // score within the same period; never expose the later score in the replay.
+    const staleScore = !play.scoringPlay && before && after
+      && before.period?.number === play.period?.number && after.period?.number === play.period?.number
+      && Number.isFinite(Date.parse(play.wallclock)) && Number.isFinite(Date.parse(after.wallclock))
+      && Date.parse(play.wallclock) > Date.parse(after.wallclock)
+      && Number.isFinite(before.homeScore) && Number.isFinite(before.awayScore)
+      && before.homeScore === after.homeScore && before.awayScore === after.awayScore;
+    const homeScore = staleScore ? before.homeScore : play.homeScore;
+    const awayScore = staleScore ? before.awayScore : play.awayScore;
     visible.add(String(play.id));
     const prefix = (item, completed) => ({ ...item,
       plays: (item.plays ?? []).filter((entry) => visible.has(String(entry.id))),
@@ -41,7 +52,7 @@ export function createReplayFrames(summary, option) {
       header: { ...summary.header, competitions: [{
         ...competition,
         competitors: competition.competitors.map((team) => ({ ...team,
-          score: String(team.homeAway === "home" ? play.homeScore : play.awayScore) })),
+          score: String(team.homeAway === "home" ? homeScore : awayScore) })),
         status: { period: play.period.number, displayClock: play.clock.displayValue,
           type: { state: index === ordered.length - 1 ? "post" : "in", completed: index === ordered.length - 1, detail: "Replay" } },
       }] },

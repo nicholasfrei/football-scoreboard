@@ -1,6 +1,9 @@
 import { normalizeGame } from "./scoreboard.js";
 import { gameHighlights } from "./highlights.js";
 import { matchupPredictor } from "./game-details.js";
+import { textIntentionalGrounding } from "./penalty.js";
+import { kickPosition } from "./kick-position.js";
+import { comparePlays } from "./play-order.js";
 
 function recentPlays(summary) {
   const drives = [...(summary.drives?.previous ?? []), summary.drives?.current].filter(Boolean);
@@ -8,15 +11,7 @@ function recentPlays(summary) {
   for (const play of drives.flatMap((drive) => drive.plays ?? [])) {
     if (play.id && play.text) byId.set(play.id, play);
   }
-  return [...byId.values()].sort((a, b) => {
-    const period = Number(a.period?.number ?? 0) - Number(b.period?.number ?? 0);
-    if (period) return period;
-    // Full college feeds can reuse/reset sequences (including an OT end marker
-    // with a Q2 sequence). Use actual play timestamps when both are available.
-    const time = Date.parse(a.wallclock) - Date.parse(b.wallclock);
-    return (Number.isFinite(time) && time !== 0 ? time : 0)
-      || Number(a.sequenceNumber ?? 0) - Number(b.sequenceNumber ?? 0);
-  });
+  return [...byId.values()].sort(comparePlays);
 }
 
 function driveSummary(drive, orderedPlays, scoringTeams) {
@@ -35,7 +30,8 @@ function driveSummary(drive, orderedPlays, scoringTeams) {
       clock: play.clock?.displayValue ?? null,
       scoring: Boolean(play.scoringPlay),
       scoringTeamId: play.scoringPlay ? scoringTeams.get(String(play.id)) ?? null : null,
-      penalty: play.penalty?.type?.text ?? (/penalty/i.test(play.type?.text ?? "") ? "Penalty" : null),
+      penalty: play.penalty?.type?.text ?? (textIntentionalGrounding(play) ? "Intentional Grounding"
+        : /penalty/i.test(play.type?.text ?? "") ? "Penalty" : null),
     })),
   };
 }
@@ -89,6 +85,38 @@ function positionFromText(text, home, away) {
   if (match[1] === home.abbreviation) return 100 - yards;
   if (match[1] === away.abbreviation) return yards;
   return null;
+}
+
+// ESPN can copy the line of scrimmage into the end spot of an unreturned miss.
+// Only correct an obvious placeholder (or missing spot) with sufficient data.
+function missedFieldGoalPosition(play, league, home, away) {
+  if (!/^Field Goal Missed$/i.test(play?.type?.text ?? "") || play.scoringPlay || play.isPenalty || play.penalty
+      || /\b(?:blocked|return(?:ed)?|touchback|penalty|no play|nullified)\b/i.test(play.text ?? "")
+      || !/\b(?:no good|wide (?:right|left)|(?:hit|hits) (?:the )?(?:(?:right|left) )?upright)\b/i.test(play.text ?? "")
+      || /\bshort\b/i.test(play.text ?? "")) return null;
+  const teams = [home, away];
+  const kicker = teams.find((team) => team.id === String(play.start?.team?.id));
+  const receiver = kicker && teams.find((team) => team.id !== kicker.id);
+  const endId = play.end?.team?.id;
+  if (!receiver || (endId != null && String(endId) !== receiver.id)) return null;
+  const start = positionFromText(play.start?.possessionText, home, away);
+  if (start === null) return null;
+  let percent;
+  if (league === "college-football") {
+    percent = receiver.id === home.id ? Math.min(start, 80) : Math.max(start, 20);
+  } else if (league === "nfl") {
+    const distance = /\b(\d{1,3})\s+yard field goal\b/i.exec(play.text ?? "");
+    if (!distance) return null;
+    const kickYards = Number(distance[1]) - 10;
+    if (kickYards < 0 || kickYards > 100) return null;
+    const raw = receiver.id === home.id ? 100 - kickYards : kickYards;
+    const offset = receiver.id === home.id ? start - raw : raw - start;
+    if (offset < 6 || offset > 9) return null;
+    percent = receiver.id === home.id ? Math.min(raw, 80) : Math.max(raw, 20);
+  } else return null;
+  const side = percent > 50 ? home : away;
+  return { teamId: receiver.id, percent, start,
+    label: `${side.abbreviation} ${percent > 50 ? 100 - percent : percent}` };
 }
 
 export function enrichGame(game, summary) {
@@ -163,6 +191,34 @@ export function enrichGame(game, summary) {
     positionSource = "last reported play";
   }
 
+  // A kick's end spot belongs to the receiver, not the kicking team's drive.
+  // Prefer a complete live situation, which can include penalty enforcement.
+  const lastCurrentPlay = currentPlays.findLast((play) => !isPause(play));
+  const kick = currentIds.has(String(latestPlay?.id))
+    ? kickPosition(lastCurrentPlay, updated.league, home, away, summary.header?.season?.year) : null;
+  if (kick && (!situation || position === null) && (!situation?.possession || possessionId === kick.teamId)) {
+    possessionId = kick.teamId;
+    position = kick.percent;
+    positionLabel = kick.label;
+    downDistance = kick.downDistance;
+    down = kick.down;
+    distance = kick.distance;
+    positionSource = "last reported play";
+  }
+  const miss = currentIds.has(String(latestPlay?.id))
+    ? missedFieldGoalPosition(lastCurrentPlay, updated.league, home, away) : null;
+  if (miss && (!situation || position === null) && (position === null || position === miss.start)
+      && (!situation?.possession || possessionId === miss.teamId)) {
+    possessionId = miss.teamId;
+    position = miss.percent;
+    positionLabel = miss.label;
+    const end = lastCurrentPlay.end;
+    downDistance = end?.shortDownDistanceText ?? null;
+    down = end?.down;
+    distance = end?.distance;
+    positionSource = "kick rule";
+  }
+
   const possessionTeam = [home, away].find((team) => team.id === possessionId);
   const ball = updated.state === "live" && possessionTeam && position !== null ? {
     percent: position,
@@ -184,6 +240,8 @@ export function enrichGame(game, summary) {
       lastPlayId: latestPlay?.id == null ? null : String(latestPlay.id),
       lastPlayAt: latestPlay?.wallclock ?? null,
       lastPlaySequence: latestPlay?.sequenceNumber == null ? null : Number(latestPlay.sequenceNumber),
+      lastPlayPeriod: latestPlay?.period?.number ?? null,
+      lastPlayClock: latestPlay?.clock?.displayValue ?? null,
       lastPlayType: latestPlay?.type?.text ?? "",
       scoring: Boolean(latestPlay?.scoringPlay),
       turnover: Boolean(latestPlay?.isTurnover),

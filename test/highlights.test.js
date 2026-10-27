@@ -23,10 +23,12 @@ test("touchdown details show the current score with the selected team first, nev
 
 test("other highlight details retain their labels and unknown-team safeguards", () => {
   const game = { selectedTeam: { id: "6" }, opponent: { id: "21" } };
-  for (const [kind, label] of Object.entries({ interception: "INTERCEPTED BY", fumble: "RECOVERED BY", punt: "PUNTING TEAM", "blocked-punt": "BLOCKED BY" })) {
+  for (const [kind, label] of Object.entries({ fumble: "RECOVERED BY", punt: "PUNTING TEAM", "blocked-punt": "BLOCKED BY", "blocked-field-goal": "BLOCKED BY" })) {
     assert.equal(highlightDetail({ kind, teamId: "21" }, game), label);
     assert.equal(highlightDetail({ kind, teamId: null }, game), "TEAM NOT CONFIRMED");
   }
+  assert.equal(highlightDetail({ kind: "interception", player: "#0 J.Crawford", teamId: "21" }, game), "INTERCEPTED BY #0 J.Crawford");
+  assert.equal(highlightDetail({ kind: "interception", teamId: "21" }, game), "");
   assert.equal(highlightDetail({ kind: "extra-point", detail: "IT’S GOOD · +1" }, game), "IT’S GOOD · +1");
   assert.equal(highlightDetail({ kind: "penalty", penaltyType: "Defensive Pass Interference", penaltyYards: 15 }, game), "15 YDS");
   assert.equal(highlightDetail({ kind: "penalty", penaltyType: "False Start", penaltyYards: null }, game), "");
@@ -61,6 +63,17 @@ test("interceptions use the receiving team even when ESPN isTurnover is false", 
   assert.equal(event.teamId, "8");
 });
 
+test("interceptions name only the player explicitly reported in play text", () => {
+  for (const [text, player] of [
+    ["Pass intercepted by #0 J.Crawford at TEXAS33", "#0 J.Crawford"],
+    ["Pass INTERCEPTED by D.Jackson at CHI -7. Touchback.", "D.Jackson"],
+    ["Pass INTERCEPTED by D.Knight (B.Carter) at BLT 38", "D.Knight"],
+    ["Pass intercepted by #19 C.McDonald III at TAM41", "#19 C.McDonald III"],
+    ["Pass intercepted; player unreported", null],
+  ]) assert.equal(classify(play({ type: { text: "Interception" }, scoringPlay: false, text,
+    start: { team: { id: "238" } }, end: { team: { id: "8" } } }))[0].player, player, text);
+});
+
 test("unknown interception and safety attribution never credits the offense", () => {
   assert.equal(classify(play({ type: { text: "Interception" }, scoringPlay: false }))[0].teamId, null);
   assert.equal(classify(play({ type: { text: "Safety" } }))[0].teamId, null);
@@ -91,6 +104,12 @@ test("sacks and negative rushes credit the defense, without flagging ordinary st
     { ...rush, text: "Penalty, no play" },
   ]) assert.deepEqual(classify(value), []);
   assert.equal(classify({ ...sack, start: undefined })[0].teamId, null);
+  assert.deepEqual(classify({ ...rush, statYardage: 0 }), [], "reported zero beats flipped coordinates");
+  assert.deepEqual(classify({ ...rush, statYardage: 2 }), [], "a gain is not a loss");
+  assert.deepEqual(classify({ ...rush, text: "Rush for 0 yards" }), [], "explicit zero is not a loss");
+  assert.deepEqual(classify({ ...rush, start: { ...rush.start, possessionText: "ARK 45" },
+    end: { ...rush.end, possessionText: "ARK 45" } }), [], "unchanged named spot is not a loss");
+  assert.equal(classify({ ...rush, statYardage: -1 })[0].kind, "tackle-for-loss");
 });
 
 test("accepted penalties alert without guessing the penalized team; declined and offsetting ones do not", () => {
@@ -106,6 +125,24 @@ test("accepted penalties alert without guessing the penalized team; declined and
   } }), []);
 });
 
+test("explicit intentional grounding text overrides a sack without guessing yardage", () => {
+  const grounding = play({ type: { text: "Sack" }, scoringPlay: false,
+    text: "Incomplete pass PENALTY MISS Intentional Grounding (#6 T.Chambliss)",
+    start: { team: { id: "8" } }, end: { team: { id: "8" } } });
+  const event = classify(grounding)[0];
+  assert.equal(event.kind, "penalty");
+  assert.equal(event.penaltyType, "Intentional Grounding");
+  assert.equal(event.penaltyYards, null);
+  assert.equal(event.teamId, null);
+  for (const suffix of [" declined", " offsetting", " offset"]) {
+    assert.notEqual(classify({ ...grounding, text: grounding.text + suffix })[0]?.kind, "penalty");
+  }
+  for (const slug of ["declined", "offsetting"]) {
+    assert.notEqual(classify({ ...grounding, penalty: { status: { slug } } })[0]?.kind, "penalty");
+  }
+  assert.equal(classify({ ...grounding, text: "Quarterback sacked; possible intentional grounding" })[0].kind, "sack");
+});
+
 test("made field goals and extra points qualify but misses and nullified plays do not", () => {
   assert.equal(classify(play({ type: { text: "Field Goal Good" } }))[0].kind, "field-goal");
   assert.equal(classify(play({ type: { text: "Extra Point Good" } }))[0].kind, "extra-point");
@@ -118,6 +155,21 @@ test("made field goals and extra points qualify but misses and nullified plays d
     play({ type: { text: "Pass Reception" }, scoringPlay: false, text: "Touchdown overturned" }),
     play({ scoringPlay: false }),
   ]) assert.deepEqual(classify(p), []);
+});
+
+test("blocked field goals credit the blocking team, independently of recovery", () => {
+  for (const end of ["8", "238"]) {
+    const result = classify(play({ type: { text: "Blocked Field Goal" }, scoringPlay: false,
+      start: { team: { id: "8" } }, end: { team: { id: end } } }));
+    assert.equal(result[0].kind, "blocked-field-goal");
+    assert.equal(result[0].teamId, "238");
+  }
+  assert.equal(classify(play({ type: { text: "Field Goal Blocked" }, scoringPlay: false, start: undefined }))[0].teamId, null);
+  assert.equal(classify(play({ type: { text: "Field Goal Missed" }, scoringPlay: false, text: "Field goal blocked" }))[0].kind, "blocked-field-goal");
+  assert.equal(classify(play({ type: { text: "Blocked Field Goal" }, scoringPlay: false,
+    text: "35 yard field goal is BLOCKED (D.Wonnum), Center-M.Orzech" }))[0].player, "D.Wonnum");
+  assert.deepEqual(classify(play({ type: { text: "Blocked Field Goal" }, scoringPlay: false, text: "Blocked, no play" })), []);
+  assert.equal(classify(play({ type: { text: "Blocked Field Goal Return Touchdown" }, scoringPlay: true }))[0].kind, "touchdown");
 });
 
 test("first downs use a confirmed new series on the same possession", () => {

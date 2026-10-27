@@ -1,3 +1,5 @@
+import { textIntentionalGrounding } from "./penalty.js";
+
 /** A new series on the same possession, not a kickoff or a change of possession. */
 function isFirstDown(play) {
   const { start, end } = play;
@@ -10,12 +12,36 @@ function isFirstDown(play) {
     && start.yardsToEndzone - end.yardsToEndzone >= start.distance);
 }
 
-/** Classify confirmed provider play types and down metadata, not commentary. */
+function playerAtStart(text) {
+  const match = /^((?:#\d+\s+)?[a-z][a-z.'-]*(?:\s+(?!(?:at|return|to|for|in|on)\b)[a-z][a-z.'-]*){0,3})/i.exec(text ?? "");
+  return match?.[1]?.replace(/\.$/, "") ?? null;
+}
+
+function interceptionPlayer(text) {
+  return playerAtStart(/\bintercepted by\s+(.+)/i.exec(text ?? "")?.[1]);
+}
+
+function blockingPlayer(text) {
+  const explicit = /\bblocked by\s+(.+)/i.exec(text ?? "")?.[1];
+  const parenthesized = /\bis blocked\s*\(([^)]+)\)/i.exec(text ?? "")?.[1];
+  return playerAtStart(explicit ?? parenthesized);
+}
+
+function rushingLoss(play) {
+  if (Number.isFinite(play.statYardage)) return play.statYardage < 0;
+  if (/\bfor\s+(?:no gain|0\s+yards?)\b/i.test(play.text ?? "")) return false;
+  if (play.start?.possessionText && play.start.possessionText === play.end?.possessionText) return false;
+  return Number.isFinite(play.start?.yardsToEndzone) && Number.isFinite(play.end?.yardsToEndzone)
+    && play.end.yardsToEndzone > play.start.yardsToEndzone;
+}
+
+/** Classify provider play types and down metadata, with a specific grounding fallback. */
 export function gameHighlights(plays, scoringPlays, teamIds) {
   const scoringTeams = new Map((scoringPlays ?? []).map((play) => [String(play.id), play.team?.id]));
   return plays.flatMap((play) => {
     const type = play.type?.text ?? "";
-    const acceptedPenalty = play.penalty?.status?.slug === "accepted" && play.penalty.type?.text;
+    const acceptedPenalty = (play.penalty?.status?.slug === "accepted" && play.penalty.type?.text)
+      || (textIntentionalGrounding(play) && "Intentional Grounding");
     if (/no play|nullified/i.test(play.text ?? "") && !acceptedPenalty) return [];
     let kind;
     if (play.scoringPlay && (play.scoringType?.name === "touchdown" || /touchdown/i.test(type))) kind = "touchdown";
@@ -25,21 +51,22 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
     else if (play.scoringPlay && /safety/i.test(type)) kind = "safety";
     else if (play.scoringPlay && (play.scoringType?.name === "extra-point" || /^Extra Point Good$/i.test(type))) kind = "extra-point";
     else if (acceptedPenalty) kind = "penalty";
+    else if (/\b(?:blocked field goal|field goal blocked)\b/i.test(type)
+      || (/field goal/i.test(type) && /\bblocked\b/i.test(play.text ?? ""))) kind = "blocked-field-goal";
     else if (/\b(?:blocked punt|punt blocked)\b/i.test(type)) kind = "blocked-punt";
     else if (/^Punt(?: Return| Fair Catch| Downed| Out of Bounds| Touchback)?$/i.test(type)) kind = "punt";
     else if (/^Sack$/i.test(type)) kind = "sack";
     else if (/^Rush$/i.test(type) && !play.scoringPlay && !play.isTurnover
-      && String(play.start?.team?.id) === String(play.end?.team?.id)
-      && Number.isFinite(play.start?.yardsToEndzone) && Number.isFinite(play.end?.yardsToEndzone)
-      && play.end.yardsToEndzone > play.start.yardsToEndzone) kind = "tackle-for-loss";
+      && play.start?.team?.id != null && play.end?.team?.id != null
+      && String(play.start.team.id) === String(play.end.team.id) && rushingLoss(play)) kind = "tackle-for-loss";
     else if (isFirstDown(play)) kind = "first-down";
     if (!kind) return [];
 
     let teamId = scoringTeams.get(String(play.id));
     if (kind === "punt") {
       teamId = play.start?.team?.id;
-    } else if (kind === "blocked-punt") {
-      // The blocking team is the opponent of the confirmed punting team,
+    } else if (kind === "blocked-punt" || kind === "blocked-field-goal") {
+      // The blocking team is the opponent of the confirmed kicking team,
       // regardless of which team ultimately recovers the blocked kick.
       const puntingTeam = String(play.start?.team?.id);
       teamId = teamIds.includes(puntingTeam) && teamIds.length === 2
@@ -63,9 +90,11 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
       sequence: Number(play.sequenceNumber),
       kind,
       teamId,
-      detail: kind === "penalty" ? `${play.penalty.type.text}${Number.isFinite(play.penalty.yards) ? ` · ${play.penalty.yards} YDS` : ""}` : type,
-      penaltyType: kind === "penalty" ? play.penalty.type.text : null,
-      penaltyYards: kind === "penalty" && Number.isFinite(play.penalty.yards) ? play.penalty.yards : null,
+      detail: kind === "penalty" ? `${acceptedPenalty}${Number.isFinite(play.penalty?.yards) ? ` · ${play.penalty.yards} YDS` : ""}` : type,
+      player: kind === "interception" ? interceptionPlayer(play.text)
+        : kind === "blocked-field-goal" ? blockingPlayer(play.text) : null,
+      penaltyType: kind === "penalty" ? acceptedPenalty : null,
+      penaltyYards: kind === "penalty" && Number.isFinite(play.penalty?.yards) ? play.penalty.yards : null,
       occurredAt: play.wallclock ?? null,
     }];
   }).filter((event) => Number.isFinite(event.sequence)).slice(-20);

@@ -138,6 +138,15 @@ test("known kicks and turnovers never reuse the old offense's unconfirmed spot",
   assert.equal(result.possessionTeamId, "2");
 });
 
+test("new football events follow game clock when a provider wallclock was revised late", () => {
+  const tracker = createBallPositionTracker();
+  tracker.observe(payload(game({ fieldContext: { driveId: "drive-1", lastPlayId: "late-time", lastPlayType: "Pass Incompletion",
+    lastPlayPeriod: 3, lastPlayClock: "14:58", lastPlayAt: "2026-10-25T02:36:43Z" } })));
+  const kickoff = game({ ball: null, possessionTeamId: null, fieldContext: { driveId: "drive-1", lastPlayId: "kick",
+    lastPlayType: "Kickoff", lastPlayPeriod: 3, lastPlayClock: "14:47", lastPlayAt: "2026-10-25T01:50:21Z" } });
+  assert.equal(tracker.observe(payload(kickoff)).ball, null, "new kick must clear the old spot");
+});
+
 test("games, leagues, home/away orientation, and non-live states cannot share a held spot", () => {
   for (const next of [
     game({ id: "456" }), game({ league: "college-football" }), game({ homeAway: "away" }),

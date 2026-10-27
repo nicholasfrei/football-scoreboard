@@ -10,6 +10,7 @@ import { gameHighlights } from "../src/highlights.js";
 import { createHighlightTracker, highlightDetail } from "../public/highlights.js";
 import { kickoffCountdown, nextRefreshDelay } from "../public/game-timing.js";
 import { createBallPositionTracker } from "../public/ball-position.js";
+import { comparePlays } from "../src/play-order.js";
 
 const root = new URL("./fixtures/games/", import.meta.url);
 const manifest = JSON.parse(await readFile(new URL("manifest.json", root), "utf8"));
@@ -18,8 +19,7 @@ const fixtures = await Promise.all(manifest.map(async (entry) => {
   const summary = JSON.parse(raw);
   const drives = [...(summary.drives?.previous ?? []), summary.drives?.current].filter(Boolean);
   const plays = [...new Map(drives.flatMap((drive) => drive.plays ?? []).map((play) => [play.id, play])).values()]
-    .sort((a, b) => a.period.number - b.period.number || Date.parse(a.wallclock) - Date.parse(b.wallclock)
-      || Number(a.sequenceNumber) - Number(b.sequenceNumber));
+    .sort(comparePlays);
   return { entry, raw, summary, drives, plays };
 }));
 
@@ -122,7 +122,11 @@ for (const fixture of fixtures) {
       assert.equal(drive.plays.length, drives[index].plays.length);
       for (const play of drive.plays) {
         const source = drives.flatMap((item) => item.plays).findLast((item) => String(item.id) === play.id);
-        assert.equal(play.penalty, source.penalty?.type?.text ?? (/penalty/i.test(source.type?.text ?? "") ? "Penalty" : null));
+        const grounding = /\bPENALTY\s+(?:\S+\s+)?intentional grounding\b/i.test(source.text)
+          && !/\b(?:declined|offsetting|offset)\b/i.test(source.text)
+          && (!source.penalty?.status?.slug || source.penalty.status.slug === "accepted");
+        assert.equal(play.penalty, source.penalty?.type?.text ?? (grounding ? "Intentional Grounding"
+          : /penalty/i.test(source.type?.text ?? "") ? "Penalty" : null));
         const scoringTeam = summary.scoringPlays.find((item) => String(item.id) === play.id)?.team?.id;
         assert.equal(play.scoringTeamId, source.scoringPlay && scoringTeam != null ? String(scoringTeam) : null);
       }
@@ -157,7 +161,8 @@ for (const fixture of fixtures) {
         assert.equal(game.latestPlaySequence, Math.max(...plays.slice(0, index + 1).map((play) => Number(play.sequenceNumber))));
         assert.equal(kickoffCountdown(game, replayNow), null);
         assert.equal(nextRefreshDelay({ spotlight: game }, replayNow), 15_000);
-        if (/End of Game|Kickoff|Extra Point/i.test(source.type.text) || source.scoringPlay) {
+        if (/End of Game|Extra Point/i.test(source.type.text) || source.scoringPlay
+            || (/Kickoff/i.test(source.type.text) && !/touchback|fair catch/i.test(`${source.type.text} ${source.text}`))) {
           assert.equal(game.ball, null, `${source.id}: no spurious ball between plays/periods`);
         }
         if (game.ball) {
@@ -168,9 +173,11 @@ for (const fixture of fixtures) {
           const spot = /^(.*?)\s+(\d{1,2})$/.exec(positionPlay.end.possessionText ?? "");
           const named = spot && Number(spot[2]) <= 50 ? spot[1] === home.abbreviation ? 100 - Number(spot[2])
             : spot[1] === away.abbreviation ? Number(spot[2]) : null : null;
-          assert.equal(game.ball.percent, named ?? (homePossession ? positionPlay.end.yardsToEndzone : 100 - positionPlay.end.yardsToEndzone));
+          if (game.ball.source !== "kick rule") {
+            assert.equal(game.ball.percent, named ?? (homePossession ? positionPlay.end.yardsToEndzone : 100 - positionPlay.end.yardsToEndzone));
+          }
           assert.equal(game.ball.direction, homePossession ? "left" : "right");
-          assert.equal(game.ball.source, "last reported play");
+          assert.ok(["last reported play", "kick rule"].includes(game.ball.source));
           assert.equal(game.possessionTeamId, String(positionPlay.end.team.id));
           assert.ok(game.ball.percent >= 0 && game.ball.percent <= 100);
           if (game.ball.firstDownPercent !== null) assert.ok(game.ball.firstDownPercent >= 0 && game.ball.firstDownPercent <= 100);
@@ -211,6 +218,22 @@ test("QB interceptions and QB/RB fumbles come from box scores, not assumed play 
   assert.equal(leader("receivingYards", "Amon-Ra St. Brown").fumbles, null);
 });
 
+test("missed field goals use the next possession spot instead of ESPN's line-of-scrimmage placeholder", () => {
+  for (const [id, pattern, expected] of [
+    ["401873010", /C\.Santos 53 yard field goal is No Good/, "NE 43"],
+    ["401873020", /T\.Smack 26 yard field goal is No Good/, "DET 20"],
+    ["401856727", /C\.Talty field goal attempt from 36 yards NO GOOD/, "TA&M 20"],
+  ]) {
+    const fixture = fixtures.find(({ entry }) => entry.id === id);
+    const index = fixture.plays.findIndex((play) => pattern.test(play.text));
+    assert.ok(index >= 0);
+    const game = enrichGame(gameFromSummary(fixture.summary, fixture.entry.league, fixture.entry.awayTeamId), replaySummary(fixture, index));
+    assert.equal(game.ball?.label, expected, fixture.plays[index].text);
+    const nextPlay = fixture.plays.slice(index + 1).find((play) => !/Timeout|End Period/i.test(play.type.text));
+    assert.equal(nextPlay?.start?.possessionText, expected, "the next recorded play confirms the spot");
+  }
+});
+
 test("actual penalties, nullified plays, scoring attribution, turnovers and missed/blocked kicks remain distinct", () => {
   const types = new Set();
   const penaltyTypes = new Set();
@@ -237,8 +260,10 @@ test("actual penalties, nullified plays, scoring attribution, turnovers and miss
         assert.equal(events[0].teamId, summary.scoringPlays.find((score) => score.id === play.id)?.team.id ?? String(play.end.team.id));
         if (/Interception/.test(play.type.text)) pickSix++;
         if (/kick|two.point|2.point/i.test(play.text)) bundledConversions++;
-      } else if (/Field Goal Missed|Blocked Field Goal/.test(play.type.text)) {
+      } else if (/Field Goal Missed/.test(play.type.text)) {
         assert.deepEqual(events, [], "a failed kick is not a made-field-goal celebration");
+      } else if (/Blocked Field Goal/.test(play.type.text)) {
+        assert.equal(events[0]?.kind, "blocked-field-goal");
       }
     }
   }

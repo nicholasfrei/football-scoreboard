@@ -88,6 +88,103 @@ test("turnover fallback uses the end possession, not the drive team", () => {
   assert.equal(result.possessionTeamId, "8");
 });
 
+test("kick touchbacks and fair catches use the receiving team's correct spot", () => {
+  for (const arkHome of [false, true]) {
+    const expected = (yards) => arkHome ? 100 - yards : yards;
+    for (const [league, type, text, endSpot, yards] of [
+      ["college-football", "Kickoff", "Kickoff, Touchback", null, 25],
+      ["college-football", "Punt", "Punt, Touchback", null, 20],
+      ["nfl", "Punt", "Punt, Touchback", null, 20],
+      ["nfl", "Kickoff", "Kickoff lands in the end zone, Touchback", null, 35],
+      ["nfl", "Kickoff", "Kickoff bounces into the end zone, Touchback", null, 20],
+      ["nfl", "Kickoff", "Kickoff, Touchback", "ARK 35", 35],
+      ["nfl", "Kickoff", "Kickoff fair catch at ARK04", null, 4],
+      ["college-football", "Kickoff", "Kickoff fair catch at ARK04", null, 25],
+      ["college-football", "Kickoff", "Kickoff fair catch at ARK24", null, 25],
+      ["college-football", "Kickoff", "Kickoff fair catch at ARK26", null, 26],
+      ["college-football", "Punt", "Punt fair catch at ARK17", null, 17],
+      ["nfl", "Punt", "Punt fair catch at ARK17", null, 17],
+    ]) {
+      const kick = { id: "kick", sequenceNumber: "1", type: { text: type }, text,
+        start: { team: { id: "238" } }, end: { team: { id: "8" }, possessionText: endSpot, down: 1, distance: 10 } };
+      const frame = summary({ arkHome, current: { id: "drive", team: { id: "238" }, plays: [kick] } });
+      frame.header.season = { year: 2026 };
+      const result = enrichGame({ ...game, league }, frame);
+      assert.equal(result.ball?.percent, expected(yards), `${league}: ${text}`);
+      assert.equal(result.ball?.label, `ARK ${yards}`);
+      assert.equal(result.possessionTeamId, "8");
+      assert.equal(result.ball.direction, arkHome ? "left" : "right");
+      assert.equal(result.ball.firstDownPercent, expected(yards) + (arkHome ? -10 : 10));
+    }
+  }
+});
+
+test("kick fallback defers to the live situation and avoids uncertain or penalized plays", () => {
+  const kick = { id: "kick", sequenceNumber: "1", type: { text: "Kickoff" }, text: "Kickoff, Touchback",
+    start: { team: { id: "238" } }, end: { team: { id: "8" } } };
+  const options = { current: { id: "drive", plays: [kick] } };
+  assert.equal(enrichGame({ ...game, league: "nfl" }, summary(options)).ball, null, "unknown NFL landing is not guessed");
+  assert.equal(enrichGame({ ...game, league: "nfl" }, summary({ current: { id: "drive", plays: [{ ...kick,
+    text: "Kickoff lands in the end zone, Touchback" }] } })).ball, null, "unknown season is not guessed");
+  const midfield = summary({ current: { id: "drive", plays: [{ ...kick, text: "Kickoff lands in the end zone, Touchback",
+    start: { ...kick.start, yardsToEndzone: 50 } }] } });
+  midfield.header.season = { year: 2026 };
+  assert.equal(enrichGame({ ...game, league: "nfl" }, midfield).ball?.label, "ARK 20");
+  assert.equal(enrichGame(game, summary({ ...options, situation: { possession: "8", possessionText: "ARK 40" } })).ball.label, "ARK 40");
+  for (const text of ["Kickoff, Touchback PENALTY ARK holding", "Kickoff, Touchback, no play", "Kickoff, muff and fumble, Touchback"]) {
+    assert.equal(enrichGame(game, summary({ current: { id: "drive", plays: [{ ...kick, text }] } })).ball, null, text);
+  }
+  assert.equal(enrichGame(game, summary({ current: { id: "drive", plays: [{ ...kick, start: {}, end: {} }] } })).ball, null);
+  assert.equal(enrichGame(game, summary({ current: { id: "drive", plays: [{ ...kick, end: { team: { id: "238" } } }] } })).ball, null);
+});
+
+test("a straightforward missed college field goal can use the previous spot when the result spot is missing", () => {
+  for (const [arkHome, label, expectedLabel, percent] of [
+    [false, "VAN 35", "VAN 35", 65], [false, "VAN 8", "VAN 20", 80],
+    [true, "VAN 35", "VAN 35", 35], [true, "VAN 8", "VAN 20", 20],
+  ]) {
+    const kick = { id: "miss", sequenceNumber: "1", type: { text: "Field Goal Missed" },
+      text: "Field goal is no good, wide right", start: { team: { id: "8" }, possessionText: label }, end: {} };
+    const result = enrichGame(game, summary({ arkHome, current: { id: "drive", plays: [kick] } }));
+    assert.equal(result.ball?.label, expectedLabel);
+    assert.equal(result.ball?.percent, percent);
+    assert.equal(result.possessionTeamId, "238");
+    assert.equal(result.ball.firstDownPercent, null, "do not invent down/distance");
+  }
+});
+
+test("missed and blocked kicks do not invent a spot when their outcome is ambiguous", () => {
+  const kick = { id: "kick", sequenceNumber: "1", type: { text: "Field Goal Missed" },
+    text: "Field goal is no good, wide right", start: { team: { id: "8" }, possessionText: "VAN 35" }, end: {} };
+  for (const variant of [
+    { ...kick, type: { text: "Blocked Field Goal" }, text: "Field goal blocked" },
+    { ...kick, text: "Field goal is no good, returned 30 yards" },
+    { ...kick, text: "Field goal is no good, PENALTY defensive offside" },
+    { ...kick, text: "Field goal is no good, short" },
+    { ...kick, start: { possessionText: "VAN 35" } },
+  ]) assert.equal(enrichGame(game, summary({ current: { id: "drive", plays: [variant] } })).ball, null);
+  assert.equal(enrichGame({ ...game, league: "nfl" }, summary({ current: { id: "drive", plays: [kick] } })).ball, null,
+    "NFL kick spot is not inferred from the line of scrimmage");
+  const withSituation = summary({ situation: { possession: "238", possessionText: "VAN 10" }, current: { id: "drive", plays: [kick] } });
+  assert.equal(enrichGame(game, withSituation).ball.label, "VAN 10", "confirmed situation wins");
+});
+
+test("NFL field goal miss uses a reported kick distance, not the line of scrimmage", () => {
+  for (const [arkHome, start, distance, expected] of [
+    [false, "VAN 35", 53, "VAN 43"], [false, "VAN 8", 26, "VAN 20"],
+    [false, "VAN 45", 63, "ARK 47"], [true, "VAN 35", 53, "VAN 43"],
+  ]) {
+    const kick = { id: "kick", sequenceNumber: "1", type: { text: "Field Goal Missed" },
+      text: `${distance} yard field goal is No Good, Wide Right`,
+      start: { team: { id: "8" }, possessionText: start },
+      end: { team: { id: "238" }, possessionText: start, down: 1, distance: 10 } };
+    assert.equal(enrichGame({ ...game, league: "nfl" }, summary({ arkHome, current: { id: "drive", plays: [kick] } })).ball?.label, expected);
+    const reported = { ...kick, end: { ...kick.end, possessionText: "VAN 30" } };
+    assert.equal(enrichGame({ ...game, league: "nfl" }, summary({ arkHome, current: { id: "drive", plays: [reported] } })).ball?.label, "VAN 30",
+      "a different reported end spot takes precedence");
+  }
+});
+
 test("final, missing and invalid position data never invent a live ball", () => {
   for (const options of [
     { state: "post", situation: { possession: "8", possessionText: "ARK 25" } },

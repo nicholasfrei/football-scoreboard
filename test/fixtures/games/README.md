@@ -49,9 +49,12 @@ Historical summaries are not archived live polls. The replay builds current-driv
 prefixes and header scores from real play data; it cannot prove live situation
 availability, polling latency, delivery order, or later provider corrections.
 Some play sequences are duplicated or reset: the Indiana–Michigan overtime end
-marker has sequence `42`, while the preceding OT play is `158`. Period and
-wallclock ordering keep the recent-play display chronological without modifying
-the saved source. End-period entries must not invent a live ball position.
+marker has sequence `42`, while the preceding OT play is `158`. In Texas–Ole
+Miss, the Q3 14:58 incompletion has a wallclock timestamp from after the quarter.
+The adapter and replay order by period and game clock, then use wallclock for
+ties, without modifying the saved source. End-period entries must not invent a
+live ball position. The replay corrects an isolated stale score on a revised
+non-scoring play when both adjacent plays confirm the same score.
 
 To inspect a complete response:
 

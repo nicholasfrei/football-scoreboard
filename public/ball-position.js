@@ -1,5 +1,10 @@
 /** Hold a confirmed field spot through fresh-feed gaps, not through new football
  * events or outages. No coordinates are inferred from clocks, scores, or prose. */
+function clockSeconds(clock) {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(clock ?? "");
+  return match && Number(match[2]) < 60 ? Number(match[1]) * 60 + Number(match[2]) : null;
+}
+
 export function createBallPositionTracker() {
   let previous = null;
   return {
@@ -19,8 +24,15 @@ export function createBallPositionTracker() {
       const at = Date.parse(context.lastPlayAt);
       const previousAt = Date.parse(previous?.lastPlayAt);
       const sequence = context.lastPlaySequence;
-      const olderPlay = previous?.key === key && (Number.isFinite(at) && Number.isFinite(previousAt) && at !== previousAt
-        ? at < previousAt : Number.isFinite(sequence) && Number.isFinite(previous?.lastPlaySequence) && sequence < previous.lastPlaySequence);
+      const period = context.lastPlayPeriod;
+      const clock = clockSeconds(context.lastPlayClock);
+      const previousClock = clockSeconds(previous?.lastPlayClock);
+      const olderPlay = previous?.key === key && (Number.isFinite(period) && Number.isFinite(previous?.lastPlayPeriod) && period !== previous.lastPlayPeriod
+        ? period < previous.lastPlayPeriod
+        : clock !== null && previousClock !== null && clock !== previousClock
+          ? clock > previousClock
+          : Number.isFinite(at) && Number.isFinite(previousAt) && at !== previousAt
+            ? at < previousAt : Number.isFinite(sequence) && Number.isFinite(previous?.lastPlaySequence) && sequence < previous.lastPlaySequence);
       const newPlay = !olderPlay && context.lastPlayId != null && context.lastPlayId !== previous?.lastPlayId;
       const resetEvent = newPlay && (context.scoring || context.turnover
         || /Touchdown|Safety|Kickoff|Punt|Interception|Fumble|Field Goal|Extra Point|End of Game/i.test(context.lastPlayType ?? ""));
@@ -42,6 +54,8 @@ export function createBallPositionTracker() {
         lastPlayId: olderPlay || context.lastPlayId == null ? previous?.lastPlayId ?? null : context.lastPlayId,
         lastPlayAt: olderPlay || context.lastPlayId == null ? previous?.lastPlayAt ?? null : context.lastPlayAt,
         lastPlaySequence: olderPlay || context.lastPlayId == null ? previous?.lastPlaySequence ?? null : sequence,
+        lastPlayPeriod: olderPlay || context.lastPlayId == null ? previous?.lastPlayPeriod ?? null : period,
+        lastPlayClock: olderPlay || context.lastPlayId == null ? previous?.lastPlayClock ?? null : context.lastPlayClock,
       };
       return { ...game, ball, possessionTeamId, ballHeld: held };
     },
