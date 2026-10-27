@@ -161,7 +161,7 @@ export function enrichGame(game, summary) {
     driveMap.set(String(drive.id), driveSummary(drive, plays, scoringTeams));
   }
   const drives = [...driveMap.values()].filter((drive) => drive.plays.length);
-  const isPause = (play) => /Timeout|End Period|End of Half|End of Regulation/i.test(play?.type?.text ?? "");
+  const isPause = (play) => /Timeout|Two-minute warning|End Period|End of Half|End of Regulation/i.test(play?.type?.text ?? "");
   // A provider can attach a new timeout to an old drive. Only recover a spot
   // when this drive contains the latest actual football event across the feed;
   // otherwise its old endpoint predates intervening scores or possessions.

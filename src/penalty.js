@@ -10,16 +10,32 @@ export function textIntentionalGrounding(play) {
     && !rejectedPenaltyText.test(text);
 }
 
-// Text-only college feeds report enforcement as PENALTY <abbreviation>
-// <infraction> [(player)] <yards> yards from <spot> to <spot>. Require that
-// complete statement, not commentary about a possible flag or net play yards.
-function reportedEnforcement(play) {
-  if (!/^Penalty$/i.test(play.type?.text ?? "")) return null;
+// Text-only college feeds can attach enforcement to the underlying run, pass
+// or kick rather than to a Penalty play. Require a complete, unambiguous
+// statement, not merely a flag mentioned in commentary or net play yardage.
+const foul = "Offensive Holding|Defensive Holding|Holding|False Start|Offside|Offsides|Delay Of Game|Defensive Pass Interference|Offensive Pass Interference|Pass Interference|Roughing The Passer|Roughing The Kicker|Personal Foul|Illegal Shift|Illegal Formation|Illegal Substitution|Targeting|Intentional Grounding|Face Mask|Illegal Forward Pass|Unnecessary Roughness|Unsportsmanlike Conduct";
+const label = new RegExp(`\\bPENALTY\\s+[A-Z][A-Z&-]*\\s+(?:(?:UNR|UNS):\\s*)?(${foul})\\b`, "gi");
+const enforcement = new RegExp([
+  `\\bPENALTY\\s+([A-Z][A-Z&-]*)\\s+(?:(?:UNR|UNS):\\s*)?(${foul})\\s+`,
+  "(?:\\([^)]*\\)\\s+)?(?:\\1\\s+(?:(?:UNR|UNS):\\s*)?\\2\\s+(?:\\([^)]*\\)\\s+)?)?",
+  "(\\d+)\\s+yards?\\s+from\\s+([A-Z][A-Z&-]*)\\s*(\\d{1,2})\\s+to\\s+([A-Z][A-Z&-]*)\\s*(\\d{1,2})(?=[\\s,.]|$)",
+].join(""), "gi");
+
+export function reportedEnforcement(play) {
+  if (play.scoringPlay || !/^(?:Penalty|Rush|Pass Reception|Pass Incompletion|Sack|Kickoff|Punt(?: Return| Fair Catch| Downed| Out of Bounds| Touchback)?)$/i.test(play.type?.text ?? "")) return null;
   const text = play.text ?? "";
-  if (rejectedPenaltyText.test(text)
-      || (text.match(/\bPENALTY\s+[A-Z][A-Z&-]*\s+/gi)?.length ?? 0) !== 1) return null;
-  const match = /\bPENALTY\s+[A-Z][A-Z&-]*\s+(False Start|Holding|Offensive Holding|Defensive Holding|Offside|Offsides|Delay Of Game|Pass Interference|Defensive Pass Interference|Offensive Pass Interference|Roughing The Passer|Roughing The Kicker|Personal Foul|Illegal Shift|Illegal Formation|Illegal Substitution|Targeting|Intentional Grounding)\s+(?:\([^)]*\)\s+)?(\d+)\s+yards?\s+from\s+[A-Z][A-Z&-]*\s*\d{1,2}\s+to\s+[A-Z][A-Z&-]*\s*\d{1,2}(?=[\s,.]|$)/i.exec(text);
-  return match ? { type: match[1], yards: Number(match[2]) } : null;
+  if (rejectedPenaltyText.test(text)) return null;
+  const mentions = [...text.matchAll(/\bPENALTY\s+[A-Z][A-Z&-]*\s+/gi)];
+  const labels = [...text.matchAll(label)];
+  const matches = [...text.matchAll(enforcement)];
+  // Two identical foul labels can share one enforcement. Conflicting fouls or
+  // multiple enforced spots cannot be attributed safely to one takeover.
+  if (!mentions.length || mentions.length !== labels.length || matches.length !== 1
+      || labels.some((item) => item[1].toLowerCase() !== matches[0][2].toLowerCase())) return null;
+  const match = matches[0];
+  return { type: match[2], yards: Number(match[3]),
+    from: { side: match[4], yards: Number(match[5]) },
+    to: { side: match[6], yards: Number(match[7]) } };
 }
 
 /** Accepted metadata is authoritative; otherwise require explicit enforcement. */

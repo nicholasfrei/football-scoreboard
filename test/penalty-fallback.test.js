@@ -148,6 +148,82 @@ test("all 54 text-only college penalties alert live and match replay without gue
   assert.deepEqual(seen, new Set(expectedEnforcement.keys()));
 });
 
+// Transcribed from explicit enforcement statements on plays ESPN labels as
+// runs, passes or kicks rather than Penalty. Keep these independent of parsing.
+const enforcedOnPlay = new Map(`
+401856732171|Holding|10
+401856732295|Face Mask|15
+401856732398|Unnecessary Roughness|15
+401856732451|Unsportsmanlike Conduct|13
+401856732535|Roughing The Passer|15
+401856732750|Personal Foul|15
+401856835110|Holding|8
+401856835207|Unnecessary Roughness|15
+401856835308|Holding|10
+401856835722|Unsportsmanlike Conduct|15
+401858496285|Holding|10
+40185672736|Unnecessary Roughness|15
+401856727253|Illegal Forward Pass|5
+401856727399|Face Mask|10
+40185673190|Personal Foul|15
+401856731356|Targeting|15
+401856731452|Illegal Formation|5
+401856731738|Face Mask|15
+401856731790|Holding|10
+`.trim().split("\n").map((row) => {
+  const [id, type, yards] = row.split("|");
+  return [id, { type, yards: Number(yards) }];
+}));
+
+test("all 19 enforced fouls attached to actual plays alert in live games and replay", () => {
+  assert.equal(enforcedOnPlay.size, 19);
+  const seen = new Set();
+  for (const { entry, summary, plays } of fixtures) {
+    const replay = new Map(createReplayFrames(summary, { ...entry, teamId: entry.awayTeamId })
+      .filter((frame) => frame.event).map((frame) => [frame.event.id, frame.event]));
+    for (const play of plays.filter((item) => enforcedOnPlay.has(item.id))) {
+      seen.add(play.id);
+      assert.notEqual(play.type.text, "Penalty", play.id);
+      const expected = enforcedOnPlay.get(play.id);
+      const event = gameHighlights([play], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId])[0];
+      assert.equal(event?.kind, "penalty", play.id);
+      assert.equal(event.teamId, null, play.id);
+      assert.equal(event.penaltyType, expected.type, play.id);
+      assert.equal(event.penaltyYards, expected.yards, play.id);
+      assert.deepEqual(replay.get(play.id), event, play.id);
+    }
+  }
+  assert.deepEqual(seen, new Set(enforcedOnPlay.keys()));
+});
+
+test("enforced offensive holding never celebrates a first down on inconsistent provider down metadata", () => {
+  const { entry, summary, plays } = fixtures.find(({ entry }) => entry.id === "401858496");
+  const hold = plays.find((play) => play.id === "401858496285");
+  const next = plays.find((play) => play.id === "401858496290");
+  assert.equal(hold.end.down, 1);
+  assert.equal(next.start.down, 2);
+  assert.equal(gameHighlights([hold], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId])[0]?.kind, "penalty");
+});
+
+test("enforcement on an underlying play must be complete, unambiguous and actually enforced", () => {
+  const { entry, summary, plays } = fixtures.find(({ entry }) => entry.id === "401856835");
+  const original = plays.find((play) => play.id === "401856835722");
+  for (const text of [
+    `${original.text} declined`,
+    `${original.text} offsetting`,
+    original.text.replace("PENALTY BYU", "Possible PENALTY BYU"),
+    original.text.replace("to BYU28", "to BYU28?"),
+    original.text.replace("from BYU43 to BYU28", "from BYU43"),
+    original.text.replace("UNS: Unsportsmanlike Conduct", "UNS: Unknown Foul"),
+    `${original.text} PENALTY UCF Holding 5 yards from BYU28 to BYU33`,
+  ]) {
+    assert.notEqual(gameHighlights([{ ...original, text }], summary.scoringPlays,
+      [entry.homeTeamId, entry.awayTeamId])[0]?.kind, "penalty", text);
+  }
+  assert.deepEqual(gameHighlights([{ ...original, type: { text: "Timeout" } }], summary.scoringPlays,
+    [entry.homeTeamId, entry.awayTeamId]), []);
+});
+
 test("accepted metadata takes precedence and only confirmed enforcement supplies yardage", () => {
   const original = fixtures.find(({ entry }) => entry.id === "401858496").plays.find((play) => play.id === "40185849612");
   for (const yards of [0, 10]) {

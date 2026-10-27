@@ -63,9 +63,10 @@ non-scoring play when both adjacent plays confirm the same score.
 Independent regression checks record expected play IDs, succeeding spots, and
 penalty types/yardage instead of deriving all expectations from the production
 sorter or provider endpoints. They cover reused-sequence alerts, all 54 text-only
-college penalties with live/replay parity, all eight voluntary kneels, and all 12
-confirmed turnovers on downs. Invalid nullified results and ambiguous blocked-kick
-endpoints do not establish ball spots. A timeout misattached to an old drive
+college Penalty plays and 19 enforced fouls attached to actual plays with
+live/replay parity, all eight voluntary kneels, and all 12 confirmed turnovers
+on downs. Invalid nullified results and ambiguous blocked-kick endpoints do not
+establish ball spots. A timeout misattached to an old drive
 cannot revive its earlier possession's endpoint. Controlled adjacent fresh polls
 also verify that every newly classified event actually reaches the browser
 tracker, separately from historical delivery timing and event-age suppression.

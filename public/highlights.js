@@ -1,4 +1,4 @@
-export const HIGHLIGHT_DURATION_MS = 12_000;
+export const HIGHLIGHT_DURATION_MS = 15_000;
 const MAX_EVENT_AGE_MS = 120_000;
 const MAX_POLL_GAP_MS = 90_000;
 
@@ -20,9 +20,8 @@ export const HIGHLIGHT_LABELS = {
 };
 
 export function highlightDuration(kind) {
-  if (kind === "touchdown") return 5 * 60_000;
-  if (kind === "first-down") return 25_000;
-  return kind === "punt" ? 4_000 : kind === "extra-point" ? 6_000 : HIGHLIGHT_DURATION_MS;
+  if (["touchdown", "field-goal", "safety"].includes(kind)) return 150_000;
+  return kind === "punt" ? 10_000 : kind === "extra-point" ? 6_000 : HIGHLIGHT_DURATION_MS;
 }
 
 export function highlightDetail(event, game) {

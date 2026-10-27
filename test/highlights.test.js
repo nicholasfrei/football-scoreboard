@@ -1,11 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { gameHighlights } from "../src/highlights.js";
-import { createHighlightTracker, highlightDetail, highlightDuration } from "../public/highlights.js";
+import { createHighlightTracker, highlightDetail, highlightDuration, HIGHLIGHT_LABELS } from "../public/highlights.js";
 
-test("touchdowns remain visible until the next spot or five minutes; first downs show for 25 seconds", () => {
-  assert.equal(highlightDuration("touchdown"), 300_000);
-  assert.equal(highlightDuration("first-down"), 25_000);
+test("every live takeover uses its configured duration", () => {
+  const expected = {
+    touchdown: 150_000,
+    "field-goal": 150_000,
+    safety: 150_000,
+    "first-down": 15_000,
+    interception: 15_000,
+    fumble: 15_000,
+    "turnover-on-downs": 15_000,
+    sack: 15_000,
+    "tackle-for-loss": 15_000,
+    penalty: 15_000,
+    "blocked-punt": 15_000,
+    "blocked-field-goal": 15_000,
+    "extra-point": 6_000,
+    punt: 10_000,
+  };
+  assert.deepEqual(Object.keys(expected).sort(), Object.keys(HIGHLIGHT_LABELS).sort());
+  for (const [kind, duration] of Object.entries(expected)) assert.equal(highlightDuration(kind), duration, kind);
 });
 
 const now = Date.parse("2026-10-31T23:55:00Z");

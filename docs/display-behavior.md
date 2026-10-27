@@ -128,6 +128,11 @@ display uses a defensible unchanged spot or waits for confirmation. On blocked
 field goals, the kick's ending location is not automatically the next scrimmage
 spot. Ambiguous results leave the ball hidden until the feed supplies a reliable
 succeeding spot, rather than inventing a blocked-kick placement rule.
+When a complete text-only penalty enforcement disagrees with the play's end
+coordinates, the fallback uses its reported spot if the field side can be
+identified. Conflicting down/distance data is hidden; a valid live situation
+still takes priority.
+
 For an ordinary incomplete pass with an invalid or missing result spot, a valid
 reported start can establish the unchanged line of scrimmage and distance with
 the down advanced. This does not override live situations, penalty enforcement,
@@ -176,22 +181,23 @@ cable channel numbers.
 ## Big-play takeovers
 
 New live interceptions, fumble recoveries, turnovers on downs, sacks, tackles for loss, accepted
-penalties, made and blocked field goals, and safeties briefly replace the main score panel
-for **12 seconds**. Penalties use the same dark fade as other takeovers, tinted
+penalties, blocked field goals, and blocked punts briefly replace the main score panel
+for **15 seconds**. Penalties use the same dark fade as other takeovers, tinted
 yellow, with the infraction as the headline and enforced yardage below only
 when reported. The app does not guess the penalized team;
 declined and offsetting penalties do not alert.
-College feeds sometimes omit structured penalty metadata. An explicitly labeled
-penalty play with a reported enforcement can still produce the same alert in
-live mode and replay; ambiguous commentary does not establish an accepted penalty.
+College feeds sometimes omit structured penalty metadata. A complete, unambiguous
+enforcement statement on a penalty play or an underlying run, pass, or kick can
+still produce the same alert in live mode and replay; ambiguous commentary does
+not establish an accepted penalty.
 If ESPN explicitly reports intentional grounding in play text without penalty
 status, the app treats it as a penalty unless the text says it was declined or
 offsetting, even when ESPN labels it a sack. It does not infer penalty yardage.
-Touchdowns remain for up to **five minutes**, ending earlier when the confirmed
-ball position changes. **First downs** show for **25 seconds**; **made extra points**
-show a kick through the uprights for **6 seconds**. Made field goals use the
-same kick animation. **Punts** show a football flight for **4 seconds**;
-**blocked punts and field goals** show a deflected football for **12 seconds**. The
+Touchdowns remain for up to **2 minutes 30 seconds**, ending earlier when the confirmed
+ball position changes. **Made field goals and safeties** also show for **2 minutes 30 seconds**.
+**First downs** show for **15 seconds**; **made extra points** show a kick through the uprights
+for **6 seconds**. Made field goals use the same kick animation. **Punts** show a football
+flight for **10 seconds**; blocked punts and field goals show a deflected football. The
 event uses the scoring/recovering team's logo and color when attribution is
 known. The event and team share a headline (for example, `TOUCHDOWN DALLAS`),
 wrapping when needed on narrow screens or for long team names.

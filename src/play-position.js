@@ -1,3 +1,5 @@
+import { reportedEnforcement } from "./penalty.js";
+
 function scrimmageSpot(spot, home, away, strict = false) {
   const teamId = spot?.team?.id == null ? null : String(spot.team.id);
   if (![home.id, away.id].includes(teamId) || !(strict ? [1, 2, 3, 4] : [0, 1, 2, 3, 4]).includes(spot.down)) return null;
@@ -14,6 +16,41 @@ function scrimmageSpot(spot, home, away, strict = false) {
       || (spot.possessionText && named === null && spot.possessionText !== "50")
       || (named !== null && numeric !== null && named !== numeric))) return null;
   return named !== null || numeric !== null ? spot : null;
+}
+
+function enforcedPlayEnd(play, home, away) {
+  // Structured penalty data and a reported live situation remain authoritative.
+  // Only repair a text-only, fully reported enforcement in the play fallback.
+  if (play?.penalty || ![0, 1, 2, 3, 4].includes(play?.end?.down)) return null;
+  const report = reportedEnforcement(play);
+  if (!report || report.to.yards < 1 || report.to.yards > 50
+      || ![home.id, away.id].includes(String(play.end.team?.id))) return null;
+
+  const sideName = report.to.side.toUpperCase();
+  const matching = [home, away].filter((team) => [team.abbreviation, team.location, team.shortName]
+    .some((name) => name?.replace(/\s/g, "").toUpperCase() === sideName));
+  let side = matching.length === 1 ? matching[0] : null;
+  if (!side && report.from.side.toUpperCase() === sideName
+      && String(play.start?.team?.id) === String(play.end.team.id)) {
+    // College play prose can say USC/UTK where the normalized teams say
+    // SC/TENN. Use the same named side in BOTH provider spots as evidence,
+    // never an arbitrary alias or the recovering/kicking team's identity.
+    const namedTeam = (spot) => [home, away].find((team) =>
+      new RegExp(`^${team.abbreviation}\\s+-?\\d{1,2}$`, "i").test(spot?.possessionText ?? ""));
+    const startSide = namedTeam(play.start);
+    const beforePenalty = play.text.split(/\bPENALTY\b/i)[0];
+    if (startSide && namedTeam(play.end)?.id === startSide.id
+        && new RegExp(`\\b${sideName}\\s*\\d{1,2}\\b`, "i").test(beforePenalty)) side = startSide;
+  }
+  if (!side) return null;
+  const label = `${side.abbreviation} ${report.to.yards}`;
+  if (play.end.possessionText === label) return null;
+  const percent = side.id === home.id ? 100 - report.to.yards : report.to.yards;
+  const yardsToEndzone = String(play.end.team.id) === home.id ? percent : 100 - percent;
+  // A contradictory provider end also has an untrustworthy down/distance and
+  // line-to-gain. Keep the confirmed possession and spot, but not those fields.
+  return { ...play.end, possessionText: label, yardsToEndzone,
+    downDistanceText: null, shortDownDistanceText: null, distance: null };
 }
 
 function incompletePassEnd(play, home, away) {
@@ -38,6 +75,8 @@ function incompletePassEnd(play, home, away) {
  * Accepted penalties may still establish a new scrimmage spot on a No Play.
  * Ordinary results and scores remain the caller's responsibility. */
 export function fallbackPlayEnd(play, plays, home, away) {
+  const enforced = enforcedPlayEnd(play, home, away);
+  if (enforced) return enforced;
   if (/^Pass Incompletion$/i.test(play?.type?.text ?? "") && !play.scoringPlay && !play.isTurnover
       && !play.isPenalty && !play.penalty
       && !/\b(?:penalty|no\s*play|nullified|overturned|intercept\w*|fumble\w*|safety)\b/i.test(play.text ?? "")) {
@@ -61,7 +100,7 @@ export function fallbackPlayEnd(play, plays, home, away) {
   // Only the immediately preceding football event in this drive can confirm
   // the retained spot. Never reach through a score, kick or unknown result.
   const index = plays.indexOf(play);
-  const previous = plays.slice(0, index).findLast((item) => !/Timeout|End Period|End of Half|End of Regulation/i.test(item.type?.text ?? ""));
+  const previous = plays.slice(0, index).findLast((item) => !/Timeout|Two-minute warning|End Period|End of Half|End of Regulation/i.test(item.type?.text ?? ""));
   if (!previous || previous.scoringPlay || /Kick|Punt|Field Goal|Extra Point|End of Game/i.test(previous.type?.text ?? "")
       || /\b(?:no\s*play|nullified)\b/i.test(previous.text ?? "")
       || (previous.period?.number != null && play.period?.number != null && previous.period.number !== play.period.number)) return null;

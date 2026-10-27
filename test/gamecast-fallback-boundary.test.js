@@ -4,6 +4,37 @@ import { readFile } from "node:fs/promises";
 import { gunzipSync } from "node:zlib";
 import { createReplayFrames } from "../src/replay.js";
 import { createBallPositionTracker } from "../public/ball-position.js";
+import { normalizeGame } from "../src/scoreboard.js";
+import { enrichGame } from "../src/gamecast.js";
+
+test("a two-minute warning cannot move the ball from the last actual play", async () => {
+  const summary = JSON.parse(gunzipSync(await readFile(new URL("fixtures/games/nfl/401873012.json.gz", import.meta.url))));
+  const competition = summary.header.competitions[0];
+  const drive = [...summary.drives.previous, summary.drives.current]
+    .find((item) => item?.plays?.some((play) => play.id === "4018730121636"));
+  const pass = drive.plays.find((play) => play.id === "4018730121623");
+  const warning = drive.plays.find((play) => play.id === "4018730121636");
+  const next = drive.plays.find((play) => play.id === "4018730121648");
+  assert.equal(pass.end.possessionText, "CIN 33");
+  assert.equal(warning.end.possessionText, "CIN 34");
+  assert.equal(next.start.possessionText, "CIN 33");
+  const base = normalizeGame({ id: summary.header.id, date: competition.date, competitions: [competition] },
+    { league: "nfl", teamId: "4" });
+  const frame = (plays) => ({
+    header: { ...summary.header, competitions: [{ ...competition,
+      status: { period: 2, displayClock: plays.at(-1).clock.displayValue, type: { state: "in", completed: false } },
+    }] },
+    drives: { current: { ...drive, plays }, previous: [] },
+    scoringPlays: [],
+  });
+  const tracker = createBallPositionTracker();
+  const before = tracker.observe({ spotlight: enrichGame(base, frame([pass])) });
+  const after = tracker.observe({ spotlight: enrichGame(base, frame([pass, warning])) });
+  assert.equal(before.ball?.label, "CIN 33");
+  assert.equal(after.fieldContext.pause, true);
+  assert.equal(after.ball?.label, "CIN 33");
+  assert.equal(after.ballHeld, true);
+});
 
 test("an overtime timeout misattached to an old drive cannot resurrect its second-quarter punt spot", async () => {
   const summary = JSON.parse(gunzipSync(await readFile(new URL("fixtures/games/college-football/401858496.json.gz", import.meta.url))));

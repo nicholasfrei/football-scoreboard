@@ -79,9 +79,9 @@ test("existing scoring, interception, fumble and accepted-penalty precedence is 
   assert.equal(classify(play(), ["8", "9"], [{ id: "downs", team: { id: "8" } }])[0].teamId, "9");
 });
 
-test("the browser accepts the new label and renders a confirmed defensive takeover for 12 seconds", () => {
+test("the browser accepts the new label and renders a confirmed defensive takeover for 15 seconds", () => {
   assert.equal(HIGHLIGHT_LABELS["turnover-on-downs"], "TURNOVER ON DOWNS");
-  assert.equal(highlightDuration("turnover-on-downs"), 12_000);
+  assert.equal(highlightDuration("turnover-on-downs"), 15_000);
   const event = classify(play())[0];
   const game = { id: "game", league: "nfl", state: "live", selectedTeam: { id: "8" }, opponent: { id: "9" }, highlights: [], latestPlaySequence: 19 };
   assert.equal(highlightDetail(event, game), "TAKEOVER BY");

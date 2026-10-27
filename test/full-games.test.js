@@ -166,16 +166,23 @@ for (const fixture of fixtures) {
           assert.equal(game.ball, null, `${source.id}: no spurious ball between plays/periods`);
         }
         if (game.ball) {
-          const positionPlay = frame.drives.current.plays.findLast((play) => !/Timeout|End Period|End of Half|End of Regulation/i.test(play.type.text));
+          const positionPlay = frame.drives.current.plays.findLast((play) => !/Timeout|Two-minute warning|End Period|End of Half|End of Regulation/i.test(play.type.text));
           // Independently checked retained spots: an offsetting/nullified TD at
           // UCF 1 and an incompletion at MISS 27 both have invalid goal-line ends.
           const restoredSpot = { "401856835462": "UCF 1", "401856732698": "MISS 27" }[positionPlay.id];
+          // ESPN's end coordinates disagree with the reported enforcement and
+          // the following snap on these five plays; assert the actual spot.
+          const enforcedSpot = {
+            "401856732398": "TEX 5", "401856732535": "TEX 24", "401856835223": "BYU 33",
+            "401856731182": "SC 3", "401856731356": "TENN 45",
+          }[positionPlay.id];
           const positionEnd = restoredSpot ? positionPlay.start : positionPlay.end;
           if (restoredSpot) assert.equal(game.ball.label, restoredSpot);
+          if (enforcedSpot) assert.equal(game.ball.label, enforcedSpot);
           const homePossession = positionEnd.team.id === entry.homeTeamId;
           const home = base.homeAway === "home" ? base.selectedTeam : base.opponent;
           const away = base.homeAway === "home" ? base.opponent : base.selectedTeam;
-          const spot = /^(.*?)\s+(\d{1,2})$/.exec(positionEnd.possessionText ?? "");
+          const spot = /^(.*?)\s+(\d{1,2})$/.exec(enforcedSpot ?? positionEnd.possessionText ?? "");
           const named = spot && Number(spot[2]) <= 50 ? spot[1] === home.abbreviation ? 100 - Number(spot[2])
             : spot[1] === away.abbreviation ? Number(spot[2]) : null : null;
           if (game.ball.source !== "kick rule") {
