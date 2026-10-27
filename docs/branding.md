@@ -34,8 +34,8 @@ is no longer bundled or served.
 Artwork remains the property of its respective owner; these source links establish
 provenance, not a license or an official endorsement of this project.
 
-The [Cowboys drive animation](images/cowboys-drive-demo.gif) uses the bundled NFL
-logos and provider colors for the offline demo. NFL logos are not replaced with
+The [Cowboys–Eagles game animation](images/cowboys-drive-demo.gif) uses the bundled NFL
+logos and provider colors for the recorded replay. NFL logos are not replaced with
 college overrides.
 
 ## Color overrides for Arkansas and its 2026 road hosts

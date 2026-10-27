@@ -6,6 +6,7 @@ import { kickoffCountdown, createRefreshLoop } from "./game-timing.js";
 import { createBallPositionTracker } from "./ball-position.js";
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT, displayScale } from "./display-size.js";
 import { scoringNeedsHighlight } from "./scoring-style.js";
+import { leaderCellItems } from "./leader-layout.js";
 
 function fitDisplay() {
   const scale = displayScale(window.innerWidth, window.innerHeight);
@@ -404,14 +405,14 @@ function renderNextDetails(game) {
   predictor.textContent = `Win chance: ${game.selectedTeam.abbreviation} ${model.selectedTeam.toFixed(1)}% · ${game.opponent.abbreviation} ${model.opponent.toFixed(1)}% · ${model.source}`;
 }
 
-function renderLeaders(game) {
-  const live = game?.state === "live";
-  document.querySelector(".next-game").hidden = live;
+function renderLeaders(game, demo = false) {
+  const visible = game?.state === "live" || (demo && game?.league === "nfl");
+  document.querySelector(".next-game").hidden = visible;
   const section = document.querySelector("#game-leaders");
-  section.hidden = !live;
+  section.hidden = !visible;
   const list = document.querySelector("#leader-list");
   list.replaceChildren();
-  if (!live) return;
+  if (!visible) return;
   const away = game.homeAway === "home" ? game.opponent : game.selectedTeam;
   const home = game.homeAway === "home" ? game.selectedTeam : game.opponent;
   const teams = document.createElement("div");
@@ -453,11 +454,9 @@ function renderLeaders(game) {
       const name = document.createElement("div");
       name.className = "leader-name";
       name.textContent = leader?.shortName ?? "Stats unavailable";
-      if (leader?.position) {
-        const position = document.createElement("span");
-        position.textContent = ` ${leader.position}`;
-        name.append(position);
-      }
+      const position = document.createElement("span");
+      position.className = "leader-position";
+      position.textContent = leader?.position ?? "";
       const attempts = document.createElement("span");
       attempts.className = "leader-metric";
       attempts.textContent = leader?.attempts ?? "—";
@@ -471,8 +470,8 @@ function renderLeaders(game) {
       extras.className = "leader-extras";
       extras.textContent = [leader?.interceptions > 0 ? `${leader.interceptions} INT` : null,
         leader?.fumbles > 0 ? `${leader.fumbles} FUM` : null].filter(Boolean).join(" · ");
-      if (side === 0) cell.append(portrait, name, attempts, yards, touchdowns, extras);
-      else cell.append(extras, attempts, yards, touchdowns, name, portrait);
+      yards.classList.add("leader-yards");
+      cell.append(...leaderCellItems(side === 0 ? "away" : "home", { portrait, name, position, attempts, yards, touchdowns, extras }));
       row.append(cell);
     }
     row.insertBefore(label, row.children[1]);
@@ -480,7 +479,7 @@ function renderLeaders(game) {
   }
 }
 
-function updateGame(game, nextGame) {
+function updateGame(game, nextGame, demo = false) {
   displayedGame = game;
   updateCountdown();
   lastGameState = game?.state ?? null;
@@ -488,7 +487,7 @@ function updateGame(game, nextGame) {
   elements.gameClock.textContent = "";
   updatePossession(game);
   renderNextDetails(nextGame);
-  renderLeaders(game);
+  renderLeaders(game, demo);
   if (!game) {
     elements.gameDetail.hidden = true;
     driveGameId = null;
@@ -634,16 +633,16 @@ async function startDriveDemo() {
   function render() {
     hideHighlight();
     const frame = frames[index];
-    updateGame(frame.spotlight, null);
+    updateGame(frame.spotlight, null, true);
     if (frame.event) showHighlight(frame.event, frame.spotlight, true, 3_200 / Number(speed.value));
-    document.querySelector(".next-game").hidden = false;
-    document.querySelector("#game-leaders").hidden = true;
     elements.gameStatusText.textContent = "REPLAY";
     elements.gameStatus.classList.remove("is-live");
     elements.feedLabel.textContent = "RECORDED GAME · NOT LIVE";
-    elements.nextOpponent.textContent = gameSelect.selectedOptions[0].textContent;
-    elements.nextDetail.textContent = "Historical play-by-play · 5 seconds per play at 1×";
-    document.querySelector("#next-predictor").textContent = "Field position is inferred from each recorded play, not a saved live feed";
+    if (frame.league !== "nfl") {
+      elements.nextOpponent.textContent = gameSelect.selectedOptions[0].textContent;
+      elements.nextDetail.textContent = "Historical play-by-play · 5 seconds per play at 1×";
+      document.querySelector("#next-predictor").textContent = "Field position is inferred from each recorded play, not a saved live feed";
+    }
     document.querySelector("#demo-step").textContent = `Play ${index + 1} / ${frames.length} · ${frame.caption}`;
     document.querySelector("#demo-progress").max = frames.length;
     document.querySelector("#demo-progress").value = index + 1;

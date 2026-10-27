@@ -2,6 +2,7 @@ import { normalizeGame } from "./scoreboard.js";
 import { enrichGame } from "./gamecast.js";
 import { gameHighlights } from "./highlights.js";
 import { comparePlays } from "./play-order.js";
+import { createReplayLeaderTracker } from "./replay-leaders.js";
 
 export const REPLAY_GAMES = {
   nfl: { id: "401873009", league: "nfl", teamId: "6", file: "nfl/401873009.json.gz", label: "Cowboys vs Eagles" },
@@ -24,6 +25,7 @@ export function createReplayFrames(summary, option) {
   }
   const ordered = [...byId.values()].sort((a, b) => comparePlays(a.play, b.play));
   const teamIds = competition.competitors.map((team) => String(team.team.id));
+  const leaderTracker = option.league === "nfl" ? createReplayLeaderTracker(summary) : null;
   const visible = new Set();
   return ordered.map(({ play, drive }, index) => {
     const before = ordered[index - 1]?.play;
@@ -61,6 +63,7 @@ export function createReplayFrames(summary, option) {
       drives: { current: prefix(drive, String(play.id) === String(drive.plays?.at(-1)?.id)), previous },
     };
     const game = enrichGame(base, snapshot);
+    if (leaderTracker) game.leaders = leaderTracker.observe(play);
     let event = gameHighlights([play], snapshot.scoringPlays, teamIds)[0] ?? null;
     // College summaries may label a play Penalty but omit structured penalty
     // metadata. Only use the explicitly reported penalty play as a fallback.

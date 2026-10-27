@@ -217,26 +217,25 @@ Takeovers use structured ESPN play types and IDs/sequences:
 The animation timer starts when the app **receives** the new play, not when it happens
 on TV. Live polling remains every 15 seconds.
 
-### Watch a complete drive demo
+### Watch a complete game replay
 
-Open [Drive demo](http://localhost:4173/?demo=drive) with the server running.
-This is an **offline, fictional Cowboys–Eagles NFL game**, independent
-of your configured team and the ESPN feed. It uses the actual scoreboard,
-field, and highlight renderer with simulated scores and plays.
-
-The 31-step sequence shows a 75-yard touchdown drive, first downs, a separate
-extra-point attempt from the NFL 15-yard line, kickoff returns/possession changes,
-and Philadelphia's drive ending in a 45-yard field goal. Dallas then punts, and
-later blocks an Eagles punt and recovers it at PHI 28. Scores advance from
-0–0 to 6–0, 7–0, then 7–3 (Dallas first).
+Open [Full game replay](http://localhost:4173/?demo=drive) with the server running.
+Choose Cowboys–Eagles (187 recorded plays) or Texas–Ole Miss (215 plays).
+The saved ESPN summaries play locally without polling the live feed. The field
+position is inferred from each play, not a saved historical live situation.
+Cowboys–Eagles also reconstructs every player's passing, rushing, and receiving
+totals as each play occurs. The displayed leaders change with the game, and
+the final totals are checked against the saved box score. These are calculated
+replay totals, not archived live-stat snapshots. Home-side stats are ordered
+as a mirror image of away-side stats.
 
 - **Pause / Play** stops or resumes advancing through plays.
 - **Next play** pauses playback and advances one step.
-- **Replay** resets the scores and starts the sequence again.
+- **Start over** resets the replay to the first recorded play.
 - **Speed** selects 1× (five seconds per step) or 2× playback.
 - **Live scoreboard** returns to your configured team and normal polling.
 
-Demo celebrations are shortened to leave the updated score visible between
+Replay celebrations are shortened to leave the updated score visible between
 plays. Pausing holds the play; an active celebration still finishes its timer.
 The sequence stops at the end. Reduced-motion preferences disable movement
 while retaining the event labels and score changes.

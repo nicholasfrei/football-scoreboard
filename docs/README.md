@@ -18,9 +18,8 @@ You can run the scoreboard on your computer before buying any display hardware.
   feed provides, its limitations, and the original college-football feed research.
 - **[Team branding sources](branding.md):** logo provenance, verified college
   color overrides, and how home-field artwork is selected.
-- **[Cowboys drive animation](images/cowboys-drive-demo.gif):** the actual app
-  playing a fictional Cowboys–Eagles game at 2× speed, including scoring plays,
-  punts, and a blocked punt.
+- **[Cowboys–Eagles game animation](images/cowboys-drive-demo.gif):** every
+  recorded play, with changing player stats and big-play highlights.
 
 ## Code map
 
@@ -44,8 +43,9 @@ There is no frontend build step or third-party runtime dependency.
   between the browser, game selector, and server cache.
 - `public/ball-position.js` holds confirmed spots through fresh-feed timeout/gaps,
   resetting at scores, drive/possession changes, and unavailable feeds.
-- `public/demo.js` supplies the offline Cowboys drive sequence; `public/field-branding.js`
-  keeps each team's primary end-zone color, including green teams.
+- `src/replay.js` builds offline frames from recorded games; `src/replay-leaders.js`
+  reconstructs the NFL replay's player totals. `public/field-branding.js` keeps
+  each team's primary end-zone color, including green teams.
 - `test/` contains network-independent tests; run them with `npm test`.
 - `test/fixtures/games/` holds ten complete compressed ESPN summaries and their
   provenance manifest; `scripts/capture-game-fixtures.js` explicitly refreshes them.

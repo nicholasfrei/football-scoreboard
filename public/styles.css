@@ -207,12 +207,12 @@ body::before {
 .leader-portrait { position: relative; display: grid; width: 36px; height: 36px; overflow: hidden; place-items: center; border: 1px solid #536055; border-radius: 50%; background: #25302a; color: #d4ddcf; }
 .leader-portrait img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .leader-name { min-width: 0; max-width: 38%; overflow: hidden; color: #f4f1e8; font-size: 13px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
-.leader-name span { color: #abbcac; font-weight: 400; }
+.leader-position { color: #c0ccbe; font-size: 13px; white-space: nowrap; }
+.leader-position:empty { display: none; }
 .leader-metric { color: #c0ccbe; font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .leader-extras { color: var(--gold); font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .leader-extras:empty { display: none; }
-.leader-cell > .leader-metric:nth-child(4),
-.leader-cell:last-child > .leader-metric:nth-child(2) { color: #f4f1e8; font-weight: 700; }
+.leader-cell .leader-yards { color: #f4f1e8; font-weight: 700; }
 .next-label { color: var(--gold); font-size: 9px; font-weight: 700; letter-spacing: .1em; }
 .next-game strong { color: #f4f1e8; font-size: 13px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
 #next-detail, #next-predictor { color: #a9b6ab; font-size: 11px; font-weight: 400; line-height: 1.4; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
@@ -366,10 +366,12 @@ body::before {
 .leader-category { font-size: 14px; }
 .leader-name { font-size: 14px; }
 .leader-metric { font-size: 13px; }
+/* Reserve space for all three leader rows while keeping the full replay on screen. */
+.display:has(.game-leaders:not([hidden])) .football-field { height: 385px; object-fit: contain; }
 
 /* Twelve points (16 CSS px) is the minimum legible type size throughout the UI. */
 .eyebrow, .season-chip, .score-topline .eyebrow, .status-pill, .team-record,
-.countdown-label, .leader-category, .leader-extras, .leader-name, .leader-metric,
+.countdown-label, .leader-category, .leader-extras, .leader-name, .leader-position, .leader-metric,
 .next-label, .feed-status, .drive-summary, .drive-title,
 .highlight-context, #highlight-detail, .demo-controls strong, .demo-buttons,
 .play-panel h2, .drive-heading button, .drive-history h3, .drive-item strong,
