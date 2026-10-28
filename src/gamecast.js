@@ -6,6 +6,7 @@ import { kickPosition } from "./kick-position.js";
 import { comparePlays } from "./play-order.js";
 import { fallbackPlayEnd } from "./play-position.js";
 import { uncertainBlockedFieldGoalSpot } from "./blocked-kick-position.js";
+import { driveStats } from "./drive-stats.js";
 import { fieldPercent, playTrajectory } from "../public/play-trajectory.js";
 
 function recentPlays(summary) {
@@ -17,18 +18,18 @@ function recentPlays(summary) {
   return [...byId.values()].sort(comparePlays);
 }
 
-function driveSummary(drive, orderedPlays, scoringTeams, home, away) {
+function driveSummary(drive, orderedPlays, scoringTeams, home, away, league) {
   const ids = new Set((drive.plays ?? []).map((play) => String(play.id)));
   const offenseId = drive.team?.id == null ? null : String(drive.team.id);
+  const plays = orderedPlays.filter((play) => ids.has(String(play.id)));
   return {
     id: String(drive.id),
     teamId: offenseId,
     team: drive.team?.abbreviation ?? drive.team?.shortDisplayName ?? "—",
     result: drive.displayResult ?? null,
     description: drive.description ?? null,
-    yards: Number.isFinite(drive.yards) ? drive.yards : null,
-    time: drive.timeElapsed?.displayValue ?? null,
-    plays: orderedPlays.filter((play) => ids.has(String(play.id))).map((play) => ({
+    ...driveStats(drive, plays, home, away, league),
+    plays: plays.map((play) => ({
       id: String(play.id), text: play.text,
       period: play.period?.number ?? null,
       clock: play.clock?.displayValue ?? null,
@@ -188,7 +189,7 @@ export function enrichGame(game, summary) {
   const currentPlays = plays.filter((play) => currentIds.has(String(play.id)));
   const driveMap = new Map();
   for (const drive of [...(summary.drives?.previous ?? []), currentDrive].filter((drive) => drive?.id != null)) {
-    driveMap.set(String(drive.id), driveSummary(drive, plays, scoringTeams, home, away));
+    driveMap.set(String(drive.id), driveSummary(drive, plays, scoringTeams, home, away, updated.league));
   }
   const drives = [...driveMap.values()].filter((drive) => drive.plays.length);
   const isPause = (play) => /Timeout|Two-minute warning|End Period|End of Half|End of Regulation/i.test(play?.type?.text ?? "");

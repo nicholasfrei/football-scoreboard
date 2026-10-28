@@ -46,6 +46,7 @@ export function createReplayFrames(summary, option) {
       plays: (item.plays ?? []).filter((entry) => visible.has(String(entry.id))),
       displayResult: completed ? item.displayResult : null,
       description: completed ? item.description : null,
+      offensivePlays: completed ? item.offensivePlays : null,
       yards: completed ? item.yards : null,
       timeElapsed: completed ? item.timeElapsed : null,
     });

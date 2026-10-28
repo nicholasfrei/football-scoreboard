@@ -6,8 +6,9 @@ import { kickoffCountdown, createRefreshLoop } from "./game-timing.js";
 import { ballPositionFallback, createBallPositionTracker } from "./ball-position.js";
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT, displayScale } from "./display-size.js";
 import { scoringNeedsHighlight } from "./scoring-style.js";
-import { leaderCellItems, showGameLeaders } from "./leader-layout.js";
-import { illustratedDrive, yardageLabel } from "./drive-illustration.js";
+import { leaderCardTeams, showGameLeaders } from "./leader-layout.js";
+import { illustratedDrive } from "./drive-illustration.js";
+import { driveSummaryLabel } from "./drive-summary.js";
 import { createBallPlacement, ROUTE_DURATION_MS, RETURN_DELAY_MS, RETURN_DURATION_MS } from "./field-animation.js";
 
 function fitDisplay() {
@@ -50,7 +51,6 @@ function svgElement(tag, attributes = {}) {
 
 function renderFieldDrive(game, drive) {
   const layer = document.querySelector("#drive-illustration");
-  const caption = document.querySelector("#field-drive-caption");
   const key = drive ? `${game.league}:${game.id}:${drive.id}:${JSON.stringify([
     drive.result, drive.description, game.state, game.currentDriveId,
     drive.plays.map((play) => [play.id, play.trajectory, play.snapPercent, play.penaltyMotion, play.type]),
@@ -65,11 +65,8 @@ function renderFieldDrive(game, drive) {
   renderedIllustrationKey = key;
   renderedIllustratedPlayId = null;
   layer.replaceChildren();
-  caption.hidden = true;
-  caption.textContent = "";
   if (!drive) return;
   const home = game.homeAway === "home" ? game.selectedTeam : game.opponent;
-  const away = game.homeAway === "home" ? game.opponent : game.selectedTeam;
   const track = illustratedDrive({ ...drive, direction: drive.teamId === home.id ? "left" : "right" });
   const finalSnap = drive.plays.findLast((play) => Number.isFinite(play.snapPercent));
   if (!track.segment && !finalSnap) return;
@@ -152,15 +149,6 @@ function renderFieldDrive(game, drive) {
     layer.append(svgElement("circle", { cx: track.finalMarker.x, cy: track.finalMarker.y,
       r: 11, class: "drive-final", "aria-label": `Final offensive snap: ${finalSnap.type ?? "play"}` }));
   }
-  const spot = (percent) => percent === 50 ? "50" : percent < 50
-    ? `${away.abbreviation} ${percent}` : `${home.abbreviation} ${100 - percent}`;
-  const summary = drive.description ?? `${track.count} tracked ${track.count === 1 ? "play" : "plays"}`;
-  const completed = Boolean(drive.result) || game.state === "final" || drive.id !== game.currentDriveId;
-  const latest = current ? yardageLabel(current) : finalSnap
-    ? `${completed ? "FINAL" : "LATEST"} SNAP ${finalSnap.type?.toUpperCase() ?? "PLAY"} · ${spot(finalSnap.snapPercent)}`
-    : track.end == null ? "" : `LAST TRACKED ${spot(track.end)}`;
-  caption.textContent = `${drive.team} DRIVE · START ${spot(driveStart)} · ${summary}${latest ? ` · ${latest}` : ""}${drive.result ? ` · ${drive.result}` : ""}`;
-  caption.hidden = false;
   return renderedRouteAnimation;
 }
 
@@ -433,7 +421,7 @@ function renderDrives(game) {
     const title = document.createElement("strong");
     title.textContent = `${drive.team} · ${drive.result ?? (position === drives.length - 1 && game.state === "live" ? "IN PROGRESS" : "DRIVE")}`;
     const detail = document.createElement("span");
-    detail.textContent = drive.description ?? `${drive.plays.length} reported plays`;
+    detail.textContent = driveSummaryLabel(drive);
     button.append(title, detail);
     driveList.prepend(button);
   }
@@ -444,11 +432,7 @@ function renderDrives(game) {
   const title = document.querySelector("#drive-title");
   title.hidden = !selected || index === drives.length - 1;
   title.textContent = title.hidden ? "" : `${selected.team} · ${selected.result ?? "DRIVE"}`;
-  document.querySelector("#drive-summary").textContent = selected
-    ? selected.description ?? [
-      `${selected.plays.length} reported plays`,
-      selected.yards == null ? null : `${selected.yards} yards`, selected.time,
-    ].filter(Boolean).join(" · ") : "";
+  document.querySelector("#drive-summary").textContent = driveSummaryLabel(selected);
   const list = document.querySelector("#recent-plays");
   const content = document.querySelector("#drive-content");
   const sameDrive = selected?.id === renderedDriveId;
@@ -547,7 +531,7 @@ function renderTeam(side, team, league) {
   document.querySelector(`#${side}-team`).dataset.teamId = team.id;
   document.querySelector(`#${side}-team`).classList.toggle("is-selected", team.id === selectedTeamId);
   const name = document.querySelector(`#${side}-name`);
-  name.textContent = rankedName(team);
+  name.textContent = league === "nfl" ? team.name ?? rankedName(team) : rankedName(team);
   name.title = team.rank ? team.rankSource ?? "ESPN event ranking" : "";
   const record = document.querySelector(`#${side}-record`);
   record.textContent = teamRecordLabel(team, league);
@@ -574,35 +558,33 @@ function renderLeaders(game, demo = false) {
   section.hidden = !visible;
   const list = document.querySelector("#leader-list");
   list.replaceChildren();
+  document.querySelector("#leader-matchup").textContent = "";
   if (!visible) return;
-  const away = game.homeAway === "home" ? game.opponent : game.selectedTeam;
-  const home = game.homeAway === "home" ? game.selectedTeam : game.opponent;
-  const teams = document.createElement("div");
-  teams.className = "leader-teams";
-  for (const [index, team] of [away, home].entries()) {
-    const side = document.createElement("div");
-    side.className = "leader-team";
-    const name = document.createElement("strong");
-    name.textContent = team.abbreviation;
-    const logo = document.createElement("span");
-    logo.className = "leader-team-logo";
-    setTeamLogo(logo, team);
-    if (index === 0) side.append(logo, name);
-    else side.append(name, logo);
-    teams.append(side);
-  }
-  list.append(teams);
+  const [away, home] = leaderCardTeams(game);
+  document.querySelector("#leader-matchup").textContent = `${away.location} / ${home.location}`;
   for (const { category, leaders } of game.leaders ?? []) {
-    const row = document.createElement("div");
-    row.className = "leader-row";
-    const label = document.createElement("strong");
+    const card = document.createElement("section");
+    card.className = "leader-card";
+    const label = document.createElement("h3");
     label.className = "leader-category";
-    label.textContent = { passingYards: "Passing Yards", rushingYards: "Rushing Yards",
-      receivingYards: "Receiving Yards" }[category] ?? category;
+    label.textContent = { passingYards: "Passing", rushingYards: "Rushing",
+      receivingYards: "Receiving" }[category] ?? category;
+    card.setAttribute("aria-label", `${label.textContent} leaders`);
+    card.append(label);
     for (const [side, team] of [away, home].entries()) {
       const leader = leaders.find((item) => item.teamId === team.id);
       const cell = document.createElement("div");
       cell.className = "leader-cell";
+      cell.dataset.side = side === 0 ? "away" : "home";
+      cell.setAttribute("aria-label", `${team.name} · ${side === 0 ? "Away" : "Home"}`);
+      const teamIdentity = document.createElement("div");
+      teamIdentity.className = "leader-team";
+      const teamLogo = document.createElement("span");
+      teamLogo.className = "leader-team-logo";
+      setTeamLogo(teamLogo, team);
+      const abbreviation = document.createElement("strong");
+      abbreviation.textContent = team.abbreviation;
+      teamIdentity.append(teamLogo, abbreviation);
       const portrait = document.createElement("span");
       portrait.className = "leader-portrait";
       portrait.textContent = leader?.name?.[0] ?? "—";
@@ -633,11 +615,19 @@ function renderLeaders(game, demo = false) {
       extras.textContent = [leader?.interceptions > 0 ? `${leader.interceptions} INT` : null,
         leader?.fumbles > 0 ? `${leader.fumbles} FUM` : null].filter(Boolean).join(" · ");
       yards.classList.add("leader-yards");
-      cell.append(...leaderCellItems(side === 0 ? "away" : "home", { portrait, name, position, attempts, yards, touchdowns, extras }));
-      row.append(cell);
+      const identity = document.createElement("div");
+      identity.className = "leader-identity";
+      identity.append(name, position);
+      const stats = document.createElement("div");
+      stats.className = "leader-stats";
+      stats.append(attempts, yards, touchdowns, extras);
+      const details = document.createElement("div");
+      details.className = "leader-details";
+      details.append(identity, stats);
+      cell.append(teamIdentity, portrait, details);
+      card.append(cell);
     }
-    row.insertBefore(label, row.children[1]);
-    list.append(row);
+    list.append(card);
   }
 }
 
@@ -673,6 +663,8 @@ function updateGame(game, nextGame, demo = false) {
   elements.gameLabel.textContent = kickoffText(game);
   renderTeam("away", isHome ? game.opponent : game.selectedTeam, game.league);
   renderTeam("home", isHome ? game.selectedTeam : game.opponent, game.league);
+  document.querySelector("#away-side").textContent = game.neutralSite ? "DESIGNATED AWAY" : "AWAY";
+  document.querySelector("#home-side").textContent = game.neutralSite ? "DESIGNATED HOME" : "HOME";
   updateField(game);
   renderDrives(game);
   elements.gameVenue.textContent = game.venue ?? "VENUE TBD";
@@ -681,7 +673,16 @@ function updateGame(game, nextGame, demo = false) {
   if (game.state === "live") {
     const quarter = game.period === 2 && /end (?:of )?(?:quarter )?2|halftime|end of (?:the )?(?:2nd|second) quarter|end of half/i.test(game.status)
       ? "HALFTIME" : game.period > 4 ? `OT${game.period - 4}` : game.period ? `Q${game.period}` : "LIVE";
-    elements.gameClock.textContent = `${quarter}${quarter !== "HALFTIME" && game.clock ? ` · ${game.clock}` : ""}`;
+    const period = document.createElement("span");
+    period.className = "clock-period";
+    period.textContent = quarter;
+    elements.gameClock.replaceChildren(period);
+    if (quarter !== "HALFTIME" && game.clock) {
+      const clock = document.createElement("strong");
+      clock.className = "clock-time";
+      clock.textContent = game.clock;
+      elements.gameClock.append(clock);
+    }
     elements.gameClock.hidden = false;
     elements.gameDetail.textContent = "";
   } else if (upcoming) {
@@ -815,6 +816,7 @@ async function startDriveDemo() {
       document.querySelector("#next-predictor").textContent = "Field position is inferred from each recorded play, not a saved live feed";
     }
     document.querySelector("#demo-step").textContent = `Play ${index + 1} / ${frames.length} · ${frame.caption}`;
+    document.querySelector("#demo-step").title = frame.caption;
     document.querySelector("#demo-progress").max = frames.length;
     document.querySelector("#demo-progress").value = index + 1;
     if (index === frames.length - 1) paused = true;

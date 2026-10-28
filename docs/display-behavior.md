@@ -8,6 +8,19 @@ The display is laid out at a fixed **1920 × 1200 pixels (landscape)**.
 It does not grow to fill a larger window or change layout at browser breakpoints.
 In a smaller window, the entire canvas scales down uniformly to fit for preview;
 its internal spacing and typography remain based on the 1920 × 1200 design.
+The broadcast-style score panel groups each team with its score, puts the live
+clock between the scores, and keeps possession/down/distance in a full-width strip.
+Kickoff date and time remain at the top left beside the boxed broadcast listing.
+The field takes two-thirds of the gamecast width, with the full scrolling drive
+panel in the remaining third. The field has no heading, legend, or footer caption, leaving more
+room for the diagram. Three compact game-leader columns sit below it; replay
+controls reserve their own space without clipping the footer.
+The field's native **1000:440 aspect ratio** determines its panel height in every
+view; the panel does not stretch to fill leftover vertical space. Its frame and
+the SVG's safe edges therefore stay evenly inset on all four sides, without
+stretching or cropping the field, logos, or markers. The score panel absorbs spare
+vertical space instead. Replay uses a compact two-column toolbar rather than a
+different field size, and long drives scroll without changing the field height.
 
 The app prioritizes a live game for the selected team. Between games, it shows
 the most recent final and previews the next matchup. **24 hours before kickoff**,
@@ -70,7 +83,8 @@ The fixed diagram direction is away offense → and home offense ←; it does no
 guess real stadium direction or switch ends each quarter. The ball moves to
 reported play positions, not continuously with players. Completed games show
 the last plays with no live ball. The scoreboard identifies the home team and
-venue above the field; the field itself has no duplicate heading.
+venue above the field. No additional field heading or marker legend takes space
+away from the diagram.
 
 The brown, white-laced football is centered across the field's width, and the
 **blue line** marks the reported ball spot. The approaching offense's red zone is
@@ -90,7 +104,7 @@ icons are 1.5× their original size (33px desktop, 24px tablet, 21px phone).
 Possession indicators are hidden when possession is unknown, the game is not live, or the
 feed is stale or offline.
 
-The field caption omits the “last reported play” suffix; source metadata remains
+The possession caption omits the “last reported play” suffix; source metadata remains
 in the data model. During a fresh-feed timeout or temporary position gap, the
 display holds the last confirmed ball spot, possession, and line to gain rather
 than hiding them or jumping to a timeout marker's placeholder yardage. A timeout
@@ -141,10 +155,10 @@ reported start can establish the unchanged line of scrimmage and distance with
 the down advanced. This does not override live situations, penalty enforcement,
 or a confirmed change of possession on fourth down.
 
-During live games and the drive demo, the quarter and game clock are centered
-**above the score**. Kickoff date/time, venue and broadcast share a single row at
-the top left in the same font. Halftime replaces `Q2 · 0:00`. Overtime
-uses `OT1`, `OT2`, and so on. The upper clock is hidden for scheduled/final games
+During live games and the drive demo, the game clock is centered **between the
+scores**, with the quarter beneath it. Kickoff date/time, venue and the boxed
+broadcast listing share a single row at the top left. Halftime replaces the
+quarter and clock. Overtime uses `OT1`, `OT2`, and so on. The central clock is hidden for scheduled/final games
 and when the feed is stale or offline.
 
 See [branding sources](branding.md) for artwork, verified college overrides,
@@ -161,14 +175,26 @@ live win-probability graph. Missing or invalid values show as unavailable;
 the app does not infer percentages. NFL values may not total 100% because
 of a tie probability.
 During a live game, this space instead compares passing, rushing, and receiving
-yardage leaders side by side: away on the left, home on the right, with team
-logos and one line per leader: headshot, name and position, completions/attempts
+yardage leaders in three columns: **Passing**, **Rushing**, and **Receiving**.
+Each column stacks the away player above the home player, with team logos,
+abbreviations, headshots, name and position, completions/attempts
 or carries or receptions, yards, touchdowns, plus confirmed interceptions and
 fumbles when present in the box score.
-Headshots sit at the outside edges; each team's numbers sit beside its name.
+Each player's complete statistics sit below their name in the same reading order
+for both teams. Content wraps within its column rather than being abbreviated
+or hidden to fit.
 
-The gamecast shows every reported play in the current drive, newest first, its
-provider drive summary, and drive history at the bottom of the same scrolling play panel. Select
+The gamecast shows every reported play in the current drive, newest first, with a
+running summary directly below **Current Drive**, formatted `7 plays, 28 yards, 2:30`.
+The summary updates with each reported play and each replay step. Provider totals
+take priority; when missing, the app derives progress from the visible drive's
+offensive plays, confirmed net field position, and game clocks. Kickoff returns,
+timeouts, and no-play penalties do not inflate the offensive play count; enforced
+penalty yardage still affects net progress. Replay clock-based durations are
+estimates, not archived time-of-possession snapshots. Unavailable yardage or time
+uses a dash rather than an invented value. No drive summary is repeated below the field.
+
+Drive history is at the bottom of the same scrolling play panel. Select
 a drive in that history to read its plays; a left-side Current drive button appears
 only while browsing an older drive and restores automatic following. Browsing an
 older drive hides the current ball, line to gain, and red-zone tint so they do
@@ -190,11 +216,9 @@ An incomplete pass uses the reported `thrown to` yard line (including college
 team-name aliases) for its centered dotted route and red X. When no reliable
 target spot is reported, depth-only `short`/`deep` descriptions (common in NFL)
 draw a schematic arc (15/30 yards, clamped to the goal line), not a measured
-landing spot; the caption never calls it a reported target or shows `(EST.)`.
-Spikes and other passes with no useful depth keep only the X at the snap. The
-caption shows a reported target when available and zero gain. It otherwise
-identifies the drive start, provider drive summary when available, and latest
-tracked play and yards. An interception uses the same fixed-height pass arc
+landing spot. Spikes and other passes with no useful depth keep only the X at the
+snap. Full play descriptions remain in the scrolling play panel rather than in
+a separate field footer. An interception uses the same fixed-height pass arc
 to the reported pick spot and, when its final spot and return yardage agree,
 a solid red line back to the defender's final spot. A pick with no return ends
 at the catch; a touchback shows the pick in the end zone but no fictitious
@@ -319,7 +343,8 @@ Cowboys–Eagles also reconstructs every player's passing, rushing, and receivin
 totals as each play occurs. The displayed leaders change with the game, and
 the final totals are checked against the saved box score. These are calculated
 replay totals, not archived live-stat snapshots. Home-side stats are ordered
-as a mirror image of away-side stats.
+in the same order as away-side stats, with the away player above the home player
+in each category.
 
 - **Pause / Play** stops or resumes advancing through plays.
 - **Next play** pauses playback and advances one step.
@@ -331,6 +356,9 @@ Replay celebrations are shortened to leave the updated score visible between
 plays. Pausing holds the play; an active celebration still finishes its timer.
 The sequence stops at the end. Reduced-motion preferences disable movement
 while retaining the event labels and score changes.
+Long play descriptions in the compact replay toolbar are shortened visually;
+hovering reveals the full description, which also remains in the scrolling
+play-by-play panel. The normal and replay views use the same field-sizing rules.
 
 ### Preview without a live game
 

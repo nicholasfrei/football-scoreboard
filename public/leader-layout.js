@@ -1,6 +1,5 @@
-export function leaderCellItems(side, { portrait, name, position, attempts, yards, touchdowns, extras }) {
-  const away = [portrait, name, position, attempts, yards, touchdowns, extras];
-  return side === "home" ? away.reverse() : away;
+export function leaderCardTeams(game) {
+  return game.homeAway === "home" ? [game.opponent, game.selectedTeam] : [game.selectedTeam, game.opponent];
 }
 
 export function showGameLeaders(game, demo = false) {

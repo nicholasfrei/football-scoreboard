@@ -22,8 +22,22 @@ test("the layout is fixed rather than reflowing at browser breakpoints", async (
   assert.doesNotMatch(css, /@media\s*\((?:min|max)-(?:width|height)|\b\d+vw\b/);
 });
 
-test("the replay field fills its panel even when game leaders are visible", async () => {
+test("one native field aspect ratio determines the panel height in normal and demo views", async () => {
   const css = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
-  const letterboxed = /\.display:has\(\.game-leaders:not\(\[hidden\]\)\) \.football-field\s*\{[^}]*object-fit:\s*contain/.test(css);
-  assert.equal(letterboxed, false, "the replay field should use its full-width natural aspect ratio");
+  const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
+  assert.match(html, /class="football-field" viewBox="0 0 1000 440"/);
+  assert.match(css, /\.field-canvas\s*\{[^}]*flex: none;[^}]*width: 100%;[^}]*aspect-ratio: 1000 \/ 440;/);
+  assert.match(css, /\.gamecast-layout\s*\{[^}]*flex: none;/);
+  assert.match(css, /\.play-panel\s*\{[^}]*contain: size;/);
+  assert.doesNotMatch(css, /\.display:has\(\.demo-controls/,
+    "demo-specific score or field dimensions must not compete with the common layout");
+  assert.doesNotMatch(html, /preserveAspectRatio="none"/, "logos and field markings must not stretch");
+});
+
+test("replay tools use a compact shared row and reserve footer space without a refresh button", async () => {
+  const css = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
+  assert.match(css, /\.demo-controls\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\) auto;/);
+  assert.match(css, /\.feed-status\s*\{[^}]*min-height: 29px;/);
+  assert.match(css, /\.score-panel\s*\{[^}]*flex: 1 0 auto;/,
+    "the score panel absorbs spare vertical space, not the football field");
 });
