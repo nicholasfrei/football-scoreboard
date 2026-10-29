@@ -118,8 +118,14 @@ export function playTrajectory(play, offenseId, home, away) {
   const declinedCanKeepResult = /^(?:Punt|Punt Return|Field Goal Good|Field Goal Missed|Pass Interception Return|Interception|Interception Return|Interception Return Touchdown)$/i.test(type);
   const penalties = text.match(/\bpenalty\b/gi)?.length ?? 0;
   const declined = text.match(/\bdeclined\b/gi)?.length ?? 0;
+  // A post-play penalty on the receiving team does not nullify the punt arc.
+  // ESPN leaves isPenalty/penalty unset on these plays; only text-level penalty
+  // detection would otherwise block them. Allow the arc when ESPN's structured
+  // flags confirm the play itself was valid.
+  const puntKeepsArc = /^(?:Punt|Punt Return)$/i.test(type) && !play.isPenalty && !play.penalty;
   if (/\b(?:no\s*play|nullified|overturned|reversed)\b/i.test(text) || play.penalty || play.isPenalty
-      || (penalties && !(declinedCanKeepResult && penalties === declined && !/\b(?:enforced|offsetting)\b/i.test(text)))) return null;
+      || (penalties && !(declinedCanKeepResult && penalties === declined && !/\b(?:enforced|offsetting)\b/i.test(text))
+          && !puntKeepsArc)) return null;
   const direction = offenseId === away.id ? 1 : offenseId === home.id ? -1 : 0;
   if (!direction) return null;
   const defensiveScore = defensiveFumbleTouchdown(play, start, offenseId, home, away, direction);
@@ -132,7 +138,12 @@ export function playTrajectory(play, offenseId, home, away) {
     : /^(?:Pass Interception Return|Interception|Interception Return|Interception Return Touchdown)$/i.test(type) ? "interception" : null;
   if (!kind || (play.isTurnover && kind !== "interception")) return null;
   const kickText = text.split(/\bInjury Update:/i)[0];
-  if ((kind === "punt" && /\b(?:blocked|muff|fumble)\b/i.test(text))
+  // A muffed punt recovered by the kicking team still shows the kick arc; the
+  // end spot (where the kicker's team recovered) is the arc's destination.
+  const muffKickerRecovered = kind === "punt" && /\bmuff\b/i.test(text)
+    && String(play.end?.team?.id ?? "") === offenseId;
+  if ((kind === "punt" && /\bblocked\b/i.test(text))
+      || (kind === "punt" && /\b(?:muff|fumble)\b/i.test(text) && !muffKickerRecovered)
       || (kind === "field-goal" && (/\b(?:blocked|short)\b/i.test(kickText)
         || /\breturn(?:ed)? (?:by|for|to)\b|\brecovered by\b/i.test(kickText)))) return null;
   if (kind === "interception") return interceptionTrajectory(play, start, offenseId, home, away, direction);

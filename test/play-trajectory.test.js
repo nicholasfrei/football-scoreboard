@@ -288,6 +288,34 @@ test("a punt with a contradictory return spot or yardage does not invent a split
   assert.equal(illustratedDrive({ plays: [{ id: "unsafe", trajectory: motion }] }).segment.yacPath, null);
 });
 
+test("a post-play receiving-team penalty on a punt still draws the arc to the post-penalty possession spot", () => {
+  const summary = JSON.parse(gunzipSync(readFileSync(new URL("./fixtures/games/college-football/401862811.json.gz", import.meta.url))));
+  const sides = summary.header.competitions[0].competitors;
+  const h = sides.find((side) => side.homeAway === "home").team;
+  const a = sides.find((side) => side.homeAway === "away").team;
+  const raw = summary.drives.previous.flatMap((drive) => drive.plays).find((play) => play.id === "401862811713");
+  // UTSA punts from their 30, TLN returns 0 yards to TLN38, PENALTY TLN Holding 10 yards → TLN28 (100-28=72).
+  const motion = playTrajectory(raw, a.id, h, a);
+  assert.deepEqual([motion?.kind, motion?.start, motion?.end, motion?.landingLabel],
+    ["punt", 30, 72, "TULN 28"]);
+  assert.equal(motion.catchPercent, null, "a 0-yard return with penalty does not split the arc");
+  assert.equal(motion.returnYards, null);
+});
+
+test("a muffed punt recovered by the kicking team draws a punt arc to the recovery spot", () => {
+  const summary = JSON.parse(gunzipSync(readFileSync(new URL("./fixtures/games/college-football/401862811.json.gz", import.meta.url))));
+  const sides = summary.header.competitions[0].competitors;
+  const h = sides.find((side) => side.homeAway === "home").team;
+  const a = sides.find((side) => side.homeAway === "away").team;
+  const raw = summary.drives.previous.flatMap((drive) => drive.plays).find((play) => play.id === "401862811644");
+  // UTSA punts from their 33, ball muffed at TLN26, recovered by UTSA at TLN17 (100-17=83).
+  const motion = playTrajectory(raw, a.id, h, a);
+  assert.deepEqual([motion?.kind, motion?.start, motion?.end, motion?.landingLabel],
+    ["punt", 33, 83, "TULN 17"]);
+  assert.equal(motion.catchPercent, null, "a muffed-and-recovered punt does not split the arc");
+  assert.equal(motion.returnYards, null);
+});
+
 test("field-goal arcs end at the back of the attacking end zone, not at a new possession", () => {
   const kick = playTrajectory(play("Field Goal Good", "AWY 35", "AWY 35", {
     text: "Kicker 53 yard field goal is GOOD", scoringPlay: true, end: {},
@@ -575,7 +603,11 @@ test("100 saved games route confirmed punts to the receiving spot and ordinary f
         const type = candidate.type?.text ?? "";
         if (!/^(?:Punt|Punt Return|Field Goal Good|Field Goal Missed|Blocked Field Goal|Punt Return Touchdown)$/i.test(type)) continue;
         const motion = playTrajectory(candidate, String(drive.team.id), h, a);
-        const penalty = /\bpenalty\b/i.test(candidate.text ?? "") && !/\bdeclined\b/i.test(candidate.text ?? "");
+        const isPuntPlay = /^(?:Punt|Punt Return)$/i.test(type);
+        // A post-play receiving-team penalty on a punt/punt-return is not unsafe:
+        // the arc now draws to the post-penalty possession spot (isPenalty/penalty unset).
+        const penalty = /\bpenalty\b/i.test(candidate.text ?? "") && !/\bdeclined\b/i.test(candidate.text ?? "")
+          && !(isPuntPlay && !candidate.isPenalty && !candidate.penalty);
         const unsafe = /\b(?:blocked|muff|fumble|no play|nullified|short)\b/i.test(candidate.text ?? "") || penalty
           || candidate.isPenalty || candidate.penalty || candidate.isTurnover;
         if (unsafe || /^(?:Blocked Field Goal|Punt Return Touchdown)$/.test(type)) {
@@ -593,6 +625,9 @@ test("100 saved games route confirmed punts to the receiving spot and ordinary f
           if (!side && candidate.end?.possessionText !== "50") continue;
           const yards = Number(named?.[2]);
           const percent = candidate.end.possessionText === "50" ? 50 : side.id === a.id ? yards : 100 - yards;
+          // A post-play penalty punt whose end resolves to the goal line (0 or 100)
+          // correctly returns null; skip rather than assert a drawable trajectory.
+          if (percent === 0 || percent === 100) { assert.equal(motion, null, `${entry.id}:${candidate.id}`); continue; }
           punts++;
           assert.equal(motion?.kind, "punt", `${entry.id}:${candidate.id} ${candidate.text}`);
           assert.equal(motion.end, percent, `${entry.id}:${candidate.id}`);
