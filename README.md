@@ -35,8 +35,11 @@ a small screen in a shadow box for an always-on game-day scoreboard.
   and blocked punts.
 - **Look ahead:** the next matchup and ESPN's pregame win-chance estimates, when available.
 - **Make it yours:** choose an ESPN team page and time zone in one configuration file.
-- **Switch favorites:** tap Cowboys, Longhorns, or UTSA logo/mascot buttons;
-  customize the scrollable favorites row in `config.json`.
+- **Switch favorites:** tap a team’s logo/mascot in the scrollable favorites row.
+  Use the search icon to find NFL and NCAAF teams and add favorites on this device.
+  Hold a favorite for 1.5 seconds to reveal its remove button, then tap **Done**;
+  **Edit favorites** in the search dialog also supports keyboard users.
+  `config.json` sets the initial favorites for new browsers.
 
 The app is a small Node.js server and a browser-based display, with no third-party
 packages or build step. It refreshes every 15 seconds from five minutes before

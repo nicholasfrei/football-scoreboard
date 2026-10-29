@@ -1,12 +1,13 @@
 import { getScoreboard, getTeamChoice } from "./espn.js";
 import { createScoreboardCache } from "./scoreboard-cache.js";
+import { createTeamDirectory } from "./team-directory.js";
 
 export function teamSelectionKey(config) {
   return `${config.league}:${config.teamKey}`;
 }
 
-/** Only configured teams can be requested; every team has its own feed/cache. */
-export function createTeamSelection(config, { load = getScoreboard, lookup = getTeamChoice } = {}) {
+/** Configured and directory-verified teams each have an isolated feed/cache. */
+export function createTeamSelection(config, { load = getScoreboard, lookup = getTeamChoice, directory = createTeamDirectory() } = {}) {
   const defaultKey = teamSelectionKey(config);
   const configurations = new Map([[defaultKey, config]]);
   const choices = new Map();
@@ -47,5 +48,17 @@ export function createTeamSelection(config, { load = getScoreboard, lookup = get
       return { defaultKey, teams };
     },
     get(key = defaultKey) { return loaders.get(key); },
+    async resolve(key = defaultKey) {
+      if (loaders.has(key)) return loaders.get(key);
+      const choice = await directory.find(key);
+      if (!choice) return undefined;
+      if (!loaders.has(choice.key)) {
+        const team = { ...choice, timeZone: config.timeZone,
+          teamUrl: `https://www.espn.com/${choice.league}/team/_/id/${choice.id}` };
+        loaders.set(choice.key, createScoreboardCache(() => load({ config: team })));
+      }
+      return loaders.get(choice.key);
+    },
+    searchTeams: (league) => directory.list(league),
   };
 }

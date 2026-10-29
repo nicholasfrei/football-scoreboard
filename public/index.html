@@ -72,7 +72,13 @@
               <span id="game-broadcast" class="broadcast-badge">TBD</span>
               <span id="game-detail" hidden>Checking the latest score…</span>
             </div>
-            <nav id="team-picker" class="team-picker" aria-label="Favorite teams" hidden></nav>
+            <div class="favorite-tools">
+              <nav id="team-picker" class="team-picker" aria-label="Favorite teams" hidden></nav>
+              <button id="team-search-open" class="team-search-open" type="button" aria-label="Search NFL and NCAAF teams" title="Search teams" aria-haspopup="dialog">
+                <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="13.5" cy="13.5" r="10"/><path d="m21 21 7 7"/></svg>
+              </button>
+              <button id="favorites-done" type="button" hidden>Done</button>
+            </div>
             <span id="game-status" class="status-pill"><i></i><span id="game-status-text">CONNECTING</span></span>
           </div>
 
@@ -215,5 +221,18 @@
       </section>
     </main>
     </div>
+    <dialog id="team-search" class="team-search" aria-labelledby="team-search-title">
+      <div class="team-search-heading"><h2 id="team-search-title">Find your teams</h2><button id="team-search-close" type="button" aria-label="Close team search">×</button></div>
+      <p>Add NFL and NCAAF teams to your favorites on this device.</p>
+      <label class="team-search-label" for="team-search-input">Team name</label>
+      <input id="team-search-input" type="search" placeholder="Search teams…" autocomplete="off" />
+      <div class="team-search-leagues" role="group" aria-label="Search league">
+        <button type="button" data-league="nfl" aria-pressed="true">NFL</button>
+        <button type="button" data-league="college-football" aria-pressed="false">NCAAF</button>
+      </div>
+      <p id="team-search-status" role="status"></p>
+      <div id="team-search-results" class="team-search-results"></div>
+      <div class="team-search-footer"><span>Hold a favorite for 1.5s to remove it.</span><button id="favorites-edit" type="button">Edit favorites</button></div>
+    </dialog>
   </body>
 </html>

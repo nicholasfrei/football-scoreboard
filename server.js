@@ -76,18 +76,32 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  if (pathname === "/api/teams/search") {
+    const league = url.searchParams.get("league") || undefined;
+    if (league && !["nfl", "college-football"].includes(league)) {
+      sendJson(response, 400, { error: "Choose NFL or NCAAF." });
+      return;
+    }
+    try {
+      sendJson(response, 200, { teams: await teamSelection.searchTeams(league) });
+    } catch {
+      sendJson(response, 503, { error: "Team search is unavailable. Please try again." });
+    }
+    return;
+  }
+
   if (pathname === "/api/teams") {
     sendJson(response, 200, await teamSelection.getCatalog());
     return;
   }
 
   if (pathname === "/api/scoreboard") {
-    const loadScoreboard = teamSelection.get(url.searchParams.get("team") ?? undefined);
-    if (!loadScoreboard) {
-      sendJson(response, 400, { error: "Choose a configured favorite team." });
-      return;
-    }
     try {
+      const loadScoreboard = await teamSelection.resolve(url.searchParams.get("team") ?? undefined);
+      if (!loadScoreboard) {
+        sendJson(response, 400, { error: "Choose an NFL or NCAAF team." });
+        return;
+      }
       sendJson(response, 200, await loadScoreboard());
     } catch (error) {
       sendJson(response, 503, {
