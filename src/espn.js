@@ -14,6 +14,17 @@ const NFL_TEAM_CACHE_TTL_MS = 60_000;
 const teamCaches = new WeakMap();
 const conferenceCaches = new WeakMap();
 
+/** Lightweight metadata lookup for favorite buttons; does not load game feeds. */
+export async function getTeamChoice(config, { fetchImpl = fetch } = {}) {
+  const response = await fetchImpl(`${BASE_URL}/${config.league}/teams/${config.teamKey}`, {
+    signal: AbortSignal.timeout(3_000),
+  });
+  if (!response.ok) throw new Error(`Team metadata HTTP ${response.status}`);
+  const { team } = await response.json();
+  if (!team?.displayName || !team.name) throw new Error("Incomplete team metadata");
+  return { name: team.displayName, mascot: team.name, logo: team.logos?.[0]?.href ?? null };
+}
+
 async function getConference(id, league, fetchImpl) {
   if (!/^\d+$/.test(id ?? "")) return null;
   let cache = conferenceCaches.get(fetchImpl);

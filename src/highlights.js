@@ -45,7 +45,7 @@ function defensiveStopPlayer(text) {
   const result = (text ?? "").split(/\bplay was REVERSED\.\s*/i).at(-1).split(/\(Original Play:/i)[0];
   // Only the credit immediately following yardage/the ending spot is a tackle.
   // Formation, fumble, penalty and injury parentheses are not defender credits.
-  const credit = /\bfor\s+(?:(?:a\s+)?loss\s+of\s+)?-?\d+\s+yards?(?:\s+loss)?(?:\s+to\s+(?:the\s+)?[a-z-]+\s*\d{1,2})?\s*\(([^()]*)\)/i.exec(result)?.[1];
+  const credit = /\bfor\s+(?:(?:a\s+)?loss\s+of\s+)?-?\d+\s+yards?(?:\s+loss)?(?:\s+to\s+(?:the\s+)?[a-z&-]+\s*\d{1,2})?\s*\(([^()]*)\)/i.exec(result)?.[1];
   if (!credit) return null;
   const players = credit.replace(/^sack split by\s+/i, "")
     .split(/;\s*|,(?!\s*(?:Jr|Sr)\.?(?:\s*,|\s*$))\s*|\s+and\s+/i).map((name) => name.trim());

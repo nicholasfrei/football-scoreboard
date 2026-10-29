@@ -13,7 +13,7 @@ export function textIntentionalGrounding(play) {
 // Text-only college feeds can attach enforcement to the underlying run, pass
 // or kick rather than to a Penalty play. Require a complete, unambiguous
 // statement, not merely a flag mentioned in commentary or net play yardage.
-const foul = "Offensive Holding|Defensive Holding|Holding|False Start|Offside|Offsides|Delay Of Game|Defensive Pass Interference|Offensive Pass Interference|Pass Interference|Roughing The Passer|Roughing The Kicker|Personal Foul|Illegal Shift|Illegal Formation|Illegal Substitution|Illegal Motion|Illegal Use Of Hands|Illegal Touch-Pass|Running Into The Kicker|Targeting|Intentional Grounding|Face Mask|Illegal Forward Pass|Unnecessary Roughness|Unsportsmanlike Conduct|Illegal Bat|Ineligible Downfield on Pass";
+const foul = "Offensive Holding|Defensive Holding|Holding|False Start|Offside|Offsides|Delay Of Game|Defensive Pass Interference|Offensive Pass Interference|Pass Interference|Roughing The Passer|Roughing The Kicker|Personal Foul|Chop Block|Leverage|Illegal Block in Back|Illegal Shift|Illegal Formation|Illegal Substitution|Illegal Motion|Illegal Snap|Illegal Use Of Hands|Illegal Touch-Pass|Running Into The Kicker|Targeting|Intentional Grounding|Face Mask|Illegal Forward Pass|Unnecessary Roughness|Unsportsmanlike Conduct|Illegal Bat|Ineligible Downfield on Pass";
 const label = new RegExp(`\\bPENALTY\\s+[A-Z][A-Z&-]*\\s+(?:(?:UNR|UNS):\\s*)?(${foul})\\b`, "gi");
 const enforcement = new RegExp([
   `\\bPENALTY\\s+([A-Z][A-Z&-]*)\\s+(?:(?:UNR|UNS):\\s*)?(${foul})\\s+`,
@@ -27,7 +27,11 @@ const declinedThenEnforced = new RegExp([
 
 export function reportedEnforcement(play) {
   if (play.scoringPlay || !/^(?:Penalty|Rush|Pass Reception|Pass Incompletion|Sack|Fumble Recovery \(Own\)|Kickoff|Punt(?: Return| Fair Catch| Downed| Out of Bounds| Touchback)?)$/i.test(play.type?.text ?? "")) return null;
-  const text = play.text ?? "";
+  const review = /\bunder automatic review\s*-\s*"([^"]+)"[^]*?\bCALL OVERTURNED\b/i.exec(play.text ?? "");
+  // A review can append the *overturned original* with its own foul. The
+  // corrected result precedes that annotation and is the only enforceable one.
+  const text = (play.text ?? "").split(/\bThe previous play is under automatic review\b/i)[0];
+  if (review && [...text.matchAll(label)].some((match) => match[1].toLowerCase() === review[1].toLowerCase())) return null;
   const mentions = [...text.matchAll(/\bPENALTY\s+[A-Z][A-Z&-]*\s+/gi)];
   if (/\bdeclined\b/i.test(text)) {
     const matches = [...text.matchAll(declinedThenEnforced)];

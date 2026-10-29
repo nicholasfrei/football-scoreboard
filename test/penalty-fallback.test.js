@@ -263,6 +263,28 @@ test("an overturned targeting call does not produce a penalty event", () => {
   assert.deepEqual(gameHighlights([play], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId]), []);
 });
 
+test("a review keeps the corrected roughing call but not the overturned original targeting", () => {
+  const { entry, summary, plays } = fixtures.find(({ entry }) => entry.id === "401858488");
+  const play = plays.find((item) => item.id === "401858488803");
+  const event = gameHighlights([play], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId])[0];
+  assert.deepEqual([event?.kind, event?.penaltyType, event?.penaltyYards],
+    ["penalty", "Roughing The Passer", 15]);
+});
+
+test("new text-only fouls require a complete single enforcement", () => {
+  for (const [id, type, yards] of [
+    ["401858263167", "Illegal Snap", 5],
+    ["401856721488", "Chop Block", 15],
+    ["401856717585", "Illegal Block in Back", 10],
+    ["401856717669", "Leverage", 15],
+  ]) {
+    const { entry, summary, plays } = fixtures.find(({ plays }) => plays.some((play) => play.id === id));
+    const event = gameHighlights([plays.find((play) => play.id === id)], summary.scoringPlays,
+      [entry.homeTeamId, entry.awayTeamId])[0];
+    assert.deepEqual([event?.kind, event?.penaltyType, event?.penaltyYards], ["penalty", type, yards], id);
+  }
+});
+
 test("new college foul names require a single reported enforcement", () => {
   for (const [id, type, yards] of [
     ["401856837397", "Illegal Motion", 5],

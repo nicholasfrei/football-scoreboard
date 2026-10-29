@@ -34,7 +34,7 @@ test("all eleven recorded voluntary kneels stay silent without changing their ru
   }
 });
 
-test("all 68 kneels in the expanded corpus avoid defensive tackle-for-loss alerts", async () => {
+test("all saved kneels avoid defensive tackle-for-loss alerts", async () => {
   let checked = 0;
   for (const entry of manifest) {
     const summary = JSON.parse(gunzipSync(await readFile(new URL(entry.file, root))));
@@ -49,7 +49,7 @@ test("all 68 kneels in the expanded corpus avoid defensive tackle-for-loss alert
       checked++;
     }
   }
-  assert.equal(checked, 68);
+  assert.equal(checked, 142);
 });
 
 function rush(overrides = {}) {

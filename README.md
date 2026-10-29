@@ -35,6 +35,8 @@ a small screen in a shadow box for an always-on game-day scoreboard.
   and blocked punts.
 - **Look ahead:** the next matchup and ESPN's pregame win-chance estimates, when available.
 - **Make it yours:** choose an ESPN team page and time zone in one configuration file.
+- **Switch favorites:** tap Cowboys, Longhorns, or UTSA logo/mascot buttons;
+  customize the scrollable favorites row in `config.json`.
 
 The app is a small Node.js server and a browser-based display, with no third-party
 packages or build step. It refreshes every 15 seconds from five minutes before
@@ -94,8 +96,10 @@ box score. These are replay estimates, not archived live-stat snapshots.
 
 ### Choose your team
 
-The included `config.json` selects the **Arkansas Razorbacks**. To display the
-**Dallas Cowboys**, replace its contents with:
+The included `config.json` starts with the **Dallas Cowboys** and includes
+**Texas Longhorns** and **UTSA Roadrunners** as tappable favorites. Customize
+the `favorites` array as described in [configuration](docs/configuration.md#favorite-teams-on-the-touchscreen).
+For a single-team Cowboys display, replace its contents with:
 
 ```json
 {
@@ -144,8 +148,8 @@ No soldering, LED matrix, or physical moving ball is required.
 ## Developing
 
 Run the tests with `npm test`. They cover configuration, countdowns, refresh timing,
-game selection, and feed normalization without calling ESPN. Fifty complete game
-fixtures (25 NFL and 25 NCAAF) replay all 9,171 plays from both teams' perspectives;
+game selection, and feed normalization without calling ESPN. One hundred complete game
+fixtures (50 NFL and 50 NCAAF) replay all 18,379 plays from both teams' perspectives;
 see [fixture provenance and replay limits](test/fixtures/games/README.md).
 The server entry point is `server.js`,
 the data adapters and normalization live in `src/`, and the display lives in

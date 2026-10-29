@@ -11,6 +11,7 @@ import { createHighlightTracker, highlightDetail } from "../public/highlights.js
 import { kickoffCountdown, nextRefreshDelay } from "../public/game-timing.js";
 import { createBallPositionTracker } from "../public/ball-position.js";
 import { comparePlays } from "../src/play-order.js";
+import { reportedEnforcement } from "../src/penalty.js";
 
 const root = new URL("./fixtures/games/", import.meta.url);
 const manifest = JSON.parse(await readFile(new URL("manifest.json", root), "utf8"));
@@ -50,16 +51,16 @@ function replaySummary(fixture, index) {
   };
 }
 
-test("fixture corpus contains 25 full NFL and 25 full NCAAF games, including the requested examples", () => {
-  assert.equal(fixtures.length, 50);
-  for (const league of ["nfl", "college-football"]) assert.equal(fixtures.filter(({ entry }) => entry.league === league).length, 25);
-  assert.equal(new Set(manifest.map((entry) => `${entry.league}:${entry.id}`)).size, 50);
+test("fixture corpus contains 50 full NFL and 50 full NCAAF games, including the requested examples", () => {
+  assert.equal(fixtures.length, 100);
+  for (const league of ["nfl", "college-football"]) assert.equal(fixtures.filter(({ entry }) => entry.league === league).length, 50);
+  assert.equal(new Set(manifest.map((entry) => `${entry.league}:${entry.id}`)).size, 100);
   for (const id of [
     "401873010", "401856732", "401873011", "401873013", "401873014", "401873018", "401873019",
     "401856840", "401856729", "401856728", "401858495", "401858500",
     "401872996", "401873021", "401858274", "401856730",
   ]) assert.ok(manifest.some((entry) => entry.id === id));
-  assert.equal(fixtures.reduce((sum, { plays }) => sum + plays.length, 0), 9171);
+  assert.equal(fixtures.reduce((sum, { plays }) => sum + plays.length, 0), 18_379);
   assert.ok(manifest.some((entry) => entry.league === "nfl" && entry.periods.includes(5)));
   assert.ok(manifest.some((entry) => entry.league === "college-football" && entry.periods.includes(6)));
 });
@@ -166,12 +167,12 @@ for (const fixture of fixtures) {
         assert.equal(game.latestPlaySequence, Math.max(...plays.slice(0, index + 1).map((play) => Number(play.sequenceNumber))));
         assert.equal(kickoffCountdown(game, replayNow), null);
         assert.equal(nextRefreshDelay({ spotlight: game }, replayNow), 15_000);
-        if (/End of Game|Extra Point/i.test(source.type.text) || source.scoringPlay
-            || (/Kickoff/i.test(source.type.text) && !/touchback|fair catch/i.test(`${source.type.text} ${source.text}`))) {
+        if (/End of Game|Extra Point/i.test(source.type?.text ?? "") || source.scoringPlay
+            || (/Kickoff/i.test(source.type?.text ?? "") && !/touchback|fair catch/i.test(`${source.type?.text} ${source.text}`))) {
           assert.equal(game.ball, null, `${source.id}: no spurious ball between plays/periods`);
         }
         if (game.ball) {
-          const positionPlay = frame.drives.current.plays.findLast((play) => !/Timeout|Two-minute warning|End Period|End of Half|End of Regulation/i.test(play.type.text));
+          const positionPlay = frame.drives.current.plays.findLast((play) => !/Timeout|Two-minute warning|End Period|End of Half|End of Regulation/i.test(play.type?.text ?? ""));
           // Independently checked retained spots: an offsetting/nullified TD at
           // UCF 1 and an incompletion at MISS 27 both have invalid goal-line ends.
           const restoredSpot = {
@@ -204,7 +205,15 @@ for (const fixture of fixtures) {
           const spot = /^(.*?)\s+(\d{1,2})$/.exec(interceptionSpot ?? kickSpot ?? enforcedSpot ?? positionEnd.possessionText ?? "");
           const named = spot && Number(spot[2]) <= 50 ? spot[1] === home.abbreviation ? 100 - Number(spot[2])
             : spot[1] === away.abbreviation ? Number(spot[2]) : null : null;
-          if (game.ball.source !== "kick rule") {
+          // Enforced penalties and turnovers may replace ESPN's raw end spot;
+          // corrupted coordinates in older games cannot serve as an oracle.
+          const trustworthyEnd = !/\bpenalty\b/i.test(positionPlay.text ?? "")
+            && !positionPlay.penalty && !positionPlay.isPenalty && !positionPlay.isTurnover
+            && !/^(?:Kickoff|Punt|Field Goal)/i.test(positionPlay.type?.text ?? "")
+            && positionEnd.team?.id === game.possessionTeamId
+            && Number.isFinite(positionEnd.yardsToEndzone) && positionEnd.yardsToEndzone <= 100
+            && !/\b(?:fumble|intercept|touchback)\b/i.test(positionPlay.text ?? "");
+          if (game.ball.source !== "kick rule" && trustworthyEnd) {
             assert.equal(game.ball.percent, named ?? (homePossession ? positionEnd.yardsToEndzone : 100 - positionEnd.yardsToEndzone), `${entry.id}/${source.id}`);
           }
           assert.equal(game.ball.direction, homePossession ? "left" : "right");
@@ -264,7 +273,7 @@ test("every separately recorded scoring play has one correctly attributed scorin
       total++;
     }
   }
-  assert.equal(total, 435);
+  assert.equal(total, 864);
 });
 
 test("every newly eligible saved play reaches the browser tracker, independently of sequence reuse", () => {
@@ -320,18 +329,23 @@ test("actual penalties, nullified plays, scoring attribution, turnovers and miss
   let bundledConversions = 0;
   for (const { entry, summary, plays } of fixtures) {
     for (const play of plays) {
-      types.add(play.type.text);
+      const type = play.type?.text ?? "";
+      if (type) types.add(type);
       if (play.penalty?.type?.text) penaltyTypes.add(play.penalty.type.text);
       const events = gameHighlights([play], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId]);
       // These entries have no complete, single enforcement (missing yardage or
       // multiple fouls); an unverified penalty must not be celebrated.
       const ambiguous = ["401858497450", "401858497462", "401862809242", "401862809622"];
       const explicitCollegePenalty = entry.league === "college-football"
-        && (play.type.text === "Penalty" || ["401856729374", "401860907550", "40185683488"].includes(play.id))
+        && (type === "Penalty" || ["401856729374", "401860907550", "40185683488"].includes(play.id))
         && !ambiguous.includes(play.id)
         && !play.penalty && /\bPENALTY\b/i.test(play.text)
-        && (!/\b(?:declined|offsetting)\b/i.test(play.text) || play.id === "401866476434");
-      const confirmedBundledTouchdown = play.id === "401856834595";
+        && (!/\b(?:declined|offsetting)\b/i.test(play.text) || play.id === "401866476434")
+        && reportedEnforcement(play);
+      const confirmedBundledTouchdown = play.scoringPlay && play.scoringType?.name === "touchdown"
+        && summary.scoringPlays.some((item) => item.id === play.id)
+        && /\bTOUCHDOWN\b[^]*\b(?:kick|pass|rush) attempt\b[^]*\bNO PLAY\b/i.test(play.text ?? "")
+        && !/\bTOUCHDOWN\s+nullified\b/i.test(play.text ?? "");
       if (confirmedBundledTouchdown) {
         assert.equal(events.length, 1);
         assert.equal(events[0].kind, "touchdown", "NO PLAY applies to the conversion, not the scored touchdown");
@@ -350,15 +364,15 @@ test("actual penalties, nullified plays, scoring attribution, turnovers and miss
           assert.ok(Number.isFinite(events[0].penaltyYards), "these college fixtures explicitly report enforcement yardage");
           assert.match(play.text, new RegExp(`\\b${events[0].penaltyYards}\\s+yards?\\b`, "i"));
         }
-      } else if (/Touchdown/.test(play.type.text) && play.scoringPlay) {
+      } else if (/Touchdown/.test(type) && play.scoringPlay) {
         assert.equal(events.length, 1);
         assert.equal(events[0].kind, "touchdown");
         assert.equal(events[0].teamId, summary.scoringPlays.find((score) => score.id === play.id)?.team.id ?? String(play.end.team.id));
-        if (/Interception/.test(play.type.text)) pickSix++;
+        if (/Interception/.test(type)) pickSix++;
         if (/kick|two.point|2.point/i.test(play.text)) bundledConversions++;
-      } else if (/Field Goal Missed/.test(play.type.text)) {
+      } else if (/Field Goal Missed/.test(type)) {
         assert.deepEqual(events, [], "a failed kick is not a made-field-goal celebration");
-      } else if (/Blocked Field Goal/.test(play.type.text)) {
+      } else if (/Blocked Field Goal/.test(type)) {
         assert.equal(events[0]?.kind, "blocked-field-goal");
       }
     }

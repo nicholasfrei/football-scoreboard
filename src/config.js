@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-export function parseConfig(value) {
+function parseTeamConfig(value) {
   if (!value || typeof value.teamUrl !== "string") throw new Error("Config requires a teamUrl string.");
   let url;
   try { url = new URL(value.teamUrl); }
@@ -21,6 +21,27 @@ export function parseConfig(value) {
   try { new Intl.DateTimeFormat("en-US", { timeZone }); }
   catch { throw new Error(`Invalid timeZone: ${timeZone}`); }
   return Object.freeze({ teamUrl: url.href, league, teamKey: key.toLowerCase(), timeZone });
+}
+
+export function parseConfig(value) {
+  const config = parseTeamConfig({ ...value, teamUrl: value?.teamUrl ?? value?.favorites?.[0]?.teamUrl });
+  if (value.favorites === undefined) return config;
+  if (!Array.isArray(value.favorites)) throw new Error("favorites must be an array of teams.");
+  const favorites = value.favorites.map((favorite) => {
+    const team = parseTeamConfig({ ...favorite, timeZone: config.timeZone });
+    for (const field of ["name", "mascot"]) {
+      if (favorite[field] !== undefined && (typeof favorite[field] !== "string" || !favorite[field].trim())) {
+        throw new Error(`Favorite ${field} must be a non-empty string.`);
+      }
+    }
+    if (favorite.logo !== undefined) {
+      let logo;
+      try { logo = new URL(favorite.logo); } catch { throw new Error("Favorite logos must use HTTPS URLs."); }
+      if (logo.protocol !== "https:" || logo.username || logo.password) throw new Error("Favorite logos must use HTTPS URLs.");
+    }
+    return Object.freeze({ ...team, name: favorite.name?.trim(), mascot: favorite.mascot?.trim(), logo: favorite.logo ?? null });
+  });
+  return Object.freeze({ ...config, favorites: Object.freeze(favorites) });
 }
 
 export const DEFAULT_CONFIG = parseConfig({

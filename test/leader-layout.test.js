@@ -63,14 +63,17 @@ test("three category cards retain both players, identities, attempts, yards, TDs
       opponent: homeAway === "away" ? home : away, leaders });
     const cards = querySelector("#leader-list").children;
     assert.equal(cards.length, 3);
-    assert.equal(querySelector("#leader-matchup").textContent, "Dallas / Philadelphia");
     for (const [index, card] of cards.entries()) {
       assert.equal(card.children[0].textContent, ["Passing", "Rushing", "Receiving"][index]);
       assert.equal(card.children[1].dataset.side, "away");
       assert.equal(card.children[2].dataset.side, "home");
-      for (const text of ["DAL", "D. Prescott", "QB", "14/21", "163 YDS", "1 TD", "2 INT · 3 FUM"])
+      assert.equal(card.children[1].children[0].children.length, 1, "away team shows only its logo");
+      assert.equal(card.children[2].children[0].children.length, 1, "home team shows only its logo");
+      assert.equal(card.children[1].attributes["aria-label"], "Dallas Cowboys · Away");
+      assert.equal(card.children[2].attributes["aria-label"], "Philadelphia Eagles · Home");
+      for (const text of ["D. Prescott", "QB", "14/21", "163 YDS", "1 TD", "2 INT · 3 FUM"])
         assert.ok(card.children[1].textContent.includes(text), `away retains ${text}`);
-      for (const text of ["PHI", "J. Hurts", "QB", "22/31", "249 YDS", "3 TD", "1 INT · 1 FUM"])
+      for (const text of ["J. Hurts", "QB", "22/31", "249 YDS", "3 TD", "1 INT · 1 FUM"])
         assert.ok(card.children[2].textContent.includes(text), `home retains ${text}`);
     }
   }
@@ -94,6 +97,5 @@ test("missing leaders keep the correct team slot and yardage fallback without in
   render({ state: "scheduled", homeAway: "away", selectedTeam: away, opponent: home });
   assert.equal(querySelector("#game-leaders").hidden, true);
   assert.equal(querySelector(".next-game").hidden, false);
-  assert.equal(querySelector("#leader-matchup").textContent, "");
   assert.equal(querySelector("#leader-list").children.length, 0);
 });

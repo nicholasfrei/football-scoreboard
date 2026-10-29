@@ -159,9 +159,17 @@ For the **labwc** desktop session, create `~/start-scoreboard-kiosk.sh`:
 #!/bin/sh
 # Wait for the local page, not the external sports feed, to be ready.
 until curl -fsS http://localhost:4173/ >/dev/null; do sleep 2; done
-exec chromium --kiosk --noerrdialogs --no-first-run \
-  --disable-infobars http://localhost:4173/
+exec chromium --ozone-platform=wayland --touch-events=enabled \
+  --kiosk --noerrdialogs --no-first-run --disable-session-crashed-bubble \
+  --user-data-dir="$HOME/.config/chromium-scoreboard" \
+  --password-store=basic http://localhost:4173/
 ```
+
+The dedicated kiosk profile avoids interfering with normal browser windows.
+`--password-store=basic` prevents desktop-keyring unlock prompts from blocking
+unattended startup, including after an account password change. It does **not**
+provide encrypted browser password storage: use this profile only for the
+scoreboard and do not save passwords or use it for personal logins.
 
 Make it executable and create the labwc configuration directory if necessary:
 

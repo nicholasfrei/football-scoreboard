@@ -5,11 +5,11 @@ import { teamRecordLabel } from "./team-record.js";
 import { kickoffCountdown, createRefreshLoop } from "./game-timing.js";
 import { ballPositionFallback, createBallPositionTracker } from "./ball-position.js";
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT, displayScale } from "./display-size.js";
-import { scoringNeedsHighlight } from "./scoring-style.js";
 import { leaderCardTeams, showGameLeaders } from "./leader-layout.js";
-import { illustratedDrive } from "./drive-illustration.js";
+import { illustratedDrive, lastDriveSnap } from "./drive-illustration.js";
 import { driveSummaryLabel } from "./drive-summary.js";
 import { createBallPlacement, ROUTE_DURATION_MS, RETURN_DELAY_MS, RETURN_DURATION_MS } from "./field-animation.js";
+import { startTeamPicker } from "./team-picker.js";
 
 function fitDisplay() {
   const scale = displayScale(window.innerWidth, window.innerHeight);
@@ -68,7 +68,7 @@ function renderFieldDrive(game, drive) {
   if (!drive) return;
   const home = game.homeAway === "home" ? game.selectedTeam : game.opponent;
   const track = illustratedDrive({ ...drive, direction: drive.teamId === home.id ? "left" : "right" });
-  const finalSnap = drive.plays.findLast((play) => Number.isFinite(play.snapPercent));
+  const finalSnap = lastDriveSnap(drive.plays);
   if (!track.segment && !finalSnap) return;
   // If the last offensive snap is a kick or a penalty, do not replay an older
   // pass as if it were the final play. Keep only the net drive line.
@@ -113,10 +113,10 @@ function renderFieldDrive(game, drive) {
       group.append(svgElement("circle", { cx: current.to, cy: current.y, r: 6, class: "drive-catch" }));
       const label = svgElement("text", { x: (current.to + current.finish) / 2,
         y: current.y + 38, class: "drive-yac-label", "text-anchor": "middle" });
-      label.textContent = `${current.yac} YAC`;
+      label.textContent = current.kind === "punt" ? `${current.returnYards} YD RETURN` : `${current.yac} YAC`;
       group.append(label);
     }
-    if (current.kind === "interception") {
+    if (current.kind === "interception" || current.kind === "fumble-return") {
       if (current.returnPath) {
         const returning = svgElement("path", { d: current.returnPath, class: "drive-return-route", fill: "none" });
         if (animate && current.id !== previousIllustratedPlayId) {
@@ -125,12 +125,14 @@ function renderFieldDrive(game, drive) {
           rememberAnimation(returning, RETURN_DELAY_MS + RETURN_DURATION_MS);
         }
         group.append(returning);
-        const label = svgElement("text", { x: (current.to + current.finish) / 2,
-          y: current.y + 38, class: "drive-return-label", "text-anchor": "middle" });
-        label.textContent = `${current.returnYards} YD RETURN`;
-        group.append(label);
+        if (current.kind === "interception") {
+          const label = svgElement("text", { x: (current.to + current.finish) / 2,
+            y: current.y + 38, class: "drive-return-label", "text-anchor": "middle" });
+          label.textContent = `${current.returnYards} YD RETURN`;
+          group.append(label);
+        }
       }
-      group.append(svgElement("circle", { cx: current.to, cy: current.y, r: 7, class: "drive-pick" }));
+      if (current.kind === "interception") group.append(svgElement("circle", { cx: current.to, cy: current.y, r: 7, class: "drive-pick" }));
     }
     if (current.kind === "incomplete") {
       const cross = svgElement("g", { class: "drive-miss" });
@@ -139,7 +141,7 @@ function renderFieldDrive(game, drive) {
       group.append(cross);
     } else if (current.kind !== "interception" || current.returnPath) group.append(svgElement("circle", {
       cx: current.finish, cy: current.y, r: 8,
-      class: current.kind === "interception" ? "drive-end is-interception" : "drive-end",
+      class: current.kind === "interception" || current.kind === "fumble-return" ? "drive-end is-interception" : "drive-end",
     }));
     layer.append(group);
   }
@@ -458,12 +460,6 @@ function renderDrives(game) {
       item.classList.add("penalty-play");
     }
     item.classList.toggle("scoring-play", play.scoring);
-    const scoringTeam = [game.selectedTeam, game.opponent].find((team) => team.id === play.scoringTeamId);
-    if (scoringTeam) {
-      item.style.setProperty("--scoring-color", scoringTeam.color);
-      item.classList.add("has-scoring-team");
-      item.classList.toggle("scoring-needs-highlight", scoringNeedsHighlight(scoringTeam.color));
-    }
     item.append(time, text);
     list.append(item);
   }
@@ -558,10 +554,8 @@ function renderLeaders(game, demo = false) {
   section.hidden = !visible;
   const list = document.querySelector("#leader-list");
   list.replaceChildren();
-  document.querySelector("#leader-matchup").textContent = "";
   if (!visible) return;
   const [away, home] = leaderCardTeams(game);
-  document.querySelector("#leader-matchup").textContent = `${away.location} / ${home.location}`;
   for (const { category, leaders } of game.leaders ?? []) {
     const card = document.createElement("section");
     card.className = "leader-card";
@@ -582,9 +576,7 @@ function renderLeaders(game, demo = false) {
       const teamLogo = document.createElement("span");
       teamLogo.className = "leader-team-logo";
       setTeamLogo(teamLogo, team);
-      const abbreviation = document.createElement("strong");
-      abbreviation.textContent = team.abbreviation;
-      teamIdentity.append(teamLogo, abbreviation);
+      teamIdentity.append(teamLogo);
       const portrait = document.createElement("span");
       portrait.className = "leader-portrait";
       portrait.textContent = leader?.name?.[0] ?? "—";
@@ -730,12 +722,14 @@ function setFeedState(state, refreshedAt) {
 }
 
 let refreshing = false;
+let activeTeamKey = null;
 async function refreshScoreboard() {
   if (refreshing) return;
   refreshing = true;
   elements.refreshButton.classList.add("is-spinning");
   try {
-    const response = await fetch("/api/scoreboard", { cache: "no-store", signal: AbortSignal.timeout(35_000) });
+    const query = activeTeamKey ? `?team=${encodeURIComponent(activeTeamKey)}` : "";
+    const response = await fetch(`/api/scoreboard${query}`, { cache: "no-store", signal: AbortSignal.timeout(35_000) });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error ?? "Score feed request failed");
 
@@ -927,6 +921,7 @@ if (demo === "drive") {
 } else if (demo === "countdown") {
   startCountdownDemo();
 } else {
+  activeTeamKey = await startTeamPicker();
   const polling = createRefreshLoop({ refresh: refreshScoreboard, getPayload: () => lastPayload });
   elements.refreshButton.addEventListener("click", polling.refreshNow);
   polling.start();

@@ -36,6 +36,12 @@ test("server serves every startup module so the dashboard can leave its loading 
     }
   }
   await checkModule("/app.js");
+  const catalogResponse = await fetch(`http://127.0.0.1:${port}/api/teams`);
+  assert.equal(catalogResponse.status, 200);
+  const catalog = await catalogResponse.json();
+  assert.equal(catalog.defaultKey, "nfl:dal");
+  assert.deepEqual(catalog.teams.map((team) => team.name), ["Dallas Cowboys", "Texas Longhorns", "UTSA Roadrunners"]);
+  assert.equal((await fetch(`http://127.0.0.1:${port}/api/scoreboard?team=nfl:unknown`)).status, 400);
   for (const [game, count] of [["nfl", 187], ["college", 215]]) {
     const response = await fetch(`http://127.0.0.1:${port}/api/demo?game=${game}`);
     assert.equal(response.status, 200);

@@ -23,6 +23,15 @@
 
 * { box-sizing: border-box; }
 
+/* Keep touchscreen swipes available for native scrolling, not text selection. */
+@media (any-pointer: coarse) {
+  body {
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+  }
+}
+
 body {
   min-height: 100vh;
   margin: 0;
@@ -141,9 +150,9 @@ body::before {
 #home-team { flex-direction: row-reverse; text-align: right; }
 .team-seal {
   display: flex;
-  flex: 0 0 96px;
-  width: 96px;
-  height: 88px;
+  flex: 0 0 120px;
+  width: 120px;
+  height: 120px;
   align-items: center;
   justify-content: center;
   overflow: visible;
@@ -178,6 +187,17 @@ body::before {
 .game-meta #game-venue { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .meta-divider { flex: none; color: #657663; }
 .status-pill { flex: none; }
+
+/* Favorites occupy the spare topline space without squeezing the game status. */
+.score-topline:has(.team-picker:not([hidden])) .game-meta { flex: 0 1 auto; max-width: 55%; }
+.team-picker { display: flex; flex: 1; min-width: 0; align-items: center; justify-content: flex-start; gap: 8px; overflow-x: auto; padding: 2px 3px 5px; scrollbar-width: thin; scrollbar-color: #657665 transparent; touch-action: pan-x; }
+.team-picker[hidden] { display: none; }
+.favorite-team:first-child { margin-inline-start: auto; }
+.favorite-team { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 4px 12px; border: 1px solid #344036; border-radius: 6px; background: #151e18; color: #c4cdc0; font-size: 16px; font-weight: 700; line-height: 1.2; text-decoration: none; white-space: nowrap; user-select: none; -webkit-user-select: none; }
+.favorite-team img { width: 30px; height: 30px; object-fit: contain; pointer-events: none; }
+.favorite-team:hover { background: #26342a; color: #fff; }
+.favorite-team[aria-current="page"] { border-color: var(--gold); background: #302b20; color: #f6df9e; }
+.favorite-team:focus-visible { outline: 3px solid #70c9ff; outline-offset: -3px; }
 .broadcast-badge { padding: 4px 10px; border: 1px solid #3b4b3e; border-radius: 5px; background: #202b23; color: #e4e9df; white-space: normal; }
 
 .field-wrap {
@@ -348,15 +368,18 @@ body::before {
 #recent-plays li { display: block; padding: 16px 0; border-bottom: 1px solid #2b392d; font-size: 20px; line-height: 1.45; color: #d7ded0; }
 #recent-plays li > span:first-child { display: block; margin-bottom: 7px; color: #a8b8a3; font-size: 16px; font-variant-numeric: tabular-nums; }
 #recent-plays li:first-child { margin-top: 14px; padding: 16px; border: 0; border-left: 3px solid var(--gold); border-radius: 7px; background: #243328; }
-#recent-plays .scoring-play { color: #f6d792; }
-#recent-plays .scoring-play.has-scoring-team .play-description {
-  color: var(--scoring-color);
-}
-#recent-plays .scoring-play.has-scoring-team.scoring-needs-highlight .play-description {
-  background: #fff; padding: 2px 4px; border-radius: 3px;
-  -webkit-box-decoration-break: clone; box-decoration-break: clone;
-}
 #recent-plays .penalty-play { color: #f6d792; }
+/* Scoring plays remain highlighted as complete rows, including the newest play. */
+#recent-plays li.scoring-play {
+  margin-top: 14px;
+  padding: 16px;
+  border: 0;
+  border-left: 3px solid rgba(255, 255, 255, .65);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, .08);
+  color: #f4f1e8;
+}
+#recent-plays li.scoring-play > span:first-child { color: #d7ded0; }
 .penalty-badge { display: inline-block; margin-right: 8px; padding: 1px 5px; border-radius: 3px; color: #21140c; background: #e4a86b; font-size: .8em; font-weight: 800; }
 .drive-history { margin: 16px 0 0; }
 .drive-history h3 { margin: 0 0 9px; color: var(--gold); font-size: 11px; letter-spacing: .1em; }
@@ -396,7 +419,7 @@ body::before {
 .drive-content { flex: 1; }
 .footer-bar { margin: 16px 32px 0; padding: 0 0 10px; gap: 8px; border-top: 0; }
 .next-label { font-size: 12px; }
-/* Twelve points (16 CSS px) is the minimum legible type size throughout the UI. */
+/* Legacy small-type floor; the larger UI type and the feed-status exception follow below. */
 .eyebrow, .season-chip, .score-topline .eyebrow, .status-pill,
 .countdown-label,
 .next-label, .feed-status, .drive-title,
@@ -415,6 +438,53 @@ body::before {
 .countdown-demo { display: flex; flex: none; align-items: center; gap: 18px; padding: 12px 32px; border-bottom: 1px solid #536044; background: #20291f; font-size: 16px; }
 .countdown-demo strong { color: #f6d792; letter-spacing: .08em; }
 .countdown-demo a { margin-left: auto; color: #eee9db; }
+
+/* Enlarge UI typography by 25%, with a 16pt (21.33px) design-size floor
+   except for the 12pt feed status. Field SVG letters stay in field coordinates. */
+body { font-size: 16pt; }
+.brand-mark { font-size: 31.25px; }
+.brand-copy h1 { font-size: 35px; }
+.team-name { font-size: 37.5px; }
+.team-record { font-size: 23.75px; }
+.clock-period { font-size: 22.5px; }
+.clock-time { font-size: 45px; }
+.clock-period:only-child { font-size: 28.75px; }
+.score-number { font-size: 120px; }
+.score-divider { font-size: 30px; }
+#kickoff-countdown-value { font-size: 82.5px; }
+.game-meta, .leader-name, .drive-summary { font-size: 22.5px; }
+.leader-cell .leader-yards, .possession-team, #recent-plays li { font-size: 25px; }
+.highlight-headline { font-size: 55px; }
+.highlight[data-kind="penalty"] .highlight-headline { font-size: 52.5px; }
+.highlight[data-kind="touchdown"] #highlight-detail { font-size: 32.5px; }
+.ball-detail { font-size: 27.5px; }
+.play-panel h2 { font-size: 21.25px; }
+.highlight[data-kind="penalty"] #highlight-detail,
+.eyebrow, .season-chip, .score-topline .eyebrow, .status-pill,
+.team-side, .team-seal, .countdown-label, .favorite-team,
+.leader-matchup, .leader-team, .leader-category, .leader-position,
+.leader-metric, .leader-extras, .next-label, .next-game strong,
+#next-detail, #next-predictor, .highlight-context,
+#highlight-detail, .demo-controls strong, .demo-controls p,
+.demo-buttons, .countdown-demo, .drive-heading button, .drive-title,
+#recent-plays li > span:first-child, .penalty-badge, .drive-history h3,
+.drive-item, .drive-item strong, .drive-item span { font-size: 16pt; }
+.feed-status { font-size: 12pt; }
+
+/* Equal vertical gaps; keep the original two-to-one field/drive layout. */
+.score-panel { margin-top: 10px; }
+.gamecast-layout { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); margin-top: 10px; }
+.footer-bar { margin-top: 10px; }
+.brand-bar { min-height: 60px; }
+.demo-controls { padding-block: 4px; }
+.ball-detail { min-height: 52px; padding-block: 4px; }
+.game-leaders { padding-block: 4px; }
+.leader-list { margin-top: 4px; }
+.leader-cell { padding-block: 0; }
+.leader-cell { grid-template-columns: 48px 48px minmax(0, 1fr); }
+.leader-team-logo, .leader-portrait { width: 48px; height: 48px; }
+.next-game { gap: 4px; }
+.footer-bar { padding-bottom: 4px; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }

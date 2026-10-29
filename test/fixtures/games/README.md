@@ -1,6 +1,6 @@
 # Complete game fixtures
 
-Twenty-five NFL and twenty-five NCAAF **complete, unmodified ESPN summary responses**,
+Fifty NFL and fifty NCAAF **complete, unmodified ESPN summary responses**,
 gzip-compressed to keep the repository small. Each includes every reported drive
 and play, scoring plays, team data, box scores, and all other returned fields.
 `manifest.json` records source/game URLs, capture times, SHA-256 hashes of the
@@ -8,9 +8,9 @@ uncompressed responses, final scores, drive/play counts, periods, and play types
 
 The Cowboys–Eagles game (`nfl/401873009.json.gz`, 187 plays, Dallas 38–21
 Philadelphia) is a separate bundled replay source. It is intentionally not in
-the fifty-game test corpus manifest; `test/replay.test.js` validates its replay.
+the hundred-game test corpus manifest; `test/replay.test.js` validates its replay.
 
-## Saved games
+## Original 50 saved games
 
 NFL (2026):
 - Patriots–Bears, October 22 — **401873010**, 180 plays (requested example).
@@ -66,7 +66,16 @@ NCAAF (October 24, 2026 local time):
 - Miami (OH)–Central Michigan — **401866476**, 187 plays.
 - Oklahoma–Mississippi State — **401856730**, 178 plays.
 
-Total: **9,171 unique plays**. The corpus includes holding, false starts,
+## 50 additional saved games
+
+Twenty-five NFL games from October 4–11 and twenty-five NCAAF games from
+October 10–24, 2026. The new college snapshots include UTSA–Tulane
+(`401862811`), whose TLN 28 incompletion provides a named-target regression.
+The new NFL snapshots include defensive fumble-return touchdowns and a
+kickoff-return touchdown. The [manifest](manifest.json) lists every matchup,
+source URL, capture timestamp, hash, and play count.
+
+Total: **18,379 unique plays**. The corpus includes holding, false starts,
 pass interference, roughing the passer, offsetting penalties, intentional
 grounding, nullified plays, sacks, interceptions, own/opponent fumble recoveries,
 punts/returns, missed/blocked field goals, touchdowns with bundled XP/two-point
@@ -115,14 +124,14 @@ Independent regression checks record expected play IDs, succeeding spots, and
 penalty types/yardage instead of deriving all expectations from the production
 sorter or provider endpoints. They cover reused-sequence alerts, 93 individually
 transcribed text-only college Penalty plays and 36 enforced fouls attached to
-actual plays with live/replay parity. Expanded corpus checks cover all 68
-reported kneels (without defensive loss alerts) and 75 confirmed turnovers on
+actual plays with live/replay parity. Expanded corpus checks cover all 142
+reported kneels (without defensive loss alerts) and 133 confirmed turnovers on
 downs. Invalid nullified results and ambiguous blocked-kick endpoints do not
 establish ball spots. A timeout misattached to an old drive
 cannot revive its earlier possession's endpoint. Controlled adjacent fresh polls
 also verify that every newly classified event actually reaches the browser
 tracker, separately from historical delivery timing and event-age suppression.
-All 1,110 ordinary incompletions with trustworthy starts are independently
+All 2,228 ordinary incompletions with trustworthy starts are independently
 checked against their starting scrimmage spot. Texas–Ole Miss play
 `401856732698` has a bad goal-line endpoint
 and a spurious 70-yard end distance; its valid start confirms MISS 27, and the

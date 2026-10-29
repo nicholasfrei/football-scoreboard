@@ -108,7 +108,7 @@ test("live situations, penalty enforcement and fourth-down possession changes re
   assert.equal(turnover.ball.direction, "left");
 });
 
-test("all 1,110 ordinary incompletions with trustworthy starts stay at their scrimmage spot", async () => {
+test("all ordinary incompletions with trustworthy starts stay at their scrimmage spot", async () => {
   const root = new URL("fixtures/games/", import.meta.url);
   const manifest = JSON.parse(await readFile(new URL("manifest.json", root), "utf8"));
   let checked = 0;
@@ -122,7 +122,7 @@ test("all 1,110 ordinary incompletions with trustworthy starts stay at their scr
     const plays = [...new Map([...(saved.drives.previous ?? []), saved.drives.current].filter(Boolean)
       .flatMap((drive) => drive.plays).map((play) => [play.id, play])).values()];
     for (const play of plays) {
-      if (play.type.text !== "Pass Incompletion" || play.scoringPlay || play.isPenalty || play.penalty
+      if (play.type?.text !== "Pass Incompletion" || play.scoringPlay || play.isPenalty || play.penalty
           || /\b(?:penalty|no play|nullified|overturned)\b/i.test(play.text)) continue;
       if (play.id === "401858274811") {
         assert.equal(play.start.possessionText, "MIA 5");
@@ -148,5 +148,5 @@ test("all 1,110 ordinary incompletions with trustworthy starts stay at their scr
       checked++;
     }
   }
-  assert.equal(checked, 1110);
+  assert.equal(checked, 2228);
 });

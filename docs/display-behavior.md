@@ -221,11 +221,14 @@ snap. Full play descriptions remain in the scrolling play panel rather than in
 a separate field footer. An interception uses the same fixed-height pass arc
 to the reported pick spot and, when its final spot and return yardage agree,
 a solid red line back to the defender's final spot. A pick with no return ends
-at the catch; a touchback shows the pick in the end zone but no fictitious
-runback to the 20. Nullified, overturned, and ambiguous picks do not get an
-invented return. An ordinary punt arcs from the snap to ESPN's named
-receiving spot after the return, fair catch, or touchback; it does not treat the
-first catch as the next possession spot. An ordinary made or missed field goal
+at the catch; a touchback shows the red pick dot in the end zone but no fictitious
+runback to the 20. Copied snap metadata on a terminal end-of-period/game marker
+does not erase the preceding interception arc. Nullified, overturned, and
+ambiguous picks do not get an invented return. A punt with confirmed landing
+and return spots arcs to the landing, then shows a solid return line to the
+next possession spot. Without a confirmed split, an ordinary punt arcs directly
+to ESPN's named receiving spot after the return, fair catch, or touchback.
+An ordinary made or missed field goal
 arcs to the back of the attacking end zone, not to the subsequent possession.
 Blocked, short, nullified and enforced-penalty kicks have no invented full
 flight. Kickoffs, timeouts, other turnovers, nullified and penalized results
@@ -381,7 +384,7 @@ they are not an offline demo. Reload the URL to play one again.
 ## Validation limits
 
 Automated tests cover live situation behavior with synthetic data and replay
-**25 full NFL and 25 full NCAAF games**, with 9,171 saved plays and both
+**50 full NFL and 50 full NCAAF games**, with 18,379 saved plays and both
 teams' perspectives. They exercise penalties, nullified plays, turnovers,
 missed/blocked field goals, bundled conversions, period changes, and overtime.
 The [complete fixtures](../test/fixtures/games/README.md) are historical summary

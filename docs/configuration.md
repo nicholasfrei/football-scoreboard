@@ -16,7 +16,7 @@ Dallas Cowboys (NFL):
 }
 ```
 
-Arkansas Razorbacks (NCAA, the included default):
+Arkansas Razorbacks (NCAA alternative):
 
 ```json
 {
@@ -38,6 +38,55 @@ The selected team controls the header logo, name, color, league, game selection,
 predictor percentages, and highlight previews. The field always uses the
 **designated home team's** branding; choosing Dallas does not put Cowboys
 artwork on an opponent's home field. See [display behavior](display-behavior.md).
+
+## Favorite teams on the touchscreen
+
+The included configuration has three favorites: **Dallas Cowboys**, **Texas
+Longhorns**, and **UTSA Roadrunners**. Their logo and mascot buttons appear in
+the game-information row between the broadcast listing and game status. Swipe
+the row horizontally when more teams are added, or use Tab and Enter with a
+keyboard. Tap a button to load that team's scoreboard, including its league,
+colors, schedule, scores, field, and players. The active button is highlighted.
+
+Edit the optional `favorites` array in `config.json` to add, remove, or reorder
+teams. Each entry only needs `teamUrl`; names, mascot labels, and logos are
+looked up automatically from ESPN. Set `timeZone` once for all teams. For example:
+
+```json
+{
+  "timeZone": "America/Chicago",
+  "favorites": [
+    {
+      "teamUrl": "https://www.espn.com/nfl/team/_/name/dal/dallas-cowboys"
+    },
+    {
+      "teamUrl": "https://www.espn.com/college-football/team/_/id/251/texas-longhorns"
+    },
+    {
+      "teamUrl": "https://www.espn.com/college-football/team/_/id/2636/utsa-roadrunners"
+    }
+  ]
+}
+```
+
+The first favorite is the default unless a top-level `teamUrl` is provided.
+Optional `name`, `mascot`, and HTTPS `logo` overrides are still supported.
+If ESPN metadata is unavailable, buttons fall back to text from the URL.
+
+Favorites share `timeZone`. Only the active team's feed is polled; each team's
+cached scores are kept separate. Switching navigates to a fresh scoreboard view
+so the previous team's plays or in-flight requests cannot leak into the new
+view. No server restart is needed when tapping a favorite.
+
+The browser remembers the last tapped team across reloads and Pi reboots when
+local storage is available. A `?team=college-football%3A251` link explicitly
+selects Texas; otherwise the remembered team is used, falling back to `teamUrl`
+if that favorite was removed. The top-level `teamUrl` remains selectable even
+when it is not in the favorites list. Omit `favorites` or use an empty array
+for the original single-team display. Favorites are hidden in replay and
+countdown previews. Missing logo artwork leaves the text button usable.
+
+Restart the service and reload Chromium after editing the configuration.
 
 ## Set the time zone
 

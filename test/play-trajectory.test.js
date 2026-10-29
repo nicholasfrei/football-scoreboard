@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { playTrajectory, driveTrack } from "../public/play-trajectory.js";
-import { illustratedDrive, yardageLabel } from "../public/drive-illustration.js";
+import { illustratedDrive, lastDriveSnap, yardageLabel } from "../public/drive-illustration.js";
 import { createReplayFrames, REPLAY_GAMES } from "../src/replay.js";
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
@@ -136,6 +136,74 @@ test("college caught-at spot supplies the air route and YAC without NFL structur
   assert.ok(graphic.segment.yacPath);
 });
 
+test("Texas–Ole Miss bundled touchdown reaches MISS 0 after the catch at MISS 8", () => {
+  const summary = JSON.parse(gunzipSync(readFileSync(new URL("./fixtures/games/college-football/401856732.json.gz", import.meta.url))));
+  const sides = summary.header.competitions[0].competitors;
+  const h = sides.find((side) => side.homeAway === "home").team;
+  const a = sides.find((side) => side.homeAway === "away").team;
+  const raw = summary.drives.previous.flatMap((drive) => drive.plays).find((play) => play.id === "401856732254");
+  assert.equal(raw.end.yardsToEndzone, 8, "provider retains the catch spot as the numeric endpoint");
+  const trajectory = playTrajectory(raw, "251", h, a);
+  assert.deepEqual([trajectory.kind, trajectory.start, trajectory.catchPercent, trajectory.end, trajectory.yac],
+    ["pass", 50, 8, 0, 8]);
+  const segment = illustratedDrive({ direction: "left", plays: [{ id: raw.id, trajectory }] }).segment;
+  assert.equal(segment.yacPath, `M ${104 + 8 * 7.92} 220 L ${104} 220`);
+});
+
+test("defensive fumble touchdowns use a red route, not a white offensive gain", () => {
+  for (const [file, id, offenseId, expected] of [
+    ["401856732", "401856732476", "251", [77, 100, null]],
+    ["401856718", "401856718447", "238", [87, 100, 95]],
+  ]) {
+    const summary = JSON.parse(gunzipSync(readFileSync(new URL(`./fixtures/games/college-football/${file}.json.gz`, import.meta.url))));
+    const sides = summary.header.competitions[0].competitors;
+    const h = sides.find((side) => side.homeAway === "home").team;
+    const a = sides.find((side) => side.homeAway === "away").team;
+    const raw = summary.drives.previous.flatMap((drive) => drive.plays).find((play) => play.id === id);
+    const motion = playTrajectory(raw, offenseId, h, a);
+    assert.deepEqual([motion.kind, motion.start, motion.end, motion.catchPercent], ["fumble-return", ...expected]);
+    const { segment } = illustratedDrive({ direction: "left", plays: [{ id, trajectory: motion }] });
+    assert.equal(segment.path, motion.catchPercent === null ? null : `M ${segment.from} 220 L ${segment.to} 220`);
+    assert.equal(segment.returnPath, `M ${motion.catchPercent === null ? segment.from : segment.to} 220 L ${segment.finish} 220`);
+    assert.equal(yardageLabel(segment), "FUMBLE RETURN");
+  }
+  assert.equal(playTrajectory(play("Rush", "AWY 25", "AWY 31", { scoringPlay: true,
+    text: "Rush for 6 yards TOUCHDOWN" }), "1", home, away)?.kind, "run");
+});
+
+test("saved NFL defensive fumble scores distinguish recovery from the red return", () => {
+  for (const [file, id] of [["401873018", "4018730181087"], ["401872987", "4018729872643"],
+    ["401872992", "4018729922147"], ["401872993", "401872993486"]]) {
+    const summary = JSON.parse(gunzipSync(readFileSync(new URL(`./fixtures/games/nfl/${file}.json.gz`, import.meta.url))));
+    const sides = summary.header.competitions[0].competitors;
+    const h = sides.find((side) => side.homeAway === "home").team;
+    const a = sides.find((side) => side.homeAway === "away").team;
+    const drive = summary.drives.previous.find((item) => item.plays.some((play) => play.id === id));
+    const raw = drive.plays.find((play) => play.id === id);
+    const motion = playTrajectory(raw, String(drive.team.id), h, a);
+    assert.equal(motion?.kind, "fumble-return", id);
+    const { segment } = illustratedDrive({ direction: String(drive.team.id) === h.id ? "left" : "right",
+      plays: [{ id, trajectory: motion }] });
+    assert.ok(segment.returnPath, id);
+    assert.equal(segment.finish, 104 + motion.end * 7.92);
+    if (motion.catchPercent !== null) assert.equal(segment.to, 104 + motion.catchPercent * 7.92);
+  }
+});
+
+test("Tulane's named TLN 28 incompletion overrides the schematic 15-yard depth", () => {
+  const summary = JSON.parse(gunzipSync(readFileSync(new URL("./fixtures/games/college-football/401862811.json.gz", import.meta.url))));
+  const sides = summary.header.competitions[0].competitors;
+  const h = sides.find((side) => side.homeAway === "home").team;
+  const a = sides.find((side) => side.homeAway === "away").team;
+  const raw = summary.drives.previous.flatMap((drive) => drive.plays).find((play) => play.id === "401862811781");
+  const motion = playTrajectory(raw, "2655", h, a);
+  assert.deepEqual([motion.kind, motion.start, motion.targetPercent, motion.targetLabel],
+    ["incomplete", 78, 72, "TULN 28"]);
+  const { segment } = illustratedDrive({ direction: "left", plays: [{ id: raw.id, trajectory: motion }] });
+  assert.equal(segment.to, 104 + 72 * 7.92);
+  assert.equal(yardageLabel(segment), "INCOMPLETE · 0 YDS · TARGET TULN 28");
+});
+
 test("the three Cowboys–Eagles NFL pass descriptions use schematic miss, structured YAC and goal-line TD", () => {
   const summary = JSON.parse(gunzipSync(readFileSync(new URL("./fixtures/games/nfl/401873009.json.gz", import.meta.url))));
   const sides = summary.header.competitions[0].competitors;
@@ -172,6 +240,52 @@ test("punt arcs land at the reported next-possession spot, not the kick's catch 
   assert.equal(segment.yacPath, null);
   const unconfirmed = playTrajectory({ ...punt, end: { team: { id: "1" }, yardsToEndzone: 74 } }, "1", home, away);
   assert.equal(unconfirmed, null, "a kicker-owned numeric endpoint cannot establish the receiver's spot");
+});
+
+test("Texas's punt to MISS 28 arcs to the catch, then shows the 18-yard return to MISS 46", () => {
+  const summary = JSON.parse(gunzipSync(readFileSync(new URL("./fixtures/games/college-football/401856732.json.gz", import.meta.url))));
+  const sides = summary.header.competitions[0].competitors;
+  const h = sides.find((side) => side.homeAway === "home").team;
+  const a = sides.find((side) => side.homeAway === "away").team;
+  const raw = summary.drives.previous.flatMap((drive) => drive.plays).find((play) => play.id === "401856732582");
+  const motion = playTrajectory(raw, "251", h, a);
+  assert.deepEqual([motion.kind, motion.start, motion.catchPercent, motion.end, motion.returnYards],
+    ["punt", 75, 28, 46, 18]);
+  assert.equal(motion.landingLabel, "MISS 28");
+  const { segment } = illustratedDrive({ direction: "left", plays: [{ id: raw.id, snapPercent: 75, trajectory: motion }] });
+  assert.equal(segment.path, `M ${segment.from} 220 Q ${(segment.from + segment.to) / 2} 70 ${segment.to} 220`);
+  assert.equal(segment.to, 104 + 28 * 7.92);
+  assert.equal(segment.yacPath, `M ${segment.to} 220 L ${104 + 46 * 7.92} 220`);
+  assert.equal(segment.returnPath, null, "a punt return uses the catch-to-end line, not an interception's red line");
+  assert.equal(yardageLabel(segment), "PUNT · TO MISS 28 · 18 YD RETURN TO MISS 46");
+});
+
+test("NFL punt return language with 'to' and 'pushed ob at' also splits the kick from the return", () => {
+  const summary = JSON.parse(gunzipSync(readFileSync(new URL("./fixtures/games/nfl/401873010.json.gz", import.meta.url))));
+  const sides = summary.header.competitions[0].competitors;
+  const h = sides.find((side) => side.homeAway === "home").team;
+  const a = sides.find((side) => side.homeAway === "away").team;
+  for (const [id, offense, expected] of [
+    ["401873010694", "17", [81, 74, 7]],
+    ["4018730102915", "3", [7, 26, 19]],
+  ]) {
+    const raw = summary.drives.previous.flatMap((drive) => drive.plays).find((play) => play.id === id);
+    const motion = playTrajectory(raw, offense, h, a);
+    assert.deepEqual([motion.catchPercent, motion.end, motion.returnYards], expected, id);
+    const { segment } = illustratedDrive({ direction: offense === h.id ? "left" : "right",
+      plays: [{ id, trajectory: motion }] });
+    assert.ok(segment.yacPath, id);
+  }
+});
+
+test("a punt with a contradictory return spot or yardage does not invent a split", () => {
+  const punt = play("Punt Return", "AWY 40", "HME 26", {
+    text: "Punter punts 34 yards to HME 26. Returner return 7 yards to HME 19",
+    end: spot("2", "HME 26", 74), statYardage: 7,
+  });
+  const motion = playTrajectory(punt, "1", home, away);
+  assert.equal(motion.catchPercent, null);
+  assert.equal(illustratedDrive({ plays: [{ id: "unsafe", trajectory: motion }] }).segment.yacPath, null);
 });
 
 test("field-goal arcs end at the back of the attacking end zone, not at a new possession", () => {
@@ -260,6 +374,32 @@ test("NFL aliases, touchbacks and college pick-sixes use the pick spot without i
   }
 });
 
+test("an end-of-game marker copied from a no-return interception leaves its pass arc and red pick dot visible", () => {
+  const summary = JSON.parse(gunzipSync(readFileSync(new URL("./fixtures/games/college-football/401856732.json.gz", import.meta.url))));
+  const lastDrive = summary.drives.previous.find((drive) => drive.plays.some((play) => play.id === "401856732903"));
+  const interception = lastDrive.plays.find((play) => play.id === "401856732903");
+  const marker = lastDrive.plays.find((play) => play.id === "401856732909");
+  const sides = summary.header.competitions[0].competitors;
+  const h = sides.find((side) => side.homeAway === "home").team;
+  const a = sides.find((side) => side.homeAway === "away").team;
+  const motion = playTrajectory(interception, "145", h, a);
+  assert.deepEqual([motion.start, motion.catchPercent, motion.end, motion.returnYards], [71, 100, 80, null]);
+  const plays = [{ id: interception.id, snapPercent: 71, trajectory: motion },
+    { id: marker.id, type: marker.type.text, snapPercent: 71, trajectory: null }];
+  assert.equal(lastDriveSnap(plays).id, interception.id);
+  const { segment } = illustratedDrive({ direction: "right", plays });
+  assert.equal(segment.kind, "interception");
+  assert.equal(segment.to, 104 + 100 * 7.92);
+  assert.equal(segment.path, `M ${segment.from} 220 Q ${(segment.from + segment.to) / 2} 70 ${segment.to} 220`);
+  assert.equal(segment.returnPath, null);
+  assert.equal(segment.finish, segment.to, "the touchback is not a return route to TEX 20");
+  assert.equal(yardageLabel(segment), "INTERCEPTION · AT TEX 0 · TOUCHBACK · TEX 20");
+  const final = createReplayFrames(summary, REPLAY_GAMES.college).at(-1).spotlight.drives.at(-1);
+  assert.equal(final.plays.at(-1).id, marker.id);
+  assert.equal(lastDriveSnap(final.plays).id, interception.id);
+  assert.equal(illustratedDrive({ ...final, direction: "right" }).segment?.path, segment.path);
+});
+
 test("a confirmed pick-six also works when ESPN labels its play Pass Interception Return", () => {
   const motion = playTrajectory({ type: { text: "Pass Interception Return" }, scoringPlay: true, isTurnover: true,
     text: "QB pass INTERCEPTED by defender at AWY 39. Defender return 39 yards to AWY 00, TOUCHDOWN",
@@ -306,17 +446,18 @@ test("unknown, penalized, nullified and change-of-possession results do not draw
   assert.equal(driveTrack({ plays: [] }).start, null);
 });
 
-test("all 50 recorded games use reported incompletion spots, never an invented target", () => {
+test("all 100 recorded games use reported incompletion spots, never an invented target", () => {
   const root = new URL("./fixtures/games/", import.meta.url);
   const manifest = JSON.parse(readFileSync(new URL("manifest.json", root)));
   // Independently transcribed from the saved play text, not the production parser.
-  const aliases = { "251": "TEXAS", "130": "U-M", "245": "TAM", "2633": "UTK",
-    "2579": "USC", "238": "VANDY", "221": "PIT", "2390": "CANES",
+  const aliases = { "251": ["TEXAS", "UT"], "130": "U-M", "245": ["TAM", "A&M"], "2633": ["UTK", "TEN"],
+    "2579": "USC", "238": "VANDY", "221": "PIT", "2390": ["CANES", "UM"],
     "254": "UTA", "68": "BSU", "164": "RU", "242": "RIC", "2649": "TOLEDO",
-    "239": "BU", "2006": "AKRON", "193": "MIAMI", "344": "STATE" };
+    "239": "BU", "2006": "AKRON", "193": "MIAMI", "344": "STATE", "2655": "TLN", "2636": "TSA", "145": "OM",
+    "84": "IND", "275": "WISC", "87": "UND", "194": "OhioSt", "120": "Maryla", "26": "UCL", "142": "Mizzou" };
   let reported = 0;
   let unavailable = 0;
-  assert.equal(manifest.length, 50);
+  assert.equal(manifest.length, 100);
   for (const entry of manifest) {
     const summary = JSON.parse(gunzipSync(readFileSync(new URL(entry.file, root))));
     const sides = summary.header.competitions[0].competitors;
@@ -328,7 +469,7 @@ test("all 50 recorded games use reported incompletion spots, never an invented t
         const trajectory = playTrajectory(candidate, String(drive.team.id), h, a);
         if (!trajectory) continue; // Penalized, nullified, or unconfirmed offensive spot.
         const match = /\bthrown to\s+([A-Za-z&-]+)\s*(\d{1,2})\b/i.exec(candidate.text);
-        const side = match && [h, a].find((team) => [team.abbreviation, aliases[team.id]]
+        const side = match && [h, a].find((team) => [team.abbreviation, aliases[team.id]].flat()
           .some((name) => name?.toUpperCase() === match[1].toUpperCase()));
         const yard = match && Number(match[2]);
         if (side && yard <= 50) {
@@ -348,13 +489,14 @@ test("all 50 recorded games use reported incompletion spots, never an invented t
   assert.ok(unavailable > 500, `expected NFL incompletions without yard-line targets, got ${unavailable}`);
 });
 
-test("50-game pass audit separates college caught-at spots from NFL structured YAC and schematic misses", () => {
+test("100-game pass audit separates college caught-at spots from NFL structured YAC and schematic misses", () => {
   const root = new URL("./fixtures/games/", import.meta.url);
   const manifest = JSON.parse(readFileSync(new URL("manifest.json", root)));
-  const aliases = { "251": "TEXAS", "130": "U-M", "245": "TAM", "2633": "UTK",
-    "2579": "USC", "238": "VANDY", "221": "PIT", "2390": "CANES",
+  const aliases = { "251": ["TEXAS", "UT"], "130": "U-M", "245": ["TAM", "A&M"], "2633": ["UTK", "TEN"],
+    "2579": "USC", "238": "VANDY", "221": "PIT", "2390": ["CANES", "UM"],
     "254": "UTA", "68": "BSU", "164": "RU", "242": "RIC", "2649": "TOLEDO",
-    "239": "BU", "2006": "AKRON", "193": "MIAMI", "344": "STATE" };
+    "239": "BU", "2006": "AKRON", "193": "MIAMI", "344": "STATE", "2655": "TLN", "2636": "TSA", "145": "OM",
+    "84": "IND", "275": "WISC", "87": "UND", "194": "OhioSt", "120": "Maryla", "26": "UCL", "142": "Mizzou" };
   const observed = { collegeCaught: 0, nflYac: 0, nflMisses: 0, scoring: 0 };
   for (const entry of manifest) {
     const summary = JSON.parse(gunzipSync(readFileSync(new URL(entry.file, root))));
@@ -392,7 +534,7 @@ test("50-game pass audit separates college caught-at spots from NFL structured Y
           }
         } else {
           const match = /\bcaught at\s+([A-Za-z&-]+)\s*(\d{1,2})\b/i.exec(candidate.text);
-          const team = match && [h, a].find((side) => [side.abbreviation, aliases[side.id]]
+          const team = match && [h, a].find((side) => [side.abbreviation, aliases[side.id]].flat()
             .some((name) => name?.toUpperCase() === match[1].toUpperCase()));
           if (!team || Number(match[2]) > 50 || candidate.statYardage !== motion.yards) continue;
           const yard = Number(match[2]);
@@ -410,11 +552,19 @@ test("50-game pass audit separates college caught-at spots from NFL structured Y
   assert.ok(observed.scoring > 100, JSON.stringify(observed));
 });
 
-test("50 saved games route confirmed punts to the receiving spot and ordinary field goals to the back end zone", () => {
+test("100 saved games route confirmed punts to the receiving spot and ordinary field goals to the back end zone", () => {
   const root = new URL("./fixtures/games/", import.meta.url);
   const manifest = JSON.parse(readFileSync(new URL("manifest.json", root)));
   let punts = 0;
+  let puntReturns = 0;
   let fieldGoals = 0;
+  // Provider prose uses more yard-line names than possessionText does.
+  const aliases = { "251": ["TEXAS", "UT"], "245": ["A&M", "TAM"], "2633": "TEN",
+    "2390": ["UM", "CANES"], "84": "IND", "275": "WISC", "87": "UND", "194": "OhioSt",
+    "120": "Maryla", "26": "UCL", "142": "Mizzou", "34": "HST", "33": "BLT",
+    "22": "ARZ", "145": "OM", "2655": "TLN", "2636": "TSA",
+    "130": "U-M", "14": "LA", "5": "CLV", "254": "UTA", "238": "VANDY",
+    "221": "PIT", "68": "BSU", "193": "Miami", "2649": "TOLEDO" };
   for (const entry of manifest) {
     const summary = JSON.parse(gunzipSync(readFileSync(new URL(entry.file, root))));
     const sides = summary.header.competitions[0].competitors;
@@ -446,7 +596,23 @@ test("50 saved games route confirmed punts to the receiving spot and ordinary fi
           punts++;
           assert.equal(motion?.kind, "punt", `${entry.id}:${candidate.id} ${candidate.text}`);
           assert.equal(motion.end, percent, `${entry.id}:${candidate.id}`);
-          assert.equal(graphic.segment.to, 104 + percent * 7.92);
+          if (motion.returnYards !== null) {
+            puntReturns++;
+            const reported = /\bpunt(?:s|ed)?\b.*?\bto\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i.exec(candidate.text);
+            const landingSide = reported && [h, a].find((team) => [team.abbreviation, aliases[team.id]].flat()
+              .some((name) => name?.toUpperCase() === reported[1].toUpperCase()));
+            assert.ok(landingSide, `${entry.id}:${candidate.id}: reported punt landing is on the field`);
+            const landing = landingSide.id === a.id ? Number(reported[2]) : 100 - Number(reported[2]);
+            assert.equal(motion.catchPercent, landing, `${entry.id}:${candidate.id}`);
+            assert.equal(motion.returnYards, candidate.statYardage, `${entry.id}:${candidate.id}`);
+            assert.equal(Math.abs(percent - landing), candidate.statYardage, `${entry.id}:${candidate.id}`);
+            assert.equal(graphic.segment.to, 104 + landing * 7.92);
+            assert.equal(graphic.segment.yacPath, `M ${graphic.segment.to} 220 L ${104 + percent * 7.92} 220`);
+            assert.match(yardageLabel(graphic.segment), /YD RETURN TO/);
+          } else {
+            assert.equal(graphic.segment.to, 104 + percent * 7.92);
+            assert.equal(graphic.segment.yacPath, null);
+          }
         } else {
           fieldGoals++;
           assert.equal(motion?.kind, "field-goal", `${entry.id}:${candidate.id} ${candidate.text}`);
@@ -457,16 +623,18 @@ test("50 saved games route confirmed punts to the receiving spot and ordinary fi
     }
   }
   assert.ok(punts > 300, `expected clean punt endpoints across the corpus: ${punts}`);
+  assert.ok(puntReturns > 150, `expected confirmed NFL and college punt returns: ${puntReturns}`);
   assert.ok(fieldGoals > 180, `expected ordinary field goals across the corpus: ${fieldGoals}`);
 });
 
-test("50 saved games separate interception flight, confirmed returns, touchbacks and invalid revisions", () => {
+test("100 saved games separate interception flight, confirmed returns, touchbacks and invalid revisions", () => {
   const root = new URL("./fixtures/games/", import.meta.url);
   const manifest = JSON.parse(readFileSync(new URL("manifest.json", root)));
   // Match text-side aliases independently of the production parser.
-  const aliases = { "251": "TEXAS", "130": "U-M", "245": "TAM", "2579": "USC",
-    "164": "RU", "239": "BU", "193": "MIAMI", "33": "BLT", "5": "CLV",
-    "22": "ARZ", "14": "LA", "34": "HST" };
+  const aliases = { "251": ["TEXAS", "UT"], "130": "U-M", "245": ["TAM", "A&M"], "2579": "USC",
+    "164": "RU", "239": "BU", "193": "MIAMI", "238": "VANDY", "2655": "TLN", "2636": "TSA", "145": "OM", "33": "BLT", "5": "CLV",
+    "22": "ARZ", "14": "LA", "34": "HST", "2390": "UM", "84": "IND", "275": "WISC",
+    "87": "UND", "194": "OhioSt", "120": "Maryla", "26": "UCL", "142": "Mizzou", "2633": "TEN" };
   const counts = { total: 0, animated: 0, returned: 0, touchbacks: 0, touchdowns: 0 };
   for (const entry of manifest) {
     const summary = JSON.parse(gunzipSync(readFileSync(new URL(entry.file, root))));
@@ -483,7 +651,7 @@ test("50 saved games separate interception flight, confirmed returns, touchbacks
         assert.equal(motion.kind, "interception", `${entry.id}:${candidate.id}`);
         const spot = /\bintercepted\b.*?\bat\s+(?:(50)\b|([A-Za-z&-]+)\s*(-?\d{1,2})\b)/i.exec(candidate.text);
         assert.ok(spot, `${entry.id}:${candidate.id} has a reported pick spot`);
-        const team = spot[2] && [h, a].find((side) => [side.abbreviation, aliases[side.id]]
+        const team = spot[2] && [h, a].find((side) => [side.abbreviation, aliases[side.id]].flat()
           .some((name) => name?.toUpperCase() === spot[2].toUpperCase()));
         const yard = spot[3] == null ? null : Number(spot[3]);
         assert.ok(spot[1] || team, `${entry.id}:${candidate.id} has a recognizable field side`);

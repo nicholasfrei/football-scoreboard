@@ -25,8 +25,10 @@ export function kickPosition(play, league, home, away, season) {
   const text = play?.text ?? "";
   const touchback = /\btouchback\b/i.test(`${type} ${text}`);
   const fairCatch = /\bfair catch\b/i.test(`${type} ${text}`);
-  if ((!kickoff && !punt) || (!touchback && !fairCatch) || play.scoringPlay || play.isTurnover
-      || play.isPenalty || play.penalty || /\b(?:penalty|no play|nullified|blocked|muff|fumble)\b/i.test(text)) return null;
+  const puntPenalty = punt && /\bPENALTY\b/i.test(text) && !play.scoringPlay && !play.isTurnover
+    ? /\bPENALTY\b[^]*?(\d+)\s+yards?\s*,?\s*enforced at\s+([A-Z]+)\s*(\d{1,2})\b/i.exec(text) : null;
+  if ((!kickoff && !punt) || (!touchback && !fairCatch && !puntPenalty) || play.scoringPlay || play.isTurnover
+      || ((play.isPenalty || play.penalty || /\b(?:penalty|no play|nullified|blocked|muff|fumble)\b/i.test(text)) && !puntPenalty)) return null;
 
   const kicker = String(play.start?.team?.id ?? "");
   const endId = String(play.end?.team?.id ?? "");
@@ -40,6 +42,16 @@ export function kickPosition(play, league, home, away, season) {
   // An end-zone placeholder is not a succeeding spot. A named end position is
   // preferred because penalties and NFL kickoff rules can alter standard spots.
   let spot = endId === receiver.id ? namedSpot(end.possessionText, home, away) : null;
+  if (puntPenalty) {
+    const enforcement = namedSpot(`${puntPenalty[2]} ${puntPenalty[3]}`, home, away);
+    const yards = Number(puntPenalty[1]);
+    // For a penalty on the receiving team, enforcement after the punt advances
+    // the receiving spot by the penalty distance toward its own goal line.
+    if (enforcement && Number.isFinite(yards)) {
+      const percent = enforcement.percent + (receiver.id === home.id ? yards : -yards);
+      if (percent > 0 && percent < 100) spot = { percent, label: `${receiver.abbreviation} ${receiver.id === home.id ? 100 - percent : percent}` };
+    }
+  }
   if (spot && (spot.percent === 0 || spot.percent === 100)) spot = null;
   const caught = fairCatch ? catchSpot(text, home, away) : null;
   // A college kickoff fair catch inside the 25 is brought out to the 25 even

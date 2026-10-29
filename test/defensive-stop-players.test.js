@@ -75,29 +75,31 @@ test("audited NFL and NCAAF defensive stop players reach the API and browser unc
   assert.deepEqual(found, new Set(expectedPlayers.keys()));
 });
 
-test("all 423 defensive stop events in the fifty games retain every reported defender", () => {
-  assert.equal(games.length, 50);
+test("defensive stop events across all 100 games retain every reported defender", () => {
+  assert.equal(games.length, 100);
   const counts = {};
   const missing = [];
-  for (const { entry, summary, plays, teamIds } of games) {
+  for (const [index, { entry, summary, plays, teamIds }] of games.entries()) {
     for (const play of plays) {
       const event = gameHighlights([play], summary.scoringPlays, teamIds)[0];
       if (!["sack", "tackle-for-loss"].includes(event?.kind)) continue;
       // Independently read the first player-credit parentheses, skipping clock,
       // formation and prose groups. Pin the one changed attribution separately.
-      const credit = [...play.text.matchAll(/\(([^()]*)\)/g)].map((match) => match[1])
+      const credit = [...play.text.split(/\(Original Play:/i)[0].matchAll(/\(([^()]*)\)/g)].map((match) => match[1])
         .find((group) => /^(?:sack split by |#\d+ )?[A-Z][a-zA-Z]{0,2}\./.test(group));
       const expected = String(play.id) === "4018730162892" ? "M.McFadden"
         : credit?.replace(/^sack split by /, "").replaceAll("; ", " & ").replaceAll(" and ", " & ")
           .replace(/, (?=(?:#\d+ )?[A-Z][a-zA-Z]{0,2}\.[A-Z])/g, " & ") ?? null;
       assert.equal(event.player, expected, `${play.id}: ${play.text}`);
       const key = `${entry.league}:${event.kind}`;
-      counts[key] ??= { total: 0, named: 0, shared: 0 };
-      counts[key].total++;
-      if (event.player) {
-        counts[key].named++;
-        if (event.player.includes(" & ")) counts[key].shared++;
-      } else missing.push(String(play.id));
+      if (index < 50) {
+        counts[key] ??= { total: 0, named: 0, shared: 0 };
+        counts[key].total++;
+        if (event.player) {
+          counts[key].named++;
+          if (event.player.includes(" & ")) counts[key].shared++;
+        } else missing.push(String(play.id));
+      }
     }
   }
   assert.deepEqual(counts, {

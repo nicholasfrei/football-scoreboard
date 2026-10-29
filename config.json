@@ -1,4 +1,14 @@
 {
-  "teamUrl": "https://www.espn.com/nfl/team/_/name/dal/dallas-cowboys",
-  "timeZone": "America/Chicago"
+  "timeZone": "America/Chicago",
+  "favorites": [
+    {
+      "teamUrl": "https://www.espn.com/nfl/team/_/name/dal/dallas-cowboys"
+    },
+    {
+      "teamUrl": "https://www.espn.com/college-football/team/_/id/251/texas-longhorns"
+    },
+    {
+      "teamUrl": "https://www.espn.com/college-football/team/_/id/2636/utsa-roadrunners"
+    }
+  ]
 }

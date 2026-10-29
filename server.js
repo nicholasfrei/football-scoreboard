@@ -3,9 +3,8 @@ import { createServer } from "node:http";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
-import { getScoreboard } from "./src/espn.js";
 import { loadConfig } from "./src/config.js";
-import { createScoreboardCache } from "./src/scoreboard-cache.js";
+import { createTeamSelection } from "./src/team-selection.js";
 import { createReplayFrames, REPLAY_GAMES } from "./src/replay.js";
 
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
@@ -21,7 +20,7 @@ const MIME_TYPES = {
   ".ttf": "font/ttf",
 };
 
-const loadScoreboard = createScoreboardCache(() => getScoreboard({ config }));
+const teamSelection = createTeamSelection(config);
 const replayCache = new Map();
 
 async function loadReplay(key) {
@@ -47,7 +46,7 @@ function sendJson(response, statusCode, value) {
 
 async function serveStatic(pathname, response) {
   const asset = pathname === "/" ? "index.html" : pathname.slice(1);
-  if (!new Set(["index.html", "app.js", "display-size.js", "game-timing.js", "ball-position.js", "field-animation.js", "highlights.js", "field-branding.js", "possession-branding.js", "scoring-style.js", "leader-layout.js", "team-record.js", "play-trajectory.js", "drive-illustration.js", "drive-summary.js", "styles.css", "assets/arkansas.png", "assets/vanderbilt.png", "assets/cowboys.png", "assets/eagles.png", "assets/fonts/Graduate-Regular.ttf"]).has(asset)) {
+  if (!new Set(["index.html", "app.js", "team-picker.js", "display-size.js", "game-timing.js", "ball-position.js", "field-animation.js", "highlights.js", "field-branding.js", "possession-branding.js", "scoring-style.js", "leader-layout.js", "team-record.js", "play-trajectory.js", "drive-illustration.js", "drive-summary.js", "styles.css", "assets/arkansas.png", "assets/vanderbilt.png", "assets/cowboys.png", "assets/eagles.png", "assets/fonts/Graduate-Regular.ttf"]).has(asset)) {
     response.writeHead(404);
     response.end("Not found");
     return;
@@ -77,7 +76,17 @@ const server = createServer(async (request, response) => {
     return;
   }
 
+  if (pathname === "/api/teams") {
+    sendJson(response, 200, await teamSelection.getCatalog());
+    return;
+  }
+
   if (pathname === "/api/scoreboard") {
+    const loadScoreboard = teamSelection.get(url.searchParams.get("team") ?? undefined);
+    if (!loadScoreboard) {
+      sendJson(response, 400, { error: "Choose a configured favorite team." });
+      return;
+    }
     try {
       sendJson(response, 200, await loadScoreboard());
     } catch (error) {

@@ -35,7 +35,7 @@ test("all 24 audited fourth-down takeovers credit the gaining team, despite isTu
   assert.deepEqual(found, expectedIds);
 });
 
-test("all 75 recorded fourth-down takeovers in the expanded corpus credit the gaining team", async () => {
+test("all recorded fourth-down takeovers in the expanded corpus credit the gaining team", async () => {
   let checked = 0;
   for (const entry of manifest) {
     const summary = JSON.parse(gunzipSync(await readFile(new URL(entry.file, root))));
@@ -52,7 +52,7 @@ test("all 75 recorded fourth-down takeovers in the expanded corpus credit the ga
       checked++;
     }
   }
-  assert.equal(checked, 75);
+  assert.equal(checked, 133);
 });
 
 function play(overrides = {}) {
