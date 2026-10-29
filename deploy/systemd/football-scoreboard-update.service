@@ -1,0 +1,9 @@
+[Unit]
+Description=Update Football Scoreboard to the latest GitHub release
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+Environment=SCOREBOARD_APP_HOME=/home/nick/apps/football-scoreboard
+ExecStart=/usr/local/sbin/football-scoreboard-update

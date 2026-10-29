@@ -151,6 +151,44 @@ systemctl status football-scoreboard
 
 For a separate config file, see [configuration](configuration.md#use-a-separate-config-file-or-port).
 
+## Install published releases and update nightly
+
+The updater follows the latest **published GitHub Release**, not pushes to
+`main`. It installs each release into a versioned directory, keeps the Pi's
+configuration outside the app files, switches the service to the new version,
+and rolls back the switch if the service fails its health check. Previous
+release directories are retained for rollback. The timer runs at **2:00 AM in
+the Pi's local time zone**; make sure the Pi's clock and time zone are correct.
+
+For a new Pi, install and validate the app first using the steps above. Then
+install the updater and its systemd units (adjust `/home/nick` if your Pi user
+is different):
+
+```sh
+sudo install -D -m 0755 scripts/update-release.sh /usr/local/sbin/football-scoreboard-update
+sudo install -D -m 0644 deploy/systemd/football-scoreboard-update.service /etc/systemd/system/football-scoreboard-update.service
+sudo install -D -m 0644 deploy/systemd/football-scoreboard-update.timer /etc/systemd/system/football-scoreboard-update.timer
+sudo install -D -m 0644 deploy/systemd/football-scoreboard-release.conf /etc/systemd/system/football-scoreboard.service.d/release-updates.conf
+mkdir -p ~/.config/football-scoreboard
+test -e ~/.config/football-scoreboard/config.json || cp ~/repos/football-scoreboard/config.json ~/.config/football-scoreboard/config.json
+chmod 600 ~/.config/football-scoreboard/config.json
+mkdir -p ~/apps/football-scoreboard/releases
+```
+
+Run one update immediately to install the latest published version and switch
+the service, then enable the nightly timer:
+
+```sh
+sudo systemctl daemon-reload
+sudo /usr/local/sbin/football-scoreboard-update
+sudo systemctl enable --now football-scoreboard-update.timer
+systemctl list-timers football-scoreboard-update.timer
+```
+
+To check updater logs, run
+`journalctl -u football-scoreboard-update.service -n 100`. The updater needs
+outbound HTTPS access to GitHub and the Pi needs `git`, `curl`, and `python3`.
+
 ## Open the browser in kiosk mode
 
 For the **labwc** desktop session, create `~/start-scoreboard-kiosk.sh`:

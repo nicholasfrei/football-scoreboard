@@ -1,6 +1,6 @@
 // Run with the local server started: node scripts/record-demo-gif.js http://localhost:4173
 // Optional CHROME_PATH and FFMPEG_PATH select locally installed recording tools.
-// Captures every Cowboys–Eagles replay play, then builds the README GIF with ffmpeg.
+// Captures the first two Cowboys–Eagles drives, then builds the README GIF with ffmpeg.
 import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
@@ -76,18 +76,6 @@ try {
   }
   if (count !== 187) throw new Error(`Expected 187 recorded plays, got ${count}`);
   await evaluate(`document.fonts.ready.then(() => Promise.all([...document.images].map(image => image.decode().catch(() => {}))))`);
-  // Seek real CSS animations instead of disabling them: the GIF must include
-  // route reveals and the football/blue-line placement after the final leg.
-  const seek = (milliseconds) => evaluate(`(async () => {
-    for (const animation of document.getAnimations()) {
-      const end = animation.effect.getComputedTiming().endTime;
-      if (!Number.isFinite(end)) continue;
-      animation.pause();
-      animation.currentTime = Math.min(${milliseconds}, end);
-      if (${milliseconds} >= end) animation.finish();
-    }
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  })()`);
   const frames = join(temp, "frames");
   await mkdir(frames);
   let frame = 0;
@@ -95,40 +83,34 @@ try {
     const { data } = await call("Page.captureScreenshot", { format: "png", captureBeyondViewport: false });
     await writeFile(join(frames, `${String(frame++).padStart(4, "0")}.png`), Buffer.from(data, "base64"));
   }
-  for (let index = 0; index < count; index++) {
+  // The first two drives in the recorded fixture contain 9 and 7 replay events.
+  const demoPlays = 16;
+  for (let index = 0; index < demoPlays; index++) {
     if (index) await evaluate('document.querySelector("#demo-next").click()');
-    const highlight = await evaluate('!document.querySelector("#highlight").hidden');
-    if (highlight) {
-      await seek(450);
-      await capture(); // Keep a brief glimpse of the actual replay highlight.
+    // Keep the field visible and let CSS animations, animationend events, and
+    // placement timers advance together in real time. Seeking CSS alone makes
+    // the ball jump between old and new positions as those timers still run.
+    await evaluate(`(() => { document.querySelector('#highlight').hidden = true;
+      document.querySelector('.score-panel').classList.remove('has-highlight'); })()`);
+    const start = Date.now();
+    for (let sample = 0; sample < 12; sample++) {
+      const delay = start + sample * 200 - Date.now();
+      if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
       await capture();
-      await evaluate(`(() => { document.querySelector('#highlight').hidden = true;
-        document.querySelector('.score-panel').classList.remove('has-highlight'); })()`);
     }
-    const hasRoute = await evaluate(`Boolean(document.querySelector('#drive-illustration .route-reveal'))`);
-    if (hasRoute) {
-      for (const milliseconds of [0, 300, 600, 900, 1200, 1600]) {
-        await seek(milliseconds);
-        await capture();
-      }
-    } else {
-      await seek(1600);
-      await capture(); // Also show the score and current leader totals for this play.
-    }
-    if (index % 25 === 0) console.log(`Captured play ${index + 1}/${count}`);
+    console.log(`Captured play ${index + 1}/${demoPlays}`);
   }
-  // Hold the final score and box-score leaders for three seconds.
-  const final = await evaluate(`({ away: document.querySelector('#away-score').textContent,
-    home: document.querySelector('#home-score').textContent, step: document.querySelector('#demo-step').textContent })`);
-  if (final.away !== "38" || final.home !== "21" || !final.step.startsWith(`Play ${count} /`)) {
-    throw new Error(`Unexpected final replay state: ${JSON.stringify(final)}`);
+  // Hold the last frame before looping back to the opening kickoff.
+  const finalStep = await evaluate(`document.querySelector('#demo-step').textContent`);
+  if (!finalStep.startsWith(`Play ${demoPlays} /`)) {
+    throw new Error(`Unexpected final replay state: ${finalStep}`);
   }
-  for (let hold = 0; hold < 12; hold++) await capture();
-  await run(ffmpegPath, ["-hide_banner", "-loglevel", "error", "-y", "-framerate", "4",
+  for (let hold = 0; hold < 10; hold++) await capture();
+  await run(ffmpegPath, ["-hide_banner", "-loglevel", "error", "-y", "-framerate", "5",
     "-i", join(frames, "%04d.png"), "-filter_complex",
-    "fps=4,split[a][b];[a]palettegen=max_colors=128:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=3",
+    "fps=5,split[a][b];[a]palettegen=max_colors=256:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=3",
     "-loop", "0", output]);
-  console.log(`Recorded ${count} plays (${frame} frames) to ${output}`);
+  console.log(`Recorded ${demoPlays} plays (${frame} frames) to ${output}`);
 } finally {
   if (chrome.pid && chrome.exitCode === null) {
     const exited = once(chrome, "exit");
