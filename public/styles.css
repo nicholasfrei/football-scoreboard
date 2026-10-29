@@ -201,26 +201,28 @@ body::before {
 .team-search-open:hover { color: var(--paper); background: #26342a; }
 .team-search-open:focus-visible, .favorite-remove:focus-visible { outline: 3px solid #70c9ff; outline-offset: 2px; }
 #favorites-done { min-height: 44px; border: 1px solid var(--gold); border-radius: 6px; background: #302b20; color: var(--paper); cursor: pointer; }
-.team-search { width: min(560px, calc(100% - 24px)); max-height: calc(100dvh - 32px); padding: 24px; border: 1px solid var(--panel-border); border-radius: 12px; color: var(--paper); background: var(--panel); box-shadow: 0 20px 80px #0009; }
+.team-search { width: min(960px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: clamp(16px, 2dvw, 32px); border: 1px solid var(--panel-border); border-radius: 12px; color: var(--paper); background: var(--panel); box-shadow: 0 20px 80px #0009; font-size: clamp(18px, 1.35dvw, 26px); }
+.team-search[open] { display: flex; flex-direction: column; gap: 12px; }
+.team-search > :not(.team-search-results) { flex: none; }
 .team-search::backdrop { background: #080d0bcc; }
 .team-search-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.team-search h2 { margin: 0; font-size: 24px; }
-.team-search p, .team-search-footer { color: var(--muted); font-size: 14px; line-height: 1.5; }
-.team-search button { min-height: 44px; padding: 8px 12px; border: 1px solid #465447; border-radius: 6px; color: var(--paper); background: #243328; cursor: pointer; }
+.team-search h2 { margin: 0; font-size: 1.4em; }
+.team-search p, .team-search-footer { margin: 0; color: var(--muted); font-size: .85em; line-height: 1.4; }
+.team-search button { min-height: 56px; padding: 10px 16px; border: 1px solid #465447; border-radius: 6px; color: var(--paper); background: #243328; font: inherit; cursor: pointer; }
 .team-search button:hover:not(:disabled) { border-color: var(--gold); }
 .team-search button:disabled { color: var(--muted); background: transparent; cursor: default; }
 .team-search button:focus-visible, .team-search input:focus-visible { outline: 3px solid #70c9ff; outline-offset: 2px; }
-.team-search-label { display: block; margin: 12px 0 6px; font-size: 14px; }
-.team-search input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #465447; border-radius: 6px; color: var(--paper); background: var(--ink); font: inherit; }
-.team-search-leagues { display: flex; gap: 8px; margin-top: 16px; }
+.team-search-label { display: block; font-size: .9em; }
+.team-search input { width: 100%; min-height: 56px; padding: 12px 16px; border: 1px solid #465447; border-radius: 6px; color: var(--paper); background: var(--ink); font: inherit; }
+.team-search-leagues { display: flex; gap: 12px; }
 .team-search-leagues button { flex: 1; }
 .team-search-leagues button[aria-pressed="true"] { border-color: var(--gold); background: #302b20; color: #f6df9e; }
-.team-search-results { max-height: 340px; overflow-y: auto; overscroll-behavior: contain; }
-.team-search-result { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--panel-border); }
-.team-search-result img { width: 36px; height: 36px; flex: none; object-fit: contain; }
-.team-search-result span { flex: 1; min-width: 0; font-size: 14px; }
+.team-search-results { flex: 0 1 auto; min-height: 0; max-height: 48dvh; overflow-y: auto; overscroll-behavior: contain; }
+.team-search-result { display: flex; align-items: center; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--panel-border); }
+.team-search-result img { width: 44px; height: 44px; flex: none; object-fit: contain; }
+.team-search-result span { flex: 1; min-width: 0; font-size: 1em; }
 .team-search-result button { flex: none; }
-.team-search-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+.team-search-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .team-picker { display: flex; flex: 1; min-width: 0; align-items: center; justify-content: flex-start; gap: 8px; overflow-x: auto; padding: 2px 3px 5px; scrollbar-width: thin; scrollbar-color: #657665 transparent; touch-action: pan-x; }
 .team-picker[hidden] { display: none; }
 .favorite-team:first-child { margin-inline-start: auto; }

@@ -108,7 +108,10 @@ function element() {
   return { children: [], events: {}, attributes: {},
     append(child) { this.children.push(child); }, replaceChildren() { this.children = []; },
     setAttribute(key, value) { this.attributes[key] = value; },
-    addEventListener(name, callback, capture = false) { this.events[capture ? `${name}Capture` : name] = callback; },
+    addEventListener(name, callback, options = false) {
+      const capture = typeof options === "boolean" ? options : options.capture;
+      this.events[capture ? `${name}Capture` : name] = callback;
+    },
   };
 }
 
@@ -127,13 +130,82 @@ test("hold waits 1.5s, suppresses navigation, and cancels on swipes and released
   link.events.clickCapture({ preventDefault() { prevented++; }, stopImmediatePropagation() { stopped++; } });
   assert.equal(prevented, 1); assert.equal(stopped, 1);
   for (const name of ["pointerup", "pointercancel", "pointerleave", "blur"]) {
-    link.events.pointerdown(down); link.events[name](); assert.equal(pending, undefined);
+    link.events.pointerdown(down); link.events[name]({}); assert.equal(pending, undefined);
   }
   link.events.pointerdown(down);
   link.events.pointermove({ clientX: 40, clientY: 20 });
   assert.equal(pending, undefined);
   link.events.pointerdown({ ...down, button: 2 });
   assert.equal(pending, undefined);
+});
+
+test("touch hold survives Chromium pointer cancellation and small finger jitter", () => {
+  const link = element();
+  let pending, held = 0, prevented = 0;
+  bindFavoriteHold(link, () => held++, {
+    setTimer(callback, delay) { assert.equal(delay, 1500); pending = callback; return 1; },
+    clearTimer() { pending = undefined; },
+  });
+  const touch = { identifier: 7, clientX: 100, clientY: 100 };
+  link.events.pointerdown({ pointerType: "touch", button: 0, ...touch });
+  assert.equal(pending, undefined, "touch lifecycle owns the timer, not duplicate pointer events");
+  link.events.touchstart({ touches: [touch] });
+  const originalTimer = pending;
+  link.events.pointercancel({ pointerType: "touch" });
+  link.events.pointerleave({ pointerType: "touch" });
+  link.events.touchmove({ touches: [{ ...touch, clientX: 112, clientY: 105 }] });
+  link.events.contextmenu({ preventDefault() { prevented++; } });
+  link.events.dragstart({ preventDefault() { prevented++; } });
+  assert.equal(pending, originalTimer);
+  pending();
+  assert.equal(held, 1);
+  link.events.touchend();
+  link.events.clickCapture({ preventDefault() { prevented++; }, stopImmediatePropagation() {} });
+  assert.equal(prevented, 3, "native menu, drag and post-hold navigation are prevented");
+});
+
+test("touch release, cancellation, a real swipe and multi-touch cancel editing", () => {
+  const link = element();
+  let pending;
+  bindFavoriteHold(link, () => assert.fail("must not enter edit mode"), {
+    setTimer(callback) { pending = callback; return 1; }, clearTimer() { pending = undefined; },
+  });
+  const touch = { identifier: 1, clientX: 30, clientY: 20 };
+  for (const end of ["touchend", "touchcancel"]) {
+    link.events.touchstart({ touches: [touch] });
+    link.events[end]();
+    assert.equal(pending, undefined);
+  }
+  link.events.touchstart({ touches: [touch] });
+  link.events.touchmove({ touches: [{ ...touch, clientX: 60 }] });
+  assert.equal(pending, undefined);
+  link.events.touchstart({ touches: [touch] });
+  link.events.touchstart({ touches: [touch, { ...touch, identifier: 2 }] });
+  assert.equal(pending, undefined);
+});
+
+test("editing can toggle without replacing the pressed link or navigating on release", () => {
+  const container = element();
+  let editing = false, prevented = false, remembered = false;
+  renderTeamPicker(container, { teams: [teams[0]] }, teams[0].key, {
+    document: { createElement: element }, onRemove() {}, onEdit() {},
+    isEditing: () => editing, remember() { remembered = true; },
+  });
+  const link = container.children[0].children[0];
+  assert.equal(link.draggable, false);
+  editing = true;
+  link.events.click({ preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(remembered, false);
+  assert.equal(container.children[0].children[0], link);
+});
+
+test("team search uses readable display-sized type and a viewport-bounded scroll area", async () => {
+  const css = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
+  assert.match(css, /\.team-search\s*\{[^}]*width: min\(960px,[^}]*font-size: clamp\(18px, 1\.35dvw, 26px\)/);
+  assert.match(css, /\.team-search\[open\]\s*\{[^}]*display: flex;[^}]*flex-direction: column/);
+  assert.match(css, /\.team-search button\s*\{[^}]*min-height: 56px;[^}]*font: inherit/);
+  assert.match(css, /\.team-search-results\s*\{[^}]*min-height: 0;[^}]*overflow-y: auto/);
 });
 
 test("editable favorites expose labeled X buttons, block navigation and keep a single favorite visible", () => {

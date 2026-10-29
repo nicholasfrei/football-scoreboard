@@ -4,12 +4,13 @@ export function selectedFavorite({ teams, defaultKey }, requested, remembered) {
 }
 
 /** A navigation starts a fresh view: no old game's scores, animations or requests. */
-export function renderTeamPicker(container, catalog, activeKey, { document, remember = () => {}, onRemove, onEdit, editing = false }) {
+export function renderTeamPicker(container, catalog, activeKey, { document, remember = () => {}, onRemove, onEdit, editing = false, isEditing = () => editing }) {
   container.replaceChildren();
   container.hidden = onRemove ? catalog.teams.length === 0 : catalog.teams.length < 2;
   for (const team of catalog.teams) {
     const link = document.createElement("a");
     link.className = "favorite-team";
+    link.draggable = false;
     link.href = `/?team=${encodeURIComponent(team.key)}`;
     link.title = team.name;
     link.setAttribute("aria-label", `Show ${team.name}`);
@@ -26,7 +27,7 @@ export function renderTeamPicker(container, catalog, activeKey, { document, reme
     label.textContent = team.mascot;
     link.append(label);
     link.addEventListener("click", (event) => {
-      if (editing) { event.preventDefault(); return; }
+      if (isEditing()) { event.preventDefault(); return; }
       remember(team.key);
     });
     if (onRemove) {
@@ -48,19 +49,44 @@ export function renderTeamPicker(container, catalog, activeKey, { document, reme
 }
 
 export function bindFavoriteHold(link, onHold, { setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
-  let timer, origin, held = false;
+  let timer, origin, held = false, touchId = null;
   const cancel = () => { clearTimer(timer); timer = undefined; };
+  const start = (point) => {
+    cancel();
+    held = false;
+    origin = { x: point.clientX, y: point.clientY };
+    timer = setTimer(() => { timer = undefined; held = true; onHold(); }, 1500);
+  };
+  // Chromium may cancel pointer events when its native link long-press menu
+  // starts. Track the actual touch lifecycle instead, without blocking swipes.
+  link.addEventListener("touchstart", (event) => {
+    if (event.touches.length !== 1) { touchId = null; cancel(); return; }
+    const touch = event.touches[0];
+    touchId = touch.identifier;
+    start(touch);
+  }, { passive: true });
+  link.addEventListener("touchmove", (event) => {
+    const touch = Array.from(event.touches).find((touch) => touch.identifier === touchId);
+    if (!touch || Math.hypot(touch.clientX - origin.x, touch.clientY - origin.y) > 18) cancel();
+  }, { passive: true });
+  const endTouch = () => { touchId = null; cancel(); };
+  link.addEventListener("touchend", endTouch, { passive: true });
+  link.addEventListener("touchcancel", endTouch, { passive: true });
   link.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "touch" || touchId !== null) return;
     cancel();
     if (event.button !== 0 || event.isPrimary === false) return;
-    held = false;
-    origin = { x: event.clientX, y: event.clientY };
-    timer = setTimer(() => { held = true; onHold(); }, 1500);
+    start(event);
   });
   link.addEventListener("pointermove", (event) => {
+    if (event.pointerType === "touch" || touchId !== null) return;
     if (origin && Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > 10) cancel();
   });
-  for (const name of ["pointerup", "pointercancel", "pointerleave", "blur"]) link.addEventListener(name, cancel);
+  for (const name of ["pointerup", "pointercancel", "pointerleave"]) link.addEventListener(name, (event) => {
+    if (event.pointerType !== "touch" && touchId === null) cancel();
+  });
+  link.addEventListener("blur", cancel);
+  link.addEventListener("dragstart", (event) => { event.preventDefault(); });
   link.addEventListener("contextmenu", (event) => event.preventDefault());
   link.addEventListener("click", (event) => {
     if (held) { event.preventDefault(); event.stopImmediatePropagation(); held = false; }
@@ -111,6 +137,13 @@ export async function startTeamPicker() {
     let activeLeague = activeKey?.startsWith("college-football:") ? "college-football" : "nfl";
     const directories = new Map();
     const pending = new Map();
+    const setEditing = (value) => {
+      editing = value;
+      done.hidden = !editing;
+      // Keep the pressed link mounted until release. Replacing it mid-touch
+      // can cancel the gesture or deliver the release to the newly shown X.
+      for (const remove of container.querySelectorAll(".favorite-remove")) remove.hidden = !editing;
+    };
     const save = () => {
       try { localStorage.setItem("scoreboard-favorites", JSON.stringify(teams)); }
       catch { return " This browser cannot save favorites after reload."; }
@@ -118,8 +151,8 @@ export async function startTeamPicker() {
     };
     const render = () => {
       done.hidden = !editing;
-      renderTeamPicker(container, { teams }, activeKey, { document, remember, editing,
-        onEdit: () => { editing = true; render(); },
+      renderTeamPicker(container, { teams }, activeKey, { document, remember, editing, isEditing: () => editing,
+        onEdit: () => setEditing(true),
         onRemove: (key) => {
           teams = teams.filter((team) => team.key !== key);
           save();
@@ -191,12 +224,12 @@ export async function startTeamPicker() {
     });
     document.querySelector("#team-search-close").addEventListener("click", () => dialog.close());
     document.querySelector("#favorites-edit").addEventListener("click", () => {
-      dialog.close(); editing = true; render();
+      dialog.close(); setEditing(true);
       (container.querySelector(".favorite-remove") ?? done).focus();
     });
-    done.addEventListener("click", () => { editing = false; render(); document.querySelector("#team-search-open").focus(); });
+    done.addEventListener("click", () => { setEditing(false); document.querySelector("#team-search-open").focus(); });
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && editing) { editing = false; render(); }
+      if (event.key === "Escape" && editing) setEditing(false);
     });
     input.addEventListener("input", showResults);
     render();
