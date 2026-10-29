@@ -5,7 +5,7 @@ import { acceptedPenalty, textIntentionalGrounding } from "./penalty.js";
 import { kickPosition } from "./kick-position.js";
 import { comparePlays } from "./play-order.js";
 import { fallbackPlayEnd } from "./play-position.js";
-import { uncertainBlockedFieldGoalSpot } from "./blocked-kick-position.js";
+import { blockedFieldGoalReturnPosition, uncertainBlockedFieldGoalSpot } from "./blocked-kick-position.js";
 import { driveStats } from "./drive-stats.js";
 import { fieldPercent, playTrajectory } from "../public/play-trajectory.js";
 
@@ -243,9 +243,22 @@ export function enrichGame(game, summary) {
     distance = kick.distance;
     positionSource = "last reported play";
   }
+  const blockedReturn = lastCurrentPlay?.id === latestPlay?.id
+    ? blockedFieldGoalReturnPosition(lastCurrentPlay, home, away) : null;
+  if (blockedReturn && (!situation || position === null)
+      && (!situation?.possession || possessionId === blockedReturn.teamId)) {
+    possessionId = blockedReturn.teamId;
+    position = blockedReturn.percent;
+    positionLabel = blockedReturn.label;
+    downDistance = null; // The provider's caption refers to its stale endpoint.
+    down = lastCurrentPlay.end.down;
+    distance = lastCurrentPlay.end.distance;
+    positionSource = "last reported play";
+  }
   const miss = currentIds.has(String(latestPlay?.id))
     ? missedFieldGoalPosition(lastCurrentPlay, updated.league, home, away) : null;
-  if (miss && (!situation || position === null) && (position === null || position === miss.start)
+  if (miss && (!situation || position === null) && (position === null || position === miss.start
+      || !positionLabel || /\s0$/.test(positionLabel))
       && (!situation?.possession || possessionId === miss.teamId)) {
     possessionId = miss.teamId;
     position = miss.percent;
@@ -293,6 +306,7 @@ export function enrichGame(game, summary) {
       lastPlayPeriod: latestPlay?.period?.number ?? null,
       lastPlayClock: latestPlay?.clock?.displayValue ?? null,
       lastPlayType: latestPlay?.type?.text ?? "",
+      scoringType: latestPlay?.scoringType?.name ?? null,
       scoring: Boolean(latestPlay?.scoringPlay),
       turnover: Boolean(latestPlay?.isTurnover),
       pause: isPause(latestPlay),

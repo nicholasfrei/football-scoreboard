@@ -13,7 +13,7 @@ export function textIntentionalGrounding(play) {
 // Text-only college feeds can attach enforcement to the underlying run, pass
 // or kick rather than to a Penalty play. Require a complete, unambiguous
 // statement, not merely a flag mentioned in commentary or net play yardage.
-const foul = "Offensive Holding|Defensive Holding|Holding|False Start|Offside|Offsides|Delay Of Game|Defensive Pass Interference|Offensive Pass Interference|Pass Interference|Roughing The Passer|Roughing The Kicker|Personal Foul|Chop Block|Leverage|Illegal Block in Back|Illegal Shift|Illegal Formation|Illegal Substitution|Illegal Motion|Illegal Snap|Illegal Use Of Hands|Illegal Touch-Pass|Running Into The Kicker|Targeting|Intentional Grounding|Face Mask|Illegal Forward Pass|Unnecessary Roughness|Unsportsmanlike Conduct|Illegal Bat|Ineligible Downfield on Pass";
+const foul = "Offensive Holding|Defensive Holding|Holding|False Start|Offside|Offsides|Delay Of Game|Defensive Pass Interference|Offensive Pass Interference|Pass Interference|Roughing The Passer|Roughing The Kicker|Personal Foul|Chop Block|Leverage|Illegal Block in Back|Blocking Out Of Bounds|Kick Catch Interference|Illegal Shift|Illegal Formation|Illegal Substitution|Illegal Motion|Illegal Snap|Illegal Use Of Hands|Illegal Touch-Pass|Running Into The Kicker|Targeting|Intentional Grounding|Face Mask|Illegal Forward Pass|Unnecessary Roughness|Unsportsmanlike Conduct|Illegal Bat|Ineligible Downfield on Pass";
 const label = new RegExp(`\\bPENALTY\\s+[A-Z][A-Z&-]*\\s+(?:(?:UNR|UNS):\\s*)?(${foul})\\b`, "gi");
 const enforcement = new RegExp([
   `\\bPENALTY\\s+([A-Z][A-Z&-]*)\\s+(?:(?:UNR|UNS):\\s*)?(${foul})\\s+`,

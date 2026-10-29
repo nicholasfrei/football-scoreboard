@@ -12,6 +12,7 @@ import { kickoffCountdown, nextRefreshDelay } from "../public/game-timing.js";
 import { createBallPositionTracker } from "../public/ball-position.js";
 import { comparePlays } from "../src/play-order.js";
 import { reportedEnforcement } from "../src/penalty.js";
+import { kickPosition } from "../src/kick-position.js";
 
 const root = new URL("./fixtures/games/", import.meta.url);
 const manifest = JSON.parse(await readFile(new URL("manifest.json", root), "utf8"));
@@ -167,8 +168,11 @@ for (const fixture of fixtures) {
         assert.equal(game.latestPlaySequence, Math.max(...plays.slice(0, index + 1).map((play) => Number(play.sequenceNumber))));
         assert.equal(kickoffCountdown(game, replayNow), null);
         assert.equal(nextRefreshDelay({ spotlight: game }, replayNow), 15_000);
+        const homeTeam = base.homeAway === "home" ? base.selectedTeam : base.opponent;
+        const awayTeam = base.homeAway === "home" ? base.opponent : base.selectedTeam;
         if (/End of Game|Extra Point/i.test(source.type?.text ?? "") || source.scoringPlay
-            || (/Kickoff/i.test(source.type?.text ?? "") && !/touchback|fair catch/i.test(`${source.type?.text} ${source.text}`))) {
+            || (/Kickoff/i.test(source.type?.text ?? "")
+              && !kickPosition(source, entry.league, homeTeam, awayTeam, summary.header.season?.year))) {
           assert.equal(game.ball, null, `${source.id}: no spurious ball between plays/periods`);
         }
         if (game.ball) {

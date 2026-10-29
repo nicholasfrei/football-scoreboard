@@ -19,7 +19,8 @@ function isTurnoverOnDowns(play, teamIds) {
       || teamIds.length !== 2 || new Set(teamIds).size !== 2
       || !/^(Rush|Pass Reception|Pass Completion|Pass Incompletion|Sack)$/i.test(play.type?.text ?? "")
       || play.penalty?.status?.slug === "accepted"
-      || /\b(?:penalty|fumble\w*|intercept\w*|touchdown|safety|no play|nullified|overturned)\b/i.test(play.text ?? "")) return false;
+       || /\b(?:fumble\w*|intercept\w*|touchdown|safety|no play|nullified|overturned)\b/i.test(play.text ?? "")
+       || (/\bpenalty\b/i.test(play.text ?? "") && !/\bdeclined\b/i.test(play.text ?? ""))) return false;
   const offense = String(start.team?.id);
   const defense = String(end.team?.id);
   return offense !== defense && teamIds.includes(offense) && teamIds.includes(defense);
@@ -78,9 +79,14 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
     if (/no play|nullified/i.test(play.text ?? "") && !acceptedPenalty && !confirmedBundledConversion) return [];
     let kind;
     if (play.scoringPlay && (play.scoringType?.name === "touchdown" || /touchdown/i.test(type))) kind = "touchdown";
-    else if (acceptedPenalty && /^Fumble Recovery \(Own\)$/i.test(type)) kind = "penalty";
+    else if (acceptedPenalty && /^Fumble Recovery \(Own\)$/i.test(type)
+      && (/\bpunt\b/i.test(play.text ?? "")
+        || String(play.start?.team?.id) === String(play.end?.team?.id))) kind = "penalty";
     else if (/interception/i.test(type) && !/touchdown/i.test(type)) kind = "interception";
     else if (/(?:fumble recovery|muffed punt recovery)/i.test(type) && !/touchdown/i.test(type)) kind = "fumble";
+    else if (/^Kickoff$/i.test(type) && /\b(?:fumble\w*|muff\w*)\b[^]*\brecovered by\b/i.test(play.text ?? "")
+      && !/\b(?:reversed|overturned|no play|nullified)\b/i.test(play.text ?? "")
+      && play.start?.team?.id != null && String(play.start.team.id) === String(play.end?.team?.id)) kind = "fumble";
     else if (play.scoringPlay && (play.scoringType?.name === "field-goal" || /field goal good/i.test(type))) kind = "field-goal";
     else if (play.scoringPlay && /safety/i.test(type)) kind = "safety";
     else if (play.scoringPlay && (play.scoringType?.name === "extra-point" || /^Extra Point Good$/i.test(type))) kind = "extra-point";
@@ -89,7 +95,8 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
     else if (acceptedPenalty) kind = "penalty";
     else if (/\b(?:blocked field goal|field goal blocked)\b/i.test(type)
       || (/field goal/i.test(type) && /\bblocked\b/i.test(play.text ?? ""))) kind = "blocked-field-goal";
-    else if (/\b(?:blocked punt|punt blocked)\b/i.test(type)) kind = "blocked-punt";
+    else if (/\b(?:blocked punt|punt blocked)\b/i.test(type)
+      || (/^Punt(?: Return)?$/i.test(type) && /\bblocked by\b/i.test(play.text ?? ""))) kind = "blocked-punt";
     else if (/^Punt(?: Return| Fair Catch| Downed| Out of Bounds| Touchback)?$/i.test(type)) kind = "punt";
     else if (isTurnoverOnDowns(play, teamIds)) kind = "turnover-on-downs";
     else if (/^Sack$/i.test(type)) kind = "sack";

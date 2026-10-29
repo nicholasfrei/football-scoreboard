@@ -147,7 +147,7 @@ test("kick touchbacks and fair catches use the receiving team's correct spot", (
       assert.equal(result.ball?.label, `ARK ${yards}`);
       assert.equal(result.possessionTeamId, "8");
       assert.equal(result.ball.direction, arkHome ? "left" : "right");
-      assert.equal(result.ball.firstDownPercent, expected(yards) + (arkHome ? -10 : 10));
+      assert.equal(result.ball.firstDownPercent, expected(yards) + (arkHome ? -10 : 10), `${league}: ${text}, arkHome=${arkHome}`);
     }
   }
 });

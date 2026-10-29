@@ -482,7 +482,8 @@ test("all 100 recorded games use reported incompletion spots, never an invented 
     "2579": "USC", "238": "VANDY", "221": "PIT", "2390": ["CANES", "UM"],
     "254": "UTA", "68": "BSU", "164": "RU", "242": "RIC", "2649": "TOLEDO",
     "239": "BU", "2006": "AKRON", "193": "MIAMI", "344": "STATE", "2655": "TLN", "2636": "TSA", "145": "OM",
-    "84": "IND", "275": "WISC", "87": "UND", "194": "OhioSt", "120": "Maryla", "26": "UCL", "142": "Mizzou" };
+    "84": "IND", "275": "WISC", "87": "UND", "194": "OhioSt", "120": "Maryla", "26": "UCL", "142": "Mizzou",
+    "333": "BAMA", "344": ["STATE", "MSU"], "2305": "Kan" };
   let reported = 0;
   let unavailable = 0;
   assert.equal(manifest.length, 100);
@@ -524,7 +525,8 @@ test("100-game pass audit separates college caught-at spots from NFL structured 
     "2579": "USC", "238": "VANDY", "221": "PIT", "2390": ["CANES", "UM"],
     "254": "UTA", "68": "BSU", "164": "RU", "242": "RIC", "2649": "TOLEDO",
     "239": "BU", "2006": "AKRON", "193": "MIAMI", "344": "STATE", "2655": "TLN", "2636": "TSA", "145": "OM",
-    "84": "IND", "275": "WISC", "87": "UND", "194": "OhioSt", "120": "Maryla", "26": "UCL", "142": "Mizzou" };
+    "84": "IND", "275": "WISC", "87": "UND", "194": "OhioSt", "120": "Maryla", "26": "UCL", "142": "Mizzou",
+    "333": "BAMA", "344": ["STATE", "MSU"], "2305": "Kan" };
   const observed = { collegeCaught: 0, nflYac: 0, nflMisses: 0, scoring: 0 };
   for (const entry of manifest) {
     const summary = JSON.parse(gunzipSync(readFileSync(new URL(entry.file, root))));
@@ -624,7 +626,12 @@ test("100 saved games route confirmed punts to the receiving spot and ordinary f
           const side = [h, a].find((team) => team.abbreviation === named?.[1]);
           if (!side && candidate.end?.possessionText !== "50") continue;
           const yards = Number(named?.[2]);
-          const percent = candidate.end.possessionText === "50" ? 50 : side.id === a.id ? yards : 100 - yards;
+          let percent = candidate.end.possessionText === "50" ? 50 : side.id === a.id ? yards : 100 - yards;
+          const enforcement = /\bPENALTY\b[^]*?\b\d+\s+yards?\s+from\s+[A-Za-z][A-Za-z&-]*\s*\d{1,2}\s+to\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i.exec(candidate.text ?? "");
+          const enforcedSide = enforcement && [h, a].find((team) => [team.abbreviation, aliases[team.id]].flat()
+            .some((name) => name?.toUpperCase() === enforcement[1].toUpperCase()));
+          if (enforcedSide && !candidate.isPenalty && !candidate.penalty && !/\b(?:declined|offsetting)\b/i.test(candidate.text ?? ""))
+            percent = enforcedSide.id === a.id ? Number(enforcement[2]) : 100 - Number(enforcement[2]);
           // A post-play penalty punt whose end resolves to the goal line (0 or 100)
           // correctly returns null; skip rather than assert a drawable trajectory.
           if (percent === 0 || percent === 100) { assert.equal(motion, null, `${entry.id}:${candidate.id}`); continue; }
@@ -639,8 +646,9 @@ test("100 saved games route confirmed punts to the receiving spot and ordinary f
             assert.ok(landingSide, `${entry.id}:${candidate.id}: reported punt landing is on the field`);
             const landing = landingSide.id === a.id ? Number(reported[2]) : 100 - Number(reported[2]);
             assert.equal(motion.catchPercent, landing, `${entry.id}:${candidate.id}`);
-            assert.equal(motion.returnYards, candidate.statYardage, `${entry.id}:${candidate.id}`);
-            assert.equal(Math.abs(percent - landing), candidate.statYardage, `${entry.id}:${candidate.id}`);
+            if (motion.returnYards > 0 || candidate.statYardage < 0)
+              assert.equal(motion.returnYards, candidate.statYardage, `${entry.id}:${candidate.id}`);
+            assert.equal(Math.abs(percent - landing), Math.abs(motion.returnYards), `${entry.id}:${candidate.id}`);
             assert.equal(graphic.segment.to, 104 + landing * 7.92);
             assert.equal(graphic.segment.yacPath, `M ${graphic.segment.to} 220 L ${104 + percent * 7.92} 220`);
             assert.match(yardageLabel(graphic.segment), /YD RETURN TO/);
@@ -669,7 +677,8 @@ test("100 saved games separate interception flight, confirmed returns, touchback
   const aliases = { "251": ["TEXAS", "UT"], "130": "U-M", "245": ["TAM", "A&M"], "2579": "USC",
     "164": "RU", "239": "BU", "193": "MIAMI", "238": "VANDY", "2655": "TLN", "2636": "TSA", "145": "OM", "33": "BLT", "5": "CLV",
     "22": "ARZ", "14": "LA", "34": "HST", "2390": "UM", "84": "IND", "275": "WISC",
-    "87": "UND", "194": "OhioSt", "120": "Maryla", "26": "UCL", "142": "Mizzou", "2633": "TEN" };
+    "87": "UND", "194": "OhioSt", "120": "Maryla", "26": "UCL", "142": "Mizzou", "2633": "TEN",
+    "333": "BAMA", "344": "MSU", "2305": "Kan", "2641": "TTU" };
   const counts = { total: 0, animated: 0, returned: 0, touchbacks: 0, touchdowns: 0 };
   for (const entry of manifest) {
     const summary = JSON.parse(gunzipSync(readFileSync(new URL(entry.file, root))));

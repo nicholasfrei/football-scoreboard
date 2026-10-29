@@ -17,7 +17,7 @@ function catchSpot(text, home, away) {
   return teams.length === 1 ? namedSpot(`${teams[0].abbreviation} ${Number(match[2])}`, home, away) : null;
 }
 
-// Only derive a receiving spot for unambiguous, non-penalized kick outcomes.
+// Only derive a receiving spot from explicit, corroborated kick outcomes.
 export function kickPosition(play, league, home, away, season) {
   const type = play?.type?.text ?? "";
   const kickoff = /^kickoff\b/i.test(type);
@@ -27,8 +27,10 @@ export function kickPosition(play, league, home, away, season) {
   const fairCatch = /\bfair catch\b/i.test(`${type} ${text}`);
   const puntPenalty = punt && /\bPENALTY\b/i.test(text) && !play.scoringPlay && !play.isTurnover
     ? /\bPENALTY\b[^]*?(\d+)\s+yards?\s*,?\s*enforced at\s+([A-Z]+)\s*(\d{1,2})\b/i.exec(text) : null;
-  if ((!kickoff && !punt) || (!touchback && !fairCatch && !puntPenalty) || play.scoringPlay || play.isTurnover
-      || ((play.isPenalty || play.penalty || /\b(?:penalty|no play|nullified|blocked|muff|fumble)\b/i.test(text)) && !puntPenalty)) return null;
+  const ordinaryReturn = kickoff && /\breturn(?:ed)?\s+\d+\s+yards?\s+to\s+(?:the\s+)?[A-Za-z]+\s*\d{1,2}\b|\bto\s+[A-Za-z]+\s*\d{1,2}\s+for\s+\d+\s+yards?\b/i.test(text);
+  if ((!kickoff && !punt) || (!touchback && !fairCatch && !puntPenalty && !ordinaryReturn)
+      || play.scoringPlay || play.isTurnover
+      || ((play.isPenalty || play.penalty || /\b(?:penalty|no play|nullified|blocked|muff|fumble|out of bounds)\b/i.test(text)) && !puntPenalty)) return null;
 
   const kicker = String(play.start?.team?.id ?? "");
   const endId = String(play.end?.team?.id ?? "");
@@ -42,14 +44,27 @@ export function kickPosition(play, league, home, away, season) {
   // An end-zone placeholder is not a succeeding spot. A named end position is
   // preferred because penalties and NFL kickoff rules can alter standard spots.
   let spot = endId === receiver.id ? namedSpot(end.possessionText, home, away) : null;
+  if (ordinaryReturn && !touchback && !fairCatch) {
+    // A named end alone is not evidence: require the returner's explicit final
+    // spot to agree, not the kickoff landing or a later penalty placement.
+    const returnSpot = /\breturn(?:ed)?\s+\d+\s+yards?\s+to\s+(?:the\s+)?([A-Za-z]+)\s*(\d{1,2})\b/i.exec(text)
+      ?? /\bto\s+([A-Za-z]+)\s*(\d{1,2})\s+for\s+\d+\s+yards?\b/i.exec(text);
+    if (!spot || !returnSpot || namedSpot(`${returnSpot[1]} ${returnSpot[2]}`, home, away)?.percent !== spot.percent) return null;
+  }
   if (puntPenalty) {
     const enforcement = namedSpot(`${puntPenalty[2]} ${puntPenalty[3]}`, home, away);
     const yards = Number(puntPenalty[1]);
-    // For a penalty on the receiving team, enforcement after the punt advances
-    // the receiving spot by the penalty distance toward its own goal line.
+    // The named offender, not the receiver, determines enforcement direction.
+    const offender = /\bPENALTY\s+on\s+([A-Z]+)-/i.exec(text)?.[1];
+    const penalized = teams.find((team) => team.abbreviation.toUpperCase() === offender?.toUpperCase());
     if (enforcement && Number.isFinite(yards)) {
-      const percent = enforcement.percent + (receiver.id === home.id ? yards : -yards);
-      if (percent > 0 && percent < 100) spot = { percent, label: `${receiver.abbreviation} ${receiver.id === home.id ? 100 - percent : percent}` };
+      const percent = enforcement.percent + (penalized?.id === kickingTeam?.id
+        ? receiver.id === home.id ? -yards : yards
+        : receiver.id === home.id ? yards : -yards);
+      if (percent > 0 && percent < 100) {
+        const side = percent > 50 ? home : away;
+        spot = { percent, label: `${side.abbreviation} ${percent > 50 ? 100 - percent : percent}` };
+      }
     }
   }
   if (spot && (spot.percent === 0 || spot.percent === 100)) spot = null;
@@ -78,6 +93,8 @@ export function kickPosition(play, league, home, away, season) {
     spot = { percent: receiver.id === home.id ? 100 - ownYards : ownYards, label: `${receiver.abbreviation} ${ownYards}` };
   }
   if (!spot) return null;
-  return { ...spot, teamId: receiver.id, down: end.down, distance: end.distance,
-    downDistance: end.downDistanceText ?? null };
+  const downDistance = end.downDistanceText?.includes(spot.label) ? end.downDistanceText : null;
+  return { ...spot, teamId: receiver.id, down: end.down,
+    distance: kickoff && fairCatch || !end.possessionText || end.possessionText === spot.label ? end.distance : null,
+    downDistance };
 }

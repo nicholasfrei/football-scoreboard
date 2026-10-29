@@ -198,6 +198,7 @@ For the **labwc** desktop session, create `~/start-scoreboard-kiosk.sh`:
 # Wait for the local page, not the external sports feed, to be ready.
 until curl -fsS http://localhost:4173/ >/dev/null; do sleep 2; done
 exec chromium --ozone-platform=wayland --touch-events=enabled \
+  --enable-wayland-ime --wayland-text-input-version=3 \
   --kiosk --noerrdialogs --no-first-run --disable-session-crashed-bubble \
   --user-data-dir="$HOME/.config/chromium-scoreboard" \
   --password-store=basic http://localhost:4173/
@@ -227,6 +228,77 @@ and the display stays awake without a keyboard attached. Other desktop
 sessions have different autostart mechanisms. See Raspberry Pi's
 [official kiosk tutorial](https://www.raspberrypi.com/tutorials/how-to-use-a-raspberry-pi-in-kiosk-mode/)
 for OS-specific guidance. Exit kiosk mode with **Alt+F4** when a keyboard is attached.
+
+### Enable the on-screen keyboard for team search
+
+On a touchscreen-only Pi, Chromium needs the desktop's on-screen keyboard to
+type into **Find your teams**. For the **labwc / Wayland** setup above:
+
+1. Check whether Squeekboard is installed and running:
+
+   ```sh
+   command -v squeekboard
+   pgrep -a squeekboard
+   ```
+
+   If it is not installed, install the keyboard and Raspberry Pi panel integration:
+
+   ```sh
+   sudo apt update
+   sudo apt install squeekboard wfplug-squeek
+   ```
+
+   Use the desktop's on-screen-keyboard preferences to enable automatic display
+   for text fields. Log out and back in, or reboot, after installing if the
+   keyboard does not start. These instructions are for labwc, not X11.
+
+2. Include **both** of these flags in `~/start-scoreboard-kiosk.sh`, as shown
+   in the launcher above:
+
+   ```sh
+   --enable-wayland-ime --wayland-text-input-version=3
+   ```
+
+   `--touch-events=enabled` alone enables touch input, not the keyboard's
+   Wayland text-input integration. Back up an existing launcher before editing:
+
+   ```sh
+   cp -p ~/start-scoreboard-kiosk.sh ~/start-scoreboard-kiosk.sh.bak
+   nano ~/start-scoreboard-kiosk.sh
+   sh -n ~/start-scoreboard-kiosk.sh
+   ```
+
+3. Restart the kiosk browser or reboot the Pi to apply the flags. Restarting
+   only `football-scoreboard.service` does **not** restart Chromium. Open the
+   team-search dialog and tap the search field on the touchscreen to test it.
+
+   When launching the kiosk manually over SSH, connect it to the existing
+   desktop session (replace `1000` with the Pi desktop user's `id -u` and
+   `wayland-0` if the desktop uses another Wayland socket):
+
+   ```sh
+   # First close the existing scoreboard kiosk; otherwise Chromium may reuse it
+   # without applying the new flags. Do not close unrelated browser sessions.
+   nohup env XDG_RUNTIME_DIR=/run/user/1000 \
+     WAYLAND_DISPLAY=wayland-0 \
+     DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus \
+     "$HOME/start-scoreboard-kiosk.sh" \
+     >"$HOME/scoreboard-kiosk.log" 2>&1 < /dev/null &
+   ```
+
+If the field is focused but the keyboard still does not appear, check that
+Squeekboard is running and the active Chromium process has both flags:
+
+```sh
+pgrep -a squeekboard
+pgrep -a chromium | grep -- '--enable-wayland-ime'
+```
+
+Some Squeekboard/labwc versions can place the keyboard **behind** fullscreen
+windows. If the keyboard works outside kiosk mode but disappears in kiosk
+mode, that is a desktop layering issue rather than a scoreboard search-field
+setting. The flags above do not resolve every such version-specific issue;
+verify keyboard visibility on the physical display.
 
 ## Mount in a shadow box or compact enclosure
 

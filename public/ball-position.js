@@ -16,7 +16,7 @@ export function ballPositionFallback(game) {
   if (game.state === "final") return "FINAL";
   if (game.state !== "live") return "Ball position appears during play";
   const type = game.fieldContext?.lastPlayType ?? "";
-  if (game.fieldContext?.scoring) return `${/touchdown/i.test(type) ? "TOUCHDOWN" : "SCORING PLAY"} · awaiting next play`;
+  if (game.fieldContext?.scoring) return `${/touchdown/i.test(`${type} ${game.fieldContext.scoringType ?? ""}`) ? "TOUCHDOWN" : "SCORING PLAY"} · awaiting next play`;
   if (/timeout/i.test(type)) return "TIMEOUT · awaiting ball position";
   return "Awaiting ball position";
 }

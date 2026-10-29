@@ -52,7 +52,7 @@ test("all recorded fourth-down takeovers in the expanded corpus credit the gaini
       checked++;
     }
   }
-  assert.equal(checked, 133);
+  assert.equal(checked, 137);
 });
 
 function play(overrides = {}) {

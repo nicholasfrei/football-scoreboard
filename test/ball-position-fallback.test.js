@@ -5,11 +5,11 @@ import { gunzipSync } from "node:zlib";
 import { ballPositionFallback } from "../public/ball-position.js";
 import { createReplayFrames, REPLAY_GAMES } from "../src/replay.js";
 
-test("the recorded Cowboys kickoff with no spot is not mislabeled as a timeout", async () => {
+test("the recorded Cowboys return uses its confirmed spot, not a timeout caption", async () => {
   const option = REPLAY_GAMES.nfl;
   const summary = JSON.parse(gunzipSync(await readFile(new URL(`fixtures/games/${option.file}`, import.meta.url))));
   const kickoff = createReplayFrames(summary, option)[0].spotlight;
-  assert.equal(kickoff.ball, null);
+  assert.equal(kickoff.ball?.label, "DAL 35");
   assert.equal(kickoff.fieldContext.lastPlayType, "Kickoff");
   assert.equal(ballPositionFallback(kickoff), "Awaiting ball position");
   assert.equal(ballPositionFallback({ state: "live", fieldContext: { lastPlayType: "", scoring: false } }), "Awaiting ball position");

@@ -28,7 +28,8 @@ function enforcedPlayEnd(play, home, away) {
 
   const sideName = report.to.side.toUpperCase();
   const matching = [home, away].filter((team) => [team.abbreviation, team.location, team.shortName]
-    .some((name) => name?.replace(/\s/g, "").toUpperCase() === sideName));
+    .some((name) => name?.replace(/\s/g, "").toUpperCase() === sideName)
+    || (team.id === "2636" && sideName === "TSA"));
   let side = matching.length === 1 ? matching[0] : null;
   if (!side && report.from.side.toUpperCase() === sideName
       && String(play.start?.team?.id) === String(play.end.team.id)) {
