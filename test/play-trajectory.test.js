@@ -61,7 +61,7 @@ test("incomplete passes with no reported target never claim an estimated yard li
 });
 
 test("NFL short and deep incompletions have a schematic arc without a claimed landing spot", () => {
-  for (const [depth, distance] of [["short", 15], ["deep", 30]]) {
+  for (const [depth, distance] of [["short", 10], ["deep", 30]]) {
     const miss = playTrajectory(play("Pass Incompletion", "AWY 40", "AWY 40", {
       text: `(Shotgun) QB pass incomplete ${depth} right to Receiver (Defender).`,
     }), "1", home, away);
@@ -76,6 +76,75 @@ test("NFL short and deep incompletions have a schematic arc without a claimed la
     text: "QB pass incomplete deep right to Receiver.",
   }), "1", home, away);
   assert.equal(illustratedDrive({ plays: [{ id: "goal", trajectory: goal }] }).segment.to, 104 + 100 * 7.92);
+});
+
+test("NFL pass wording covers both depths and all three directions for each outcome", () => {
+  for (const offense of [away, home]) {
+    const direction = offense === away ? 1 : -1;
+    const start = spot(offense.id, `${offense.abbreviation} 40`, 60);
+    const end = spot(offense.id, `${offense.abbreviation} 48`, 52);
+    const defense = offense === away ? home : away;
+    for (const depth of ["short", "deep"]) for (const side of ["left", "middle", "right"]) {
+      const base = { start, end, statYardage: 8, yardsAfterCatch: 3 };
+      const completed = playTrajectory({ ...base, type: { text: "Pass Reception" },
+        text: `QB pass ${depth} ${side} to Receiver for 8 yards.` }, offense.id, home, away);
+      assert.equal(completed?.kind, "pass");
+      assert.equal(completed.yards, 8);
+      assert.equal(completed.catchPercent, completed.start + 5 * direction);
+      const incomplete = playTrajectory({ ...base, end: {}, type: { text: "Pass Incompletion" },
+        text: `QB pass incomplete ${depth} ${side} to Receiver.` }, offense.id, home, away);
+      assert.equal(incomplete?.kind, "incomplete");
+      assert.equal(incomplete.schematicYards, depth === "short" ? 10 : 30);
+      const graphic = illustratedDrive({ direction: direction === 1 ? "right" : "left",
+        plays: [{ id: "miss", trajectory: incomplete }] });
+      assert.equal(graphic.segment.to, 104 + (incomplete.start + incomplete.schematicYards * direction) * 7.92);
+      const intercepted = playTrajectory({ ...base, type: { text: "Pass Interception Return" },
+        text: `QB pass ${depth} ${side} intended for Receiver INTERCEPTED by Defender at ${offense.abbreviation} 48.`,
+        isTurnover: true, statYardage: 0, end: { ...end, team: { id: defense.id } } }, offense.id, home, away);
+      assert.equal(intercepted?.kind, "interception");
+      assert.equal(intercepted.catchPercent, completed.end);
+      assert.equal(intercepted.returnYards, 0);
+    }
+  }
+});
+
+test("saved NFL fourth-down completions keep their pass arc when possession changes", () => {
+  for (const [game, id, yards] of [
+    ["401873020", "4018730201680", 0], ["401873022", "4018730223780", 3],
+    ["401873019", "4018730193495", 6], ["401873002", "401873002721", 2],
+    ["401873006", "4018730063602", 5], ["401872987", "4018729873545", 6],
+    ["401872992", "4018729924158", 9], ["401872969", "4018729694490", 9],
+  ]) {
+    const summary = JSON.parse(gunzipSync(readFileSync(new URL(`./fixtures/games/nfl/${game}.json.gz`, import.meta.url))));
+    const sides = summary.header.competitions[0].competitors;
+    const h = sides.find((side) => side.homeAway === "home").team;
+    const a = sides.find((side) => side.homeAway === "away").team;
+    const raw = summary.drives.previous.flatMap((drive) => drive.plays).find((play) => play.id === id);
+    const offenseId = String(raw.start.team.id);
+    const motion = playTrajectory(raw, offenseId, h, a);
+    assert.equal(motion?.kind, "pass", id);
+    assert.equal(motion.yards, yards, id);
+    assert.ok(illustratedDrive({ plays: [{ id, trajectory: motion }] }).segment.path, id);
+    for (const variant of [
+      { start: { ...raw.start, down: 3 } },
+      { statYardage: yards + 1 },
+      { start: { ...raw.start, distance: yards } },
+      { text: `${raw.text} FUMBLES, recovered by defense.` },
+    ]) assert.equal(playTrajectory({ ...raw, ...variant }, offenseId, h, a), null, id);
+  }
+});
+
+test("NFL interceptions recognize WAS prose with WSH structured spots", () => {
+  const summary = JSON.parse(gunzipSync(readFileSync(new URL("./fixtures/games/nfl/401872965.json.gz", import.meta.url))));
+  const sides = summary.header.competitions[0].competitors;
+  const h = sides.find((side) => side.homeAway === "home").team;
+  const a = sides.find((side) => side.homeAway === "away").team;
+  for (const [id, pick, end, yards] of [["4018729651368", 66, 63, 3], ["4018729652279", 73, 80, 7]]) {
+    const raw = summary.drives.previous.flatMap((drive) => drive.plays).find((play) => play.id === id);
+    const motion = playTrajectory(raw, String(raw.start.team.id), h, a);
+    assert.equal(motion?.kind, "interception", id);
+    assert.deepEqual([motion.catchPercent, motion.end, motion.returnYards], [pick, end, yards], id);
+  }
 });
 
 test("reported incompletion targets resolve both sides, zero, midfield and provider team aliases", () => {
@@ -190,7 +259,7 @@ test("saved NFL defensive fumble scores distinguish recovery from the red return
   }
 });
 
-test("Tulane's named TLN 28 incompletion overrides the schematic 15-yard depth", () => {
+test("Tulane's named TLN 28 incompletion overrides the schematic 10-yard depth", () => {
   const summary = JSON.parse(gunzipSync(readFileSync(new URL("./fixtures/games/college-football/401862811.json.gz", import.meta.url))));
   const sides = summary.header.competitions[0].competitors;
   const h = sides.find((side) => side.homeAway === "home").team;
@@ -214,7 +283,7 @@ test("the three Cowboys–Eagles NFL pass descriptions use schematic miss, struc
   const trajectory = (id) => playTrajectory(plays.find((candidate) => String(candidate.id) === id), "6", h, a);
   const miss = trajectory("401873009515"); // Pickens: short, but no reported landing yard line.
   assert.equal(miss.targetPercent, null);
-  assert.equal(illustratedDrive({ plays: [{ id: "miss", trajectory: miss }] }).segment.to, 104 + 46 * 7.92);
+  assert.equal(illustratedDrive({ plays: [{ id: "miss", trajectory: miss }] }).segment.to, 104 + 41 * 7.92);
   assert.equal(yardageLabel(miss), "INCOMPLETE · 0 YDS");
   const deep = trajectory("401873009538"); // Flournoy: PHI 34, 35 yards, 18 YAC.
   assert.deepEqual([deep.start, deep.catchPercent, deep.end, deep.yac], [31, 48, 66, 18]);
@@ -593,7 +662,7 @@ test("100 saved games route confirmed punts to the receiving spot and ordinary f
     "2390": ["UM", "CANES"], "84": "IND", "275": "WISC", "87": "UND", "194": "OhioSt",
     "120": "Maryla", "26": "UCL", "142": "Mizzou", "34": "HST", "33": "BLT",
     "22": "ARZ", "145": "OM", "2655": "TLN", "2636": "TSA",
-    "130": "U-M", "14": "LA", "5": "CLV", "254": "UTA", "238": "VANDY",
+    "130": "U-M", "14": "LA", "5": "CLV", "28": "WAS", "254": "UTA", "238": "VANDY",
     "221": "PIT", "68": "BSU", "193": "Miami", "2649": "TOLEDO" };
   for (const entry of manifest) {
     const summary = JSON.parse(gunzipSync(readFileSync(new URL(entry.file, root))));
@@ -678,7 +747,7 @@ test("100 saved games separate interception flight, confirmed returns, touchback
     "164": "RU", "239": "BU", "193": "MIAMI", "238": "VANDY", "2655": "TLN", "2636": "TSA", "145": "OM", "33": "BLT", "5": "CLV",
     "22": "ARZ", "14": "LA", "34": "HST", "2390": "UM", "84": "IND", "275": "WISC",
     "87": "UND", "194": "OhioSt", "120": "Maryla", "26": "UCL", "142": "Mizzou", "2633": "TEN",
-    "333": "BAMA", "344": "MSU", "2305": "Kan", "2641": "TTU" };
+    "333": "BAMA", "344": "MSU", "2305": "Kan", "2641": "TTU", "28": "WAS" };
   const counts = { total: 0, animated: 0, returned: 0, touchbacks: 0, touchdowns: 0 };
   for (const entry of manifest) {
     const summary = JSON.parse(gunzipSync(readFileSync(new URL(entry.file, root))));

@@ -24,7 +24,7 @@ const targetAliases = {
   "254": ["UTA"], "68": ["BSU"], "164": ["RU"], "242": ["RIC"],
   "2649": ["TOLEDO"], "239": ["BU"], "2006": ["AKRON"], "193": ["MIAMI"],
   "344": ["STATE"], "33": ["BLT"], "5": ["CLV"], "22": ["ARZ"],
-  "14": ["LA"], "34": ["HST"], "145": ["OM"],
+  "14": ["LA"], "34": ["HST"], "28": ["WAS"], "145": ["OM"],
   "2655": ["TLN"], "2636": ["TSA"],
   "84": ["IND"], "275": ["WISC"], "87": ["UND"], "194": ["OHIOST"],
   "120": ["MARYLA"], "26": ["UCL"], "142": ["MIZZOU"],
@@ -226,8 +226,16 @@ export function playTrajectory(play, offenseId, home, away) {
        && (end - start) * direction !== play.statYardage
        && /\bfor\s+\d+\s+yards?\b/i.test(text)
        && !/\b(?:lateral|penalty)\b/i.test(text)) return null;
-  if (end === null || (kind !== "incomplete" && play.end?.team?.id != null
-      && String(play.end.team.id) !== offenseId)) return null;
+   // A completed fourth-down pass can finish short of the sticks. ESPN then
+   // assigns the endpoint to the defense; the confirmed gain is still a pass.
+   const fourthDownPass = kind === "pass" && play.start.down === 4 && play.end?.down === 1
+     && Number.isFinite(play.start.distance) && Number.isFinite(play.statYardage)
+     && play.statYardage < play.start.distance && end !== null
+     && (end - start) * direction === play.statYardage
+     && fieldPercent({ possessionText: play.end?.possessionText }, home, away) === end
+     && !/\b(?:fumble\w*|intercept\w*|safety)\b/i.test(text);
+   if (end === null || (kind !== "incomplete" && play.end?.team?.id != null
+       && String(play.end.team.id) !== offenseId && !fourthDownPass)) return null;
   const yards = kind === "incomplete" ? 0 : (end - start) * direction;
   // NFL supplies structured YAC; college play text usually names the catch spot.
   // Only draw the split when the reported gain agrees with the field endpoints.
@@ -247,7 +255,7 @@ export function playTrajectory(play, offenseId, home, away) {
     ? /\bpass incomplete (short|deep)\b/i.exec(text)?.[1]?.toLowerCase() : null;
   return { kind, start, end, yards, yac,
     ...(kind === "incomplete" ? { targetPercent: target?.percent ?? null, targetLabel: target?.label ?? null,
-      schematicYards: depth === "short" ? 15 : depth === "deep" ? 30 : null } : {}),
+      schematicYards: depth === "short" ? 10 : depth === "deep" ? 30 : null } : {}),
     catchPercent,
     label: kind === "run" ? "RUN" : kind === "pass" ? "PASS" : "INCOMPLETE" };
 }

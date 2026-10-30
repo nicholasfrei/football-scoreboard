@@ -216,7 +216,7 @@ body {
 .team-picker { display: flex; flex: 1; min-width: 0; align-items: center; justify-content: flex-start; gap: 8px; overflow-x: auto; padding: 2px 3px 5px; scrollbar-width: thin; scrollbar-color: #545d68 transparent; touch-action: pan-x; }
 .team-picker[hidden] { display: none; }
 .favorite-team:first-child { margin-inline-start: auto; }
-.favorite-team { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 4px 12px; border: 1px solid var(--panel-border); border-radius: 6px; background: var(--panel); color: #adbac7; font-size: 16px; font-weight: 700; line-height: 1.2; text-decoration: none; white-space: nowrap; user-select: none; -webkit-user-select: none; }
+.favorite-team { display: inline-flex; flex: none; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 4px 12px; border: 1px solid var(--panel-border); border-radius: 6px; background: var(--display-background); color: #adbac7; font-size: 16px; font-weight: 700; line-height: 1.2; text-decoration: none; white-space: nowrap; user-select: none; -webkit-user-select: none; }
 .favorite-team img { width: 30px; height: 30px; object-fit: contain; pointer-events: none; }
 .favorite-team:hover { background: #373e47; color: #fff; }
 .favorite-team[aria-current="page"] { border-color: var(--team-color); background: #373e47; color: #cdd9e5; }
