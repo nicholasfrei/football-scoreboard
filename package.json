@@ -1,6 +1,6 @@
 {
   "name": "football-scoreboard",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "A configurable, always-on NFL and NCAA football scoreboard.",
   "type": "module",
