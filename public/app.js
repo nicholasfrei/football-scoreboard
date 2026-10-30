@@ -41,6 +41,7 @@ let renderedIllustrationKey = null;
 let renderedIllustratedPlayId = null;
 let renderedIllustrationView = null;
 let renderedRouteAnimation = null;
+let renderedPenaltyMotionKey = null;
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 function svgElement(tag, attributes = {}) {
@@ -58,17 +59,22 @@ function renderFieldDrive(game, drive) {
   // Repeated polls must not replay the same play or move the route backwards.
   if (key === renderedIllustrationKey) return renderedRouteAnimation;
   const previousIllustratedPlayId = renderedIllustratedPlayId;
+  const previousPenaltyMotionKey = renderedPenaltyMotionKey;
   const view = `${game.league}:${game.id}:${game.homeAway}:${selectedDriveId ?? "current"}`;
   const animate = renderedIllustrationKey !== null && key !== null && renderedIllustrationView === view && !reducedMotion.matches;
   renderedIllustrationView = view;
   renderedRouteAnimation = null;
   renderedIllustrationKey = key;
   renderedIllustratedPlayId = null;
+  renderedPenaltyMotionKey = null;
   layer.replaceChildren();
   if (!drive) return;
   const home = game.homeAway === "home" ? game.selectedTeam : game.opponent;
   const track = illustratedDrive({ ...drive, direction: drive.teamId === home.id ? "left" : "right" });
   const finalSnap = lastDriveSnap(drive.plays);
+  const latest = drive.plays.at(-1);
+  const penaltyMotion = latest === finalSnap ? finalSnap?.penaltyMotion : null;
+  renderedPenaltyMotionKey = penaltyMotion ? `${game.league}:${game.id}:${drive.id}:${finalSnap.id}:${JSON.stringify(penaltyMotion)}` : null;
   if (!track.segment && !finalSnap) return;
   // If the last offensive snap is a kick or a penalty, do not replay an older
   // pass as if it were the final play. Keep only the net drive line.
@@ -76,16 +82,28 @@ function renderFieldDrive(game, drive) {
   layer.style.setProperty("--route-duration", `${ROUTE_DURATION_MS}ms`);
   layer.style.setProperty("--return-delay", `${RETURN_DELAY_MS}ms`);
   layer.style.setProperty("--return-duration", `${RETURN_DURATION_MS}ms`);
-  const rememberAnimation = (element, durationMs) => {
+  const rememberAnimation = (element, durationMs, start = current?.start) => {
     // The final animated leg determines when the ball may be placed.
-    renderedRouteAnimation = { element, durationMs, start: current.start, playId: current.id };
+    renderedRouteAnimation = { element, durationMs, start, playId: finalSnap.id };
   };
   renderedIllustratedPlayId = current?.id ?? null;
   const color = [game.selectedTeam, game.opponent].find((team) => team.id === drive.teamId)?.color ?? "#d6b46a";
   layer.style.setProperty("--drive-color", color);
   const driveStart = track.start ?? finalSnap?.snapPercent;
   if (track.progressPath) layer.append(svgElement("path", { d: track.progressPath, class: "drive-progress", fill: "none" }));
-  for (const d of track.penaltyPaths) layer.append(svgElement("path", { d, class: "drive-penalty", fill: "none" }));
+  for (const d of track.penaltyPaths) {
+    const path = svgElement("path", { d, class: "drive-penalty", fill: "none" });
+    if (animate && renderedPenaltyMotionKey !== previousPenaltyMotionKey) {
+      const mask = svgElement("mask", { id: "penalty-reveal", maskUnits: "userSpaceOnUse",
+        x: 0, y: 0, width: 1000, height: 440 });
+      const reveal = svgElement("path", { d, class: "route-reveal", fill: "none", pathLength: 100 });
+      mask.append(reveal);
+      layer.append(mask);
+      path.setAttribute("mask", "url(#penalty-reveal)");
+      rememberAnimation(reveal, ROUTE_DURATION_MS, penaltyMotion.start);
+    }
+    layer.append(path);
+  }
   if (current) {
     const group = svgElement("g", { class: "drive-latest" });
     const path = current.path && svgElement("path", { d: current.path, class: `drive-route is-${current.kind}`, fill: "none" });
@@ -203,7 +221,8 @@ function updateHighlights(payload) {
   if (activeHighlight && !activeHighlight.demo) {
     const stillValid = !payload.stale && !payload.gamecastUnavailable && game?.state === "live"
       && game.id === activeHighlight.gameId && game.league === activeHighlight.league && game.highlights?.some((event) =>
-        event.id === activeHighlight.id && event.kind === activeHighlight.kind && event.teamId === activeHighlight.teamId);
+        event.id === activeHighlight.id && event.phase === activeHighlight.phase
+        && event.kind === activeHighlight.kind && event.teamId === activeHighlight.teamId);
     const moved = activeHighlight.kind === "touchdown" && game.ball && (
       game.ball.percent !== activeHighlight.ballPercent || game.possessionTeamId !== activeHighlight.possessionTeamId);
     if (!stillValid || moved) hideHighlight();
@@ -446,7 +465,9 @@ function renderDrives(game) {
     const item = document.createElement("li");
     item.dataset.playId = play.id;
     const time = document.createElement("span");
-    time.textContent = `${play.period > 4 ? `OT${play.period - 4}` : `Q${play.period ?? "—"}`} · ${play.clock ?? "—"}`;
+     const downDistance = [1, 2, 3, 4].includes(play.down) && Number.isFinite(play.distance)
+       ? ` · ${["", "1st", "2nd", "3rd", "4th"][play.down]} & ${play.distance}` : "";
+     time.textContent = `${play.period > 4 ? `OT${play.period - 4}` : `Q${play.period ?? "—"}`} · ${play.clock ?? "—"}${downDistance}`;
     const text = document.createElement("span");
     const description = document.createElement("span");
     description.className = "play-description";

@@ -167,7 +167,7 @@ for (const fixture of fixtures) {
           frame.drives.current.plays.map((item) => String(item.id)));
         assert.equal(game.latestPlaySequence, Math.max(...plays.slice(0, index + 1).map((play) => Number(play.sequenceNumber))));
         assert.equal(kickoffCountdown(game, replayNow), null);
-        assert.equal(nextRefreshDelay({ spotlight: game }, replayNow), 15_000);
+        assert.equal(nextRefreshDelay({ spotlight: game }, replayNow), 10_000);
         const homeTeam = base.homeAway === "home" ? base.selectedTeam : base.opponent;
         const awayTeam = base.homeAway === "home" ? base.opponent : base.selectedTeam;
         if (/End of Game|Extra Point/i.test(source.type?.text ?? "") || source.scoringPlay
@@ -262,7 +262,7 @@ test("QB interceptions and QB/RB fumbles come from box scores, not assumed play 
   assert.equal(leader("receivingYards", "Amon-Ra St. Brown").fumbles, null);
 });
 
-test("every separately recorded scoring play has one correctly attributed scoring event", () => {
+test("every separately recorded scoring play has one correctly attributed primary scoring event", () => {
   const kinds = { touchdown: "touchdown", "field-goal": "field-goal", safety: "safety",
     "defensive-two-point-conversion": "two-point-conversion" };
   let total = 0;
@@ -270,7 +270,8 @@ test("every separately recorded scoring play has one correctly attributed scorin
     for (const play of plays.filter((item) => item.scoringPlay)) {
       const source = summary.scoringPlays.find((item) => item.id === play.id);
       assert.ok(source, `${play.id}: scoring entry is present`);
-      const events = gameHighlights([play], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId]);
+      const events = gameHighlights([play], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId])
+        .filter((event) => !event.phase);
       assert.equal(events.length, 1, play.id);
       assert.equal(events[0].kind, kinds[play.scoringType?.name], play.id);
       assert.equal(events[0].teamId, String(source.team.id), play.id);
@@ -336,7 +337,9 @@ test("actual penalties, nullified plays, scoring attribution, turnovers and miss
       const type = play.type?.text ?? "";
       if (type) types.add(type);
       if (play.penalty?.type?.text) penaltyTypes.add(play.penalty.type.text);
-      const events = gameHighlights([play], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId]);
+      const events = gameHighlights([play], summary.scoringPlays, [entry.homeTeamId, entry.awayTeamId])
+        .filter((event) => !event.phase || event.kind === "penalty"
+          && (!play.scoringPlay || /\bTOUCHDOWN\s+nullified\b/i.test(play.text)));
       // These entries have no complete, single enforcement (missing yardage or
       // multiple fouls); an unverified penalty must not be celebrated.
       const ambiguous = ["401858497450", "401858497462", "401862809242", "401862809622"];
@@ -375,7 +378,7 @@ test("actual penalties, nullified plays, scoring attribution, turnovers and miss
         if (/Interception/.test(type)) pickSix++;
         if (/kick|two.point|2.point/i.test(play.text)) bundledConversions++;
       } else if (/Field Goal Missed/.test(type)) {
-        assert.deepEqual(events, [], "a failed kick is not a made-field-goal celebration");
+        assert.equal(events[0]?.kind, "missed-field-goal", "a failed kick is not a made-field-goal celebration");
       } else if (/Blocked Field Goal/.test(type)) {
         assert.equal(events[0]?.kind, "blocked-field-goal");
       }

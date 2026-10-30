@@ -26,21 +26,21 @@ test("rapid refresh starts five minutes before kickoff, including a next game be
   assert.equal(needsRapidRefresh(payload(), kickoff - 300_001), false);
   assert.equal(needsRapidRefresh(payload(), kickoff - 300_000), true);
   assert.equal(nextRefreshDelay(payload(), kickoff - 301_000), 1000);
-  assert.equal(nextRefreshDelay(payload(), kickoff - 300_000), 15_000);
-  assert.equal(nextRefreshDelay(payload({ state: "final" }, game), kickoff - 1), 15_000);
-  assert.equal(nextRefreshDelay(payload(), kickoff + 3_600_000), 15_000, "overdue pregame keeps checking until provider confirms play");
+  assert.equal(nextRefreshDelay(payload(), kickoff - 300_000), 10_000);
+  assert.equal(nextRefreshDelay(payload({ state: "final" }, game), kickoff - 1), 10_000);
+  assert.equal(nextRefreshDelay(payload(), kickoff + 3_600_000), 10_000, "overdue pregame keeps checking until provider confirms play");
   assert.equal(nextRefreshDelay(payload(), kickoff - 86_401_000), 1000, "wake at the 24-hour display boundary");
 });
 
 test("all live periods and temporary delays stay fast; finals, canceled games and TBD stay normal", () => {
   for (const period of [1, 2, 3, 4, 5, 6, 8]) {
-    assert.equal(nextRefreshDelay(payload({ ...game, state: "live", period }), kickoff + 24 * 3_600_000), 15_000);
+    assert.equal(nextRefreshDelay(payload({ ...game, state: "live", period }), kickoff + 24 * 3_600_000), 10_000);
   }
   for (const status of ["Halftime", "End of 3rd Quarter"]) {
-    assert.equal(nextRefreshDelay(payload({ ...game, state: "live", status }), kickoff), 15_000);
+    assert.equal(nextRefreshDelay(payload({ ...game, state: "live", status }), kickoff), 10_000);
   }
   for (const status of ["Delayed", "Suspended"]) {
-    assert.equal(nextRefreshDelay(payload({ ...game, state: "unknown", status }), kickoff), 15_000);
+    assert.equal(nextRefreshDelay(payload({ ...game, state: "unknown", status }), kickoff), 10_000);
   }
   for (const value of [null, { ...game, state: "final" }, { ...game, timeTbd: true },
     { ...game, state: "unknown", status: "Postponed" }, { ...game, state: "unknown", status: "Canceled" }]) {
@@ -68,15 +68,15 @@ test("polling is start-to-start, shares manual refreshes, retries failures, and 
   now += 2000;
   complete();
   await first;
-  assert.equal(scheduled.delay, 13_000, "request duration does not add to the 15-second interval");
-  now += 13_000;
+  assert.equal(scheduled.delay, 8_000, "request duration does not add to the 10-second interval");
+  now += 8_000;
   const second = scheduled.fn();
   await Promise.resolve();
   assert.equal(calls, 2);
   // An outage that leaves the last payload unchanged must preserve rapid polling.
   complete();
   await second;
-  assert.equal(scheduled.delay, 15_000);
+  assert.equal(scheduled.delay, 10_000);
   current = payload({ ...game, state: "final" });
   const final = loop.refreshNow();
   await Promise.resolve();
@@ -140,7 +140,7 @@ test("a rejected refresh schedules a retry and stopping an in-flight request pre
     },
   });
   await assert.rejects(loop.start(), /Network unavailable/);
-  assert.equal(delay, 15_000);
+  assert.equal(delay, 10_000);
   fail = false;
   delay = undefined;
   const pending = loop.refreshNow();

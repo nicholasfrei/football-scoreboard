@@ -19,7 +19,7 @@ selected team's schedule rather than hard-coding a matchup. Returned fields
 vary by game: play-by-play, field position, predictions, broadcasts, and artwork
 may be missing. These endpoints have no established support contract, schema
 guarantee, or verified live-latency guarantee for this project. The app's
-15-second pregame/live (five-minute otherwise) browser polling interval is not a
+10-second pregame/live (five-minute otherwise) browser polling interval is not a
 provider freshness or access guarantee.
 
 ## Access and reuse limitations

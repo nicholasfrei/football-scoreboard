@@ -1,7 +1,7 @@
 export const COUNTDOWN_WINDOW_MS = 24 * 60 * 60 * 1000;
 export const PREGAME_WINDOW_MS = 5 * 60 * 1000;
 export const NORMAL_POLL_MS = 5 * 60_000;
-export const LIVE_POLL_MS = 15_000;
+export const LIVE_POLL_MS = 10_000;
 
 function kickoffTime(game) {
   return game && !game.timeTbd && game.kickoffAt ? Date.parse(game.kickoffAt) : NaN;

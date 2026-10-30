@@ -42,8 +42,8 @@ a small screen in a shadow box for an always-on game-day scoreboard.
   `config.json` sets the initial favorites for new browsers.
 
 The app is a small Node.js server and a browser-based display, with no third-party
-packages or build step. It refreshes every 15 seconds from five minutes before
-kickoff through the game, and every 30 seconds otherwise; it is not a video stream
+packages or build step. It refreshes every 10 seconds from five minutes before
+kickoff through the game, and every five minutes otherwise; it is not a video stream
 or real-time player tracker. Between games, it shows the most recent result and
 previews the next matchup. In the final 24 hours before kickoff, that matchup
 takes over with a ticking `HH:MM:SS` countdown in place of the score.

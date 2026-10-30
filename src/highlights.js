@@ -76,9 +76,11 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
       && scoringTeams.has(String(play.id))
       && /\bTOUCHDOWN\b[^]*\b(?:kick|pass|rush) attempt\b[^]*\bNO PLAY\b/i.test(play.text ?? "")
       && !/\bTOUCHDOWN\s+nullified\b/i.test(play.text ?? "");
+    const nullifiedTouchdown = /\bTOUCHDOWN\s+nullified\b/i.test(play.text ?? "");
+    if (nullifiedTouchdown && !acceptedPenalty) return [];
     if (/no play|nullified/i.test(play.text ?? "") && !acceptedPenalty && !confirmedBundledConversion) return [];
     let kind;
-    if (play.scoringPlay && (play.scoringType?.name === "touchdown" || /touchdown/i.test(type))) kind = "touchdown";
+    if (!nullifiedTouchdown && play.scoringPlay && (play.scoringType?.name === "touchdown" || /touchdown/i.test(type))) kind = "touchdown";
     else if (acceptedPenalty && /^Fumble Recovery \(Own\)$/i.test(type)
       && (/\bpunt\b/i.test(play.text ?? "")
         || String(play.start?.team?.id) === String(play.end?.team?.id))) kind = "penalty";
@@ -98,6 +100,7 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
     else if (/\b(?:blocked punt|punt blocked)\b/i.test(type)
       || (/^Punt(?: Return)?$/i.test(type) && /\bblocked by\b/i.test(play.text ?? ""))) kind = "blocked-punt";
     else if (/^Punt(?: Return| Fair Catch| Downed| Out of Bounds| Touchback)?$/i.test(type)) kind = "punt";
+    else if (/^(?:Field Goal Missed|Missed Field Goal)$/i.test(type)) kind = "missed-field-goal";
     else if (isTurnoverOnDowns(play, teamIds)) kind = "turnover-on-downs";
     else if (/^Sack$/i.test(type)) kind = "sack";
     else if (/^Rush$/i.test(type) && !play.scoringPlay && !play.isTurnover
@@ -131,8 +134,9 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
     }
     teamId = teamId == null ? null : String(teamId);
     if (!teamIds.includes(teamId)) teamId = null;
-    return [{
+    const primary = {
       id: String(play.id),
+      ...(kind === "penalty" && !/^Penalty$/i.test(type) ? { phase: "penalty" } : {}),
       sequence: Number(play.sequenceNumber),
       kind,
       teamId,
@@ -143,6 +147,20 @@ export function gameHighlights(plays, scoringPlays, teamIds) {
       penaltyType: kind === "penalty" ? acceptedPenalty.type : null,
       penaltyYards: kind === "penalty" ? acceptedPenalty.yards : null,
       occurredAt: play.wallclock ?? null,
-    }];
+    };
+    // ESPN often revises a touchdown's *existing* play after the conversion.
+    // Keep the touchdown identity and expose the conversion as a separate phase.
+    const conversion = kind === "touchdown" && /\b(?:extra point is|kick attempt)\s+(GOOD|NO GOOD|BLOCKED)\b/i.exec(play.text ?? "");
+    const events = conversion ? [primary, {
+      id: primary.id, sequence: primary.sequence, phase: "conversion",
+      kind: conversion[1].toUpperCase() === "GOOD" ? "extra-point" : "extra-point-missed",
+      teamId: primary.teamId, detail: conversion[1].toUpperCase(), occurredAt: primary.occurredAt,
+    }] : [primary];
+    if (kind !== "penalty" && acceptedPenalty) events.push({
+      id: primary.id, sequence: primary.sequence, phase: "penalty", kind: "penalty",
+      teamId: null, detail: `${acceptedPenalty.type}${acceptedPenalty.yards === null ? "" : ` · ${acceptedPenalty.yards} YDS`}`,
+      penaltyType: acceptedPenalty.type, penaltyYards: acceptedPenalty.yards, occurredAt: primary.occurredAt,
+    });
+    return events;
   }).filter((event) => Number.isFinite(event.sequence)).slice(-20);
 }

@@ -33,7 +33,7 @@ Game Leaders remain beneath the last completed game when its player stats are
 available; the Next Up panel returns when the upcoming matchup takes over for
 the countdown. The season is fetched dynamically; no particular matchup is hard-coded.
 
-The browser polls every **five minutes** normally, switching to **15 seconds**
+The browser polls every **five minutes** normally, switching to **10 seconds**
 starting **five minutes before kickoff**, including while waiting for ESPN's
 live status. It keeps that cadence throughout play, halftime, overtime, and
 temporary delays/suspensions, returning to normal after a final. The manual
@@ -334,7 +334,7 @@ Takeovers use structured ESPN play types, stable play IDs, and ordered play hist
   feed clears the active live takeover.
 
 The animation timer starts when the app **receives** the new play, not when it happens
-on TV. Live polling remains every 15 seconds.
+on TV. Live polling remains every 10 seconds.
 
 ### Watch a complete game replay
 

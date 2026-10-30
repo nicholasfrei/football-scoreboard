@@ -29,21 +29,48 @@ function driveSummary(drive, orderedPlays, scoringTeams, home, away, league) {
     result: drive.displayResult ?? null,
     description: drive.description ?? null,
     ...driveStats(drive, plays, home, away, league),
-    plays: plays.map((play) => ({
+    plays: plays.map((play) => {
+      const amendment = bundledPenalty(play, offenseId, home, away);
+      return {
       id: String(play.id), text: play.text,
-      period: play.period?.number ?? null,
-      clock: play.clock?.displayValue ?? null,
+       period: play.period?.number ?? null,
+       clock: play.clock?.displayValue ?? null,
+       down: [1, 2, 3, 4].includes(play.start?.down) ? play.start.down : null,
+       distance: Number.isFinite(play.start?.distance) ? play.start.distance : null,
       scoring: Boolean(play.scoringPlay),
       scoringTeamId: play.scoringPlay ? scoringTeams.get(String(play.id)) ?? null : null,
-      trajectory: playTrajectory(play, offenseId, home, away),
+      trajectory: amendment?.trajectory ?? playTrajectory(play, offenseId, home, away),
       snapPercent: String(play.start?.team?.id) === offenseId && [1, 2, 3, 4].includes(play.start?.down)
         ? fieldPercent(play.start, home, away) : null,
-      penaltyMotion: penaltyMotion(play, offenseId, home, away),
+      penaltyMotion: amendment?.motion ?? penaltyMotion(play, offenseId, home, away),
       type: play.type?.text ?? null,
       penalty: play.penalty?.type?.text ?? (textIntentionalGrounding(play) ? "Intentional Grounding"
         : /penalty/i.test(play.type?.text ?? "") ? "Penalty" : null),
-    })),
+      }; }),
   };
+}
+
+function bundledPenalty(play, offenseId, home, away) {
+  const penalty = acceptedPenalty(play);
+  if (!penalty || /^Penalty$/i.test(play.type?.text ?? "")
+      || /\b(?:no play|nullified|reversed|overturned)\b/i.test(play.text ?? "")
+      || String(play.start?.team?.id) !== offenseId || String(play.end?.team?.id) !== offenseId) return null;
+  const [original, ...foul] = (play.text ?? "").split(/\bPENALTY\b/i);
+  if (!foul.length || /\bPENALTY\b/i.test(original)) return null;
+  // NFL: "to CAR 7 ... PENALTY ..., 4 yards, enforced at CAR 7".
+  // Only connect the actual pre-foul endpoint to ESPN's confirmed end spot.
+  const enforced = /\benforced at\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i.exec(foul[0]);
+  const named = enforced && `${enforced[1].toUpperCase()} ${Number(enforced[2])}`;
+  if (!named || !new RegExp(`\\bto\\s+(?:the\\s+)?${enforced[1]}\\s*${Number(enforced[2])}\\b`, "i").test(original)) return null;
+  const start = fieldPercent({ possessionText: named }, home, away);
+  const end = fieldPercent(play.end, home, away);
+  if (start === null || end === null || start === end
+      || (penalty.yards !== null && Math.abs(end - start) > penalty.yards)) return null;
+  const underlying = { ...play, text: original, isPenalty: false, penalty: null,
+    end: { ...play.end, possessionText: named, yardsToEndzone: undefined } };
+  const trajectory = playTrajectory(underlying, offenseId, home, away);
+  return { motion: { start, end, fromPlay: true },
+    trajectory: trajectory?.end === start ? trajectory : null };
 }
 
 function penaltyMotion(play, offenseId, home, away) {

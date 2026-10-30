@@ -107,3 +107,38 @@ test("empty ordered pregame baselines allow the first live play", () => {
   tracker.observe(payload([], [], { state: "scheduled" }), now - 15_000);
   assert.equal(tracker.observe(payload(["first"], [event("first", 1)]), now)?.id, "first");
 });
+
+test("appended phases on one play emit in order without replaying its touchdown", () => {
+  const tracker = createHighlightTracker();
+  const td = { ...event("td", 10), kind: "touchdown" };
+  const xp = { ...event("td", 10), kind: "extra-point", phase: "conversion" };
+  const flag = { ...event("td", 10), kind: "penalty", phase: "penalty" };
+  tracker.observe(payload(["older"]), now - 15_000);
+  assert.equal(tracker.observe(payload(["older", "td"], [td]), now)?.kind, "touchdown");
+  assert.equal(tracker.observe(payload(["older", "td"], [td, xp]), now + 15_000)?.kind, "extra-point");
+  assert.equal(tracker.observe(payload(["older", "td"], [td, xp, flag]), now + 30_000)?.kind, "penalty");
+  assert.equal(tracker.observe(payload(["older", "td"], [td, xp, flag]), now + 45_000), null);
+});
+
+test("a conversion already bundled with the first snapshot does not replay on repeated polls", () => {
+  const tracker = createHighlightTracker();
+  const td = { ...event("td", 10), kind: "touchdown" };
+  const xp = { ...event("td", 10), kind: "extra-point", phase: "conversion" };
+  tracker.observe(payload(["older"]), now - 15_000);
+  assert.equal(tracker.observe(payload(["older", "td"], [td, xp]), now)?.kind, "touchdown");
+  assert.equal(tracker.observe(payload(["older", "td"], [td, xp]), now + 15_000), null);
+  assert.equal(tracker.observe(payload(["older", "td"], [td, xp]), now + 30_000), null);
+  assert.equal(tracker.observe(payload(["older", "td", "new"], [td, xp, event("older", 11)]), now + 45_000), null);
+});
+
+test("a newly enforced flag on an ordinary known snap is its own event", () => {
+  const tracker = createHighlightTracker();
+  tracker.observe(payload(["rush"]), now - 15_000);
+  const penalty = { ...event("rush", 10, new Date(now - 180_000).toISOString()),
+    kind: "penalty", phase: "penalty" };
+  assert.equal(tracker.observe(payload(["rush"], [penalty]), now)?.kind, "penalty");
+  assert.equal(tracker.observe(payload(["rush"], [penalty]), now + 15_000), null);
+  assert.equal(tracker.observe(payload(["rush", "other", "latest", "newest"], [
+    { ...penalty, id: "other" },
+  ]), now + 30_000), null, "an old play's late classification is not a new live event");
+});

@@ -54,6 +54,24 @@ test("accepted penalty yardage reaches the drive illustration, but declined and 
   assert.equal(drive({ ...foul, end: spot(25) }).plays[0].penaltyMotion, null);
 });
 
+test("an appended post-play NFL penalty draws from the play endpoint, not its snap", () => {
+  const bundled = { id: "run", sequenceNumber: "2", type: { text: "Rush" }, statYardage: 1,
+    text: "Runner to VAN 7 for 1 yard. PENALTY on VAN, Unnecessary Roughness, 4 yards, enforced at VAN 7.",
+    start: { team: { id: "8" }, possessionText: "VAN 8", down: 1 },
+    end: { team: { id: "8" }, possessionText: "VAN 3", down: 1 },
+    penalty: { status: { slug: "accepted" }, type: { text: "Unnecessary Roughness" }, yards: 4 } };
+  const result = enrichGame(game, summary({ current: { id: "drive", team: { id: "8" }, plays: [bundled] } }));
+  const line = result.drives.at(-1).plays[0];
+  assert.deepEqual(line.penaltyMotion, { start: 93, end: 97, fromPlay: true });
+  assert.equal(line.trajectory.end, 93);
+  const chart = illustratedDrive({ ...result.drives.at(-1), direction: "right" });
+  assert.equal(chart.segment.end, 93);
+  assert.deepEqual(chart.penaltyPaths, [`M ${104 + 93 * 7.92} 220 L ${104 + 97 * 7.92} 220`]);
+  assert.equal(enrichGame(game, summary({ current: { id: "drive", team: { id: "8" }, plays: [
+    { ...bundled, text: bundled.text.replace("enforced", "declined"), penalty: { ...bundled.penalty, status: { slug: "declined" } } },
+  ] } })).drives.at(-1).plays[0].penaltyMotion, null);
+});
+
 test("home possession attacks left across the field", () => {
   for (const [label, expected] of [["VAN 25", 75], ["ARK 32", 32], ["VAN 50", 50]]) {
     const result = enrichGame(game, summary({ situation: { possession: "238", possessionText: label } }));

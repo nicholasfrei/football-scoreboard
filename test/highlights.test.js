@@ -5,21 +5,23 @@ import { createHighlightTracker, highlightDetail, highlightDuration, HIGHLIGHT_L
 
 test("every live takeover uses its configured duration", () => {
   const expected = {
-    touchdown: 150_000,
-    "field-goal": 150_000,
+    touchdown: 300_000,
+    "field-goal": 300_000,
+    "missed-field-goal": 60_000,
     safety: 150_000,
     "first-down": 15_000,
-    interception: 15_000,
-    fumble: 15_000,
-    "turnover-on-downs": 15_000,
+    interception: 60_000,
+    fumble: 60_000,
+    "turnover-on-downs": 60_000,
     sack: 15_000,
     "tackle-for-loss": 15_000,
     penalty: 15_000,
-    "blocked-punt": 15_000,
-    "blocked-field-goal": 15_000,
-    "extra-point": 6_000,
+    "blocked-punt": 60_000,
+    "blocked-field-goal": 60_000,
+    "extra-point": 15_000,
+    "extra-point-missed": 15_000,
     "two-point-conversion": 15_000,
-    punt: 10_000,
+    punt: 15_000,
   };
   assert.deepEqual(Object.keys(expected).sort(), Object.keys(HIGHLIGHT_LABELS).sort());
   for (const [kind, duration] of Object.entries(expected)) assert.equal(highlightDuration(kind), duration, kind);
@@ -63,6 +65,14 @@ function play(overrides = {}) {
 function classify(value, scoring = []) {
   return gameHighlights([value], scoring, ["8", "238"]);
 }
+
+test("missed field goals are highlighted with their configured minute duration", () => {
+  const event = classify(play({
+    type: { text: "Field Goal Missed" }, scoringPlay: false, text: "Field Goal Missed",
+  }))[0];
+  assert.equal(event.kind, "missed-field-goal");
+  assert.equal(highlightDuration(event.kind), 60_000);
+});
 
 test("touchdowns name the scoring team, including a pick-six", () => {
   assert.equal(classify(play())[0].teamId, "8");
@@ -160,11 +170,11 @@ test("explicit intentional grounding text overrides a sack without guessing yard
   assert.equal(classify({ ...grounding, text: "Quarterback sacked; possible intentional grounding" })[0].kind, "sack");
 });
 
-test("made field goals and extra points qualify but misses and nullified plays do not", () => {
+test("made field goals and extra points qualify; missed field goals alert, but other misses and nullified plays do not", () => {
   assert.equal(classify(play({ type: { text: "Field Goal Good" } }))[0].kind, "field-goal");
   assert.equal(classify(play({ type: { text: "Extra Point Good" } }))[0].kind, "extra-point");
+  assert.equal(classify(play({ type: { text: "Field Goal Missed" }, scoringPlay: false }))[0].kind, "missed-field-goal");
   for (const p of [
-    play({ type: { text: "Field Goal Missed" }, scoringPlay: false }),
     play({ type: { text: "Extra Point Missed" }, scoringPlay: false }),
     play({ type: { text: "Extra Point Blocked" }, scoringPlay: false }),
     play({ type: { text: "Two Point Pass" } }),
@@ -179,6 +189,20 @@ test("a confirmed touchdown survives a NO PLAY on its bundled conversion attempt
     scoringType: { name: "touchdown" } });
   assert.equal(classify(touchdown, [{ id: "p1", team: { id: "8" } }])[0]?.kind, "touchdown");
   assert.deepEqual(classify({ ...touchdown, text: "TOUCHDOWN nullified by penalty. NO PLAY" }, []), []);
+});
+
+test("a touchdown retains its own identity as ESPN appends a conversion and a flag", () => {
+  const touchdown = play({ scoringType: { name: "touchdown" }, text: "Rush for TOUCHDOWN." });
+  const scoring = [{ id: "p1", team: { id: "8" } }];
+  assert.deepEqual(classify(touchdown, scoring).map(({ kind, phase }) => [kind, phase]), [["touchdown", undefined]]);
+  const revised = { ...touchdown, text: "Rush for TOUCHDOWN. Kicker extra point is GOOD.",
+    penalty: { status: { slug: "accepted" }, type: { text: "Offside" }, yards: 5 } };
+  assert.deepEqual(classify(revised, scoring).map(({ id, kind, phase }) => [id, kind, phase]), [
+    ["p1", "touchdown", undefined], ["p1", "extra-point", "conversion"], ["p1", "penalty", "penalty"],
+  ]);
+  assert.equal(classify({ ...revised, text: "Rush for TOUCHDOWN. Kicker extra point is NO GOOD." }, scoring)[1].kind,
+    "extra-point-missed");
+  assert.equal(classify({ ...revised, text: "TOUCHDOWN nullified. PENALTY on offense." }, scoring)[0].kind, "penalty");
 });
 
 test("a separate defensive two-point conversion credits the scoring defense", () => {

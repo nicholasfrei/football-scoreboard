@@ -11,9 +11,11 @@ export const HIGHLIGHT_LABELS = {
   "tackle-for-loss": "TACKLE FOR LOSS",
   penalty: "PENALTY",
   "field-goal": "FIELD GOAL",
+  "missed-field-goal": "MISSED FIELD GOAL",
   safety: "SAFETY",
   "first-down": "FIRST DOWN",
   "extra-point": "EXTRA POINT",
+  "extra-point-missed": "EXTRA POINT MISSED",
   "two-point-conversion": "DEFENSIVE 2-POINT CONVERSION",
   punt: "PUNT",
   "blocked-punt": "BLOCKED PUNT",
@@ -21,8 +23,10 @@ export const HIGHLIGHT_LABELS = {
 };
 
 export function highlightDuration(kind) {
-  if (["touchdown", "field-goal", "safety"].includes(kind)) return 150_000;
-  return kind === "punt" ? 10_000 : kind === "extra-point" ? 6_000 : HIGHLIGHT_DURATION_MS;
+  if (["touchdown", "field-goal"].includes(kind)) return 300_000;
+  if (kind === "safety") return 150_000;
+  if (["interception", "fumble", "turnover-on-downs", "missed-field-goal", "blocked-punt", "blocked-field-goal"].includes(kind)) return 60_000;
+  return ["punt", "extra-point", "extra-point-missed"].includes(kind) ? 15_000 : HIGHLIGHT_DURATION_MS;
 }
 
 export function highlightDetail(event, game) {
@@ -85,19 +89,27 @@ export function createHighlightTracker() {
       sequence = Math.max(sequence ?? 0, Number.isFinite(game.latestPlaySequence) ? game.latestPlaySequence : 0);
       lastPollAt = now;
       const candidates = game.highlights.filter((event) => {
-        if (seen.has(event.id)) return false;
-        seen.add(event.id);
+        const identity = `${event.id}:${event.phase ?? "play"}`;
+        if (seen.has(identity)) return false;
+        seen.add(identity);
         const at = Date.parse(event.occurredAt);
         // Keep sequence compatibility only for older responses lacking ID order.
         const appended = playOrder !== null
-          ? orderedContinuation && !previousIds.has(event.id) && positions.get(event.id) > anchor
+          ? orderedContinuation && (event.phase && previousIds.has(event.id)
+            ? positions.get(event.id) >= playOrder.length - 3
+            : !previousIds.has(event.id) && positions.get(event.id) > anchor)
           : previousOrder === null && event.sequence > previousSequence;
         return !baseline && game.state === "live" && appended
           && Object.hasOwn(HIGHLIGHT_LABELS, event.kind)
-          && (!Number.isFinite(at) || (now - at <= MAX_EVENT_AGE_MS && at <= now + 30_000));
+          && (event.phase && previousIds.has(event.id) || !Number.isFinite(at)
+            || (now - at <= MAX_EVENT_AGE_MS && at <= now + 30_000));
       });
-      return candidates.sort((a, b) => playOrder !== null
-        ? positions.get(a.id) - positions.get(b.id) : a.sequence - b.sequence).at(-1) ?? null;
+      // Display one takeover per poll. A conversion present on the first
+      // snapshot is baseline for that play; only later amendments are new.
+      const newest = candidates.sort((a, b) => playOrder !== null
+        ? positions.get(a.id) - positions.get(b.id) : a.sequence - b.sequence);
+      const event = newest.findLast((item) => !item.phase) ?? newest.at(-1);
+      return event ?? null;
     },
   };
 }
