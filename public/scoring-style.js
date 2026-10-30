@@ -1,5 +1,5 @@
 // Keep this panel color in sync with .play-panel in styles.css.
-const PANEL_COLOR = "#0c120e";
+const PANEL_COLOR = "#1c2128";
 
 function luminance(color) {
   if (!/^#[0-9a-f]{6}$/i.test(color ?? "")) return null;

@@ -23,6 +23,17 @@ function summary({ arkHome = false, state = "in", situation, current, previous =
 }
 const game = { id: "401856726", name: "Arkansas at Vanderbilt", venue: "FirstBank Stadium" };
 
+test("only a reported end-of-second-quarter play anchors the halftime estimate", () => {
+  const frame = summary({ current: { id: "half", team: { id: "8" }, plays: [{
+    id: "end", sequenceNumber: "22000", period: { number: 2 }, clock: { displayValue: "0:00" },
+    type: { text: "End of Half" }, text: "END QUARTER 2", wallclock: "2026-10-30T01:45:53Z",
+  }] } });
+  frame.header.competitions[0].status = { period: 2, displayClock: "0:00", type: { state: "in", detail: "Halftime" } };
+  assert.equal(enrichGame({ ...game, league: "college-football", selectedTeam: { id: "8" } }, frame).halftimeStartedAt, "2026-10-30T01:45:53Z");
+  frame.drives.current.plays[0].text = "END QUARTER 1";
+  assert.equal(enrichGame({ ...game, league: "college-football", selectedTeam: { id: "8" } }, frame).halftimeStartedAt, null);
+});
+
 test("accepted penalty yardage reaches the drive illustration, but declined and bundled plays do not", () => {
   const spot = (label) => ({ team: { id: "8" }, possessionText: `ARK ${label}`, down: 1 });
   const foul = { id: "flag", sequenceNumber: "1", type: { text: "Penalty" },

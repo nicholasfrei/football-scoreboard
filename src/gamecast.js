@@ -211,6 +211,9 @@ export function enrichGame(game, summary) {
     .filter((play) => [home.id, away.id].includes(String(play.team?.id)))
     .map((play) => [String(play.id), String(play.team.id)]));
   const latestPlay = plays.at(-1);
+  const endOfHalf = updated.state === "live" && updated.period === 2
+    ? plays.findLast((play) => play.period?.number === 2 && /End of Half|End Period/i.test(play.type?.text ?? "")
+      && /(?:end (?:of )?(?:quarter )?2|end of (?:the )?(?:2nd|second) quarter|end of half)/i.test(play.text ?? "")) : null;
   const currentDrive = summary.drives?.current;
   const currentIds = new Set((currentDrive?.plays ?? []).map((play) => String(play.id)));
   const currentPlays = plays.filter((play) => currentIds.has(String(play.id)));
@@ -323,6 +326,7 @@ export function enrichGame(game, summary) {
 
   return {
     ...updated,
+    halftimeStartedAt: endOfHalf?.wallclock ?? null,
     broadcasts: updated.broadcasts.length ? updated.broadcasts : game.broadcasts ?? [],
     matchupPredictor: matchupPredictor(summary.predictor, updated),
     fieldContext: {

@@ -14,6 +14,16 @@ function game(overrides = {}) {
 }
 const payload = (spotlight, extra = {}) => ({ spotlight, ...extra });
 
+test("halftime clears the last first-half ball and possession", () => {
+  const tracker = createBallPositionTracker();
+  tracker.observe(payload(game()));
+  const half = tracker.observe(payload(game({ period: 2, status: "Halftime", ball: null })));
+  assert.equal(half.ball, null);
+  assert.equal(half.possessionTeamId, null);
+  const resumed = tracker.observe(payload(game({ period: 3, status: "3rd Quarter", ball: null })));
+  assert.equal(resumed.ball, null);
+});
+
 test("missing possession ID follows field direction, never the opposite team's end zone", () => {
   for (const homeAway of ["home", "away"]) {
     const homeId = homeAway === "home" ? "1" : "2";

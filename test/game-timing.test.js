@@ -1,11 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { kickoffCountdown, needsRapidRefresh, nextRefreshDelay, createRefreshLoop } from "../public/game-timing.js";
+import { kickoffCountdown, halftimeCountdown, needsRapidRefresh, nextRefreshDelay, createRefreshLoop } from "../public/game-timing.js";
 import { createScoreboardCache } from "../src/scoreboard-cache.js";
 
 const kickoff = Date.parse("2026-10-31T23:45:00Z");
 const game = { state: "scheduled", kickoffAt: new Date(kickoff).toISOString() };
 const payload = (spotlight = game, nextGame = null) => ({ spotlight, nextGame });
+
+test("halftime estimates from ESPN's end-of-half play, per league, and stops at zero", () => {
+  const start = Date.parse("2026-10-30T01:45:53Z");
+  for (const [league, minutes] of [["nfl", 13], ["college-football", 20]]) {
+    const half = { state: "live", status: "Halftime", period: 2, league, halftimeStartedAt: new Date(start).toISOString() };
+    assert.equal(halftimeCountdown(half, start), `${minutes}:00`);
+    assert.equal(halftimeCountdown(half, start + 17_000), `${String(minutes - 1).padStart(2, "0")}:43`);
+    assert.equal(halftimeCountdown(half, start + minutes * 60_000), "00:00");
+    assert.equal(halftimeCountdown(half, start + (minutes + 5) * 60_000), "00:00");
+    for (const change of [{ status: "End of 1st Quarter" }, { period: 3 }, { state: "final" },
+      { halftimeStartedAt: null }, { halftimeStartedAt: "invalid" }]) {
+      assert.equal(halftimeCountdown({ ...half, ...change }, start + 1000), null);
+    }
+    assert.equal(halftimeCountdown(half, start - 60_001), null);
+  }
+});
 
 test("countdown starts at exactly 24 hours, ticks in HH:MM:SS, and clamps at zero", () => {
   for (const [remaining, expected] of [

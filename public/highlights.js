@@ -23,7 +23,7 @@ export const HIGHLIGHT_LABELS = {
 };
 
 export function highlightDuration(kind) {
-  if (["touchdown", "field-goal"].includes(kind)) return 300_000;
+  if (["touchdown", "field-goal"].includes(kind)) return 180_000;
   if (kind === "safety") return 150_000;
   if (["interception", "fumble", "turnover-on-downs", "missed-field-goal", "blocked-punt", "blocked-field-goal"].includes(kind)) return 60_000;
   return ["punt", "extra-point", "extra-point-missed"].includes(kind) ? 15_000 : HIGHLIGHT_DURATION_MS;
@@ -35,7 +35,7 @@ export function highlightDetail(event, game) {
   if (event.kind === "blocked-field-goal" && event.player) return `BLOCKED BY ${event.player}`;
   if (event.kind === "sack" && event.player) return `SACK BY ${event.player}`;
   if (event.kind === "tackle-for-loss" && event.player) return `STOPPED BY ${event.player}`;
-  if (event.kind === "touchdown") {
+  if (["touchdown", "field-goal"].includes(event.kind)) {
     const { selectedTeam, opponent } = game;
     return `${selectedTeam.abbreviation} ${selectedTeam.score ?? "—"}-${opponent.score ?? "—"} ${opponent.abbreviation}`;
   }

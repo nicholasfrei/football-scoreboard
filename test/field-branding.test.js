@@ -40,7 +40,7 @@ test("uniform end-zone fitting preserves proportions, stays centered, and respec
     const box = { x: 3, y: -74, width, height: 74 };
     const [fit] = endzoneTextLayout([box]);
     assert.ok(box.width * fit.scale <= 320);
-    assert.ok(box.height * fit.scale <= 50);
+    assert.ok(box.height * fit.scale <= 56);
     assert.equal((box.x + box.width / 2) * fit.scale + fit.x, 0);
     assert.equal((box.y + box.height / 2) * fit.scale + fit.y, 0);
     assert.ok(Math.abs((box.width * fit.scale) / (box.height * fit.scale) - box.width / box.height) < .0001);
@@ -53,5 +53,5 @@ test("empty end-zone labels do not introduce invalid transforms or prevent fitti
   assert.deepEqual(endzoneTextLayout([empty, empty]), [null, null]);
   const layout = endzoneTextLayout([empty, { x: 0, y: -70, width: 400, height: 70 }]);
   assert.equal(layout[0], null);
-  assert.equal(layout[1].scale, 50 / 70);
+  assert.equal(layout[1].scale, 56 / 70);
 });

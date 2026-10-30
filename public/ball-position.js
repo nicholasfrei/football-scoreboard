@@ -27,7 +27,8 @@ export function createBallPositionTracker() {
     reset() { previous = null; },
     observe(payload) {
       const game = payload?.spotlight;
-      if (!game || game.state !== "live" || payload.stale || payload.gamecastUnavailable) {
+      if (!game || game.state !== "live" || payload.stale || payload.gamecastUnavailable
+          || (game.period === 2 && /halftime/i.test(game.status ?? ""))) {
         previous = null;
         return game ? { ...game, ball: null, possessionTeamId: null } : null;
       }

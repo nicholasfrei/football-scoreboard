@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { runInNewContext } from "node:vm";
 import { teamRecordLabel } from "../public/team-record.js";
+import { halftimeCountdown } from "../public/game-timing.js";
 
 const source = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
 
@@ -31,7 +32,7 @@ function gameView() {
   const updateGame = runInNewContext(`${updateGameSource}; updateGame`, {
     document, elements, updateCountdown: noop, updatePossession: noop, renderNextDetails: noop,
     renderLeaders: noop, renderTeam: noop, updateField: noop, renderDrives: noop, setStatus: noop,
-    kickoffText: () => "MON, OCT 26 · 7:15 PM CDT", formatDate: () => "MON, OCT 26",
+    kickoffText: () => "MON, OCT 26 · 7:15 PM CDT", formatDate: () => "MON, OCT 26", halftimeCountdown,
   });
   return { updateGame, elements, querySelector };
 }
@@ -63,6 +64,14 @@ test("broadcast clock keeps regulation, halftime, and overtime readable without 
     assert.equal(elements.gameClock.hidden, true);
     assert.equal(elements.gameClock.textContent, "");
   }
+});
+
+test("a reported halftime marker shows an estimated break timer below the score", () => {
+  const { updateGame, elements } = gameView();
+  updateGame({ ...game, period: 2, clock: "0:00", status: "Halftime",
+    halftimeStartedAt: new Date(Date.now() - 17_000).toISOString() });
+  assert.match(elements.gameClock.children[1].textContent, /^12:4[23]$/);
+  assert.equal(elements.gameClock.children[2].textContent, "EST. TO 2ND HALF");
 });
 
 test("neutral-site team labels identify designated sides rather than claiming a home stadium", () => {

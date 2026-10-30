@@ -3,7 +3,7 @@ export function possessionBranding(game) {
     ? [game.selectedTeam, game.opponent].find((team) => team?.id === game.possessionTeamId)
     : null;
   const color = team?.color;
-  if (!/^#[0-9a-f]{6}$/i.test(color ?? "")) return { color: "#202b23", ink: "#e4e9df" };
+  if (!/^#[0-9a-f]{6}$/i.test(color ?? "")) return { color: "#373e47", ink: "#cdd9e5" };
 
   const channels = color.slice(1).match(/../g).map((channel) => {
     const value = parseInt(channel, 16) / 255;

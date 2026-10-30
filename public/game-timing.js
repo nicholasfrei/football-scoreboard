@@ -17,6 +17,17 @@ export function kickoffCountdown(game, now = Date.now()) {
     .map((part) => String(part).padStart(2, "0")).join(":");
 }
 
+/** ESPN supplies the end-of-half play timestamp, not a break clock. */
+export function halftimeCountdown(game, now = Date.now()) {
+  if (game?.state !== "live" || game.period !== 2 || !/halftime|end (?:of )?(?:quarter )?2|end of (?:the )?(?:2nd|second) quarter|end of half/i.test(game.status ?? "")) return null;
+  const duration = game.league === "nfl" ? 13 : game.league === "college-football" ? 20 : null;
+  if (duration === null || !game.halftimeStartedAt) return null;
+  const start = Date.parse(game.halftimeStartedAt);
+  if (!Number.isFinite(start) || start > Number(now) + 60_000) return null;
+  const seconds = Math.max(0, Math.ceil((start + duration * 60_000 - Number(now)) / 1000));
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 export function needsRapidRefresh(payload, now = Date.now()) {
   return [payload?.spotlight, payload?.nextGame].some((game) => game && (
     game.state === "live"

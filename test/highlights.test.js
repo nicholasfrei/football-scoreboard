@@ -5,8 +5,8 @@ import { createHighlightTracker, highlightDetail, highlightDuration, HIGHLIGHT_L
 
 test("every live takeover uses its configured duration", () => {
   const expected = {
-    touchdown: 300_000,
-    "field-goal": 300_000,
+    touchdown: 180_000,
+    "field-goal": 180_000,
     "missed-field-goal": 60_000,
     safety: 150_000,
     "first-down": 15_000,
@@ -34,6 +34,7 @@ test("touchdown details show the current score with the selected team first, nev
   for (const teamId of ["6", "21", null]) {
     assert.equal(highlightDetail({ kind: "touchdown", teamId, detail: "+6 POINTS" }, game), "DAL 20-17 PHI");
   }
+  assert.equal(highlightDetail({ kind: "field-goal", teamId: "6" }, game), "DAL 20-17 PHI");
   assert.equal(highlightDetail({ kind: "touchdown" }, { ...game, homeAway: "away" }), "DAL 20-17 PHI");
   game.selectedTeam.score = 0;
   game.opponent.score = null;

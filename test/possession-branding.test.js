@@ -21,7 +21,7 @@ test("light primary colors get contrasting dark text", () => {
 });
 
 test("unknown possession, inactive games, and unavailable colors reset to neutral", () => {
-  const neutral = { color: "#202b23", ink: "#e4e9df" };
+  const neutral = { color: "#373e47", ink: "#cdd9e5" };
   for (const value of [null, { ...game, state: "final" }, { ...game, state: "scheduled" },
     { ...game, possessionTeamId: null }, { ...game, possessionTeamId: "unknown" },
     { ...game, opponent: { id: "phi" } }]) {

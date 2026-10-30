@@ -130,7 +130,7 @@ test("football and blue line wait together without blinking; the yellow line and
   const source = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
   const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
   const css = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
-  assert.match(html, /<g id="ball-marker"[^>]*>\s*<line[^>]+\/>\s*<\/g>\s*<g id="football-marker"/);
+  assert.match(html, /<g id="ball-marker"[^>]*>\s*<line[^>]+\/>[\s\S]*?<\/g>\s*<g id="football-marker"/);
   assert.match(source, /createBallPlacement\(\{ render: updateFootballMarker \}\)/);
   assert.match(css, /#first-down-marker \{ transition: transform \.8s ease; \}/);
   assert.match(css, /#ball-marker, #football-marker \{ transition: none; \}/);
@@ -142,9 +142,10 @@ test("football and blue line wait together without blinking; the yellow line and
       writes, attributes: {}, classList: { toggle() {} },
       getAttribute(name) { return this.attributes[name]; },
       setAttribute(name, value) { writes.push([name, value]); this.attributes[name] = value; },
-      replaceChildren(...children) { this.children = children; } };
+      replaceChildren(...children) { this.children = children; }, removeAttribute(name) { delete this.attributes[name]; } };
   }
-  const elements = Object.fromEntries(["#ball-marker", "#football-marker", "#first-down-marker", "#redzone-tint", "#ball-detail"]
+  const elements = Object.fromEntries(["#ball-marker", "#football-marker", "#first-down-marker", "#redzone-tint", "#ball-detail",
+    "#possession-pin", "#possession-pin-logo", "#possession-pin-fallback", "#football-direction"]
     .map((selector) => [selector, node()]));
   const document = { querySelector: (selector) => {
     assert.ok(elements[selector], `unexpected selector: ${selector}`);
@@ -156,7 +157,7 @@ test("football and blue line wait together without blinking; the yellow line and
     ball: { percent: 82, direction: "right", firstDownPercent: 90, downDistance: "2nd & 8 at HME 18", possession: "AWY", label: "HME 18" } };
   lines(confirmed);
   const fieldState = () => JSON.stringify(Object.fromEntries(Object.entries(elements)
-    .filter(([key]) => !["#football-marker", "#ball-marker"].includes(key))));
+    .filter(([key]) => !["#football-marker", "#ball-marker", "#football-direction"].includes(key))));
   const originalFieldState = fieldState();
   const motion = animation();
   const placement = createBallPlacement({ render: football, schedule: () => 1, cancel() {} });

@@ -175,5 +175,6 @@ test("favorites stay horizontally scrollable with touch targets and native swipe
   assert.match(css, /\.team-picker\s*\{[^}]*min-width: 0;[^}]*overflow-x: auto;[^}]*touch-action: pan-x;/);
   assert.match(css, /\.favorite-team\s*\{[^}]*flex: none;[^}]*min-height: 44px;/);
   assert.match(css, /\.favorite-team\[aria-current="page"\]/);
+  assert.match(css, /\.favorite-team\[aria-current="page"\]\s*\{[^}]*border-color: var\(--team-color\);/);
   assert.match(css, /\.favorite-team:first-child\s*\{\s*margin-inline-start: auto;/);
 });

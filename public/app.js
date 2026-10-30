@@ -2,7 +2,7 @@ import { createHighlightTracker, highlightDetail, highlightDuration, HIGHLIGHT_L
 import { endzoneTextLayout, fieldBranding } from "./field-branding.js";
 import { possessionBranding } from "./possession-branding.js";
 import { teamRecordLabel } from "./team-record.js";
-import { kickoffCountdown, createRefreshLoop } from "./game-timing.js";
+import { kickoffCountdown, halftimeCountdown, createRefreshLoop } from "./game-timing.js";
 import { ballPositionFallback, createBallPositionTracker } from "./ball-position.js";
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT, displayScale } from "./display-size.js";
 import { leaderCardTeams, showGameLeaders } from "./leader-layout.js";
@@ -50,8 +50,14 @@ function svgElement(tag, attributes = {}) {
   return element;
 }
 
+function overlapsCurrentBall(game, drive, x, y) {
+  return game.ball && drive.id === game.drives?.at(-1)?.id && y === 220
+    && Math.abs(x - (104 + game.ball.percent * 7.92)) < 0.5;
+}
+
 function renderFieldDrive(game, drive) {
   const layer = document.querySelector("#drive-illustration");
+  const yacOverlay = document.querySelector("#drive-yac-overlay");
   const key = drive ? `${game.league}:${game.id}:${drive.id}:${JSON.stringify([
     drive.result, drive.description, game.state, game.currentDriveId,
     drive.plays.map((play) => [play.id, play.trajectory, play.snapPercent, play.penaltyMotion, play.type]),
@@ -68,6 +74,7 @@ function renderFieldDrive(game, drive) {
   renderedIllustratedPlayId = null;
   renderedPenaltyMotionKey = null;
   layer.replaceChildren();
+  yacOverlay.replaceChildren();
   if (!drive) return;
   const home = game.homeAway === "home" ? game.selectedTeam : game.opponent;
   const track = illustratedDrive({ ...drive, direction: drive.teamId === home.id ? "left" : "right" });
@@ -87,9 +94,6 @@ function renderFieldDrive(game, drive) {
     renderedRouteAnimation = { element, durationMs, start, playId: finalSnap.id };
   };
   renderedIllustratedPlayId = current?.id ?? null;
-  const color = [game.selectedTeam, game.opponent].find((team) => team.id === drive.teamId)?.color ?? "#d6b46a";
-  layer.style.setProperty("--drive-color", color);
-  const driveStart = track.start ?? finalSnap?.snapPercent;
   if (track.progressPath) layer.append(svgElement("path", { d: track.progressPath, class: "drive-progress", fill: "none" }));
   for (const d of track.penaltyPaths) {
     const path = svgElement("path", { d, class: "drive-penalty", fill: "none" });
@@ -127,12 +131,14 @@ function renderFieldDrive(game, drive) {
         yac.classList.add("is-revealing");
         rememberAnimation(yac, RETURN_DELAY_MS + RETURN_DURATION_MS);
       }
-      group.append(yac);
-      group.append(svgElement("circle", { cx: current.to, cy: current.y, r: 6, class: "drive-catch" }));
+      yacOverlay.append(yac);
+      if (!overlapsCurrentBall(game, drive, current.to, current.y)) {
+        yacOverlay.append(svgElement("circle", { cx: current.to, cy: current.y, r: 6, class: "drive-catch" }));
+      }
       const label = svgElement("text", { x: (current.to + current.finish) / 2,
         y: current.y + 38, class: "drive-yac-label", "text-anchor": "middle" });
       label.textContent = current.kind === "punt" ? `${current.returnYards} YD RETURN` : `${current.yac} YAC`;
-      group.append(label);
+      yacOverlay.append(label);
     }
     if (current.kind === "interception" || current.kind === "fumble-return") {
       if (current.returnPath) {
@@ -150,21 +156,27 @@ function renderFieldDrive(game, drive) {
           group.append(label);
         }
       }
-      if (current.kind === "interception") group.append(svgElement("circle", { cx: current.to, cy: current.y, r: 7, class: "drive-pick" }));
+      if (current.kind === "interception" && !overlapsCurrentBall(game, drive, current.to, current.y)) {
+        group.append(svgElement("circle", { cx: current.to, cy: current.y, r: 7, class: "drive-pick" }));
+      }
     }
-    if (current.kind === "incomplete") {
+    if (current.kind === "incomplete" || current.kind === "field-goal" && current.landingLabel === "MISSED") {
       const cross = svgElement("g", { class: "drive-miss" });
       const y = current.y;
       cross.append(svgElement("path", { d: `M ${current.to - 10} ${y - 10} L ${current.to + 10} ${y + 10} M ${current.to + 10} ${y - 10} L ${current.to - 10} ${y + 10}` }));
       group.append(cross);
-    } else if (current.kind !== "interception" || current.returnPath) group.append(svgElement("circle", {
-      cx: current.finish, cy: current.y, r: 8,
-      class: current.kind === "interception" || current.kind === "fumble-return" ? "drive-end is-interception" : "drive-end",
-    }));
+    } else if (current.kind !== "interception" || current.returnPath) {
+      const end = svgElement("circle", {
+        cx: current.finish, cy: current.y, r: 8,
+        class: "drive-end",
+      });
+      // Keep the YAC endpoint above the field markers with the YAC leg.
+      if (!overlapsCurrentBall(game, drive, current.finish, current.y)) {
+        (current.yacPath ? yacOverlay : group).append(end);
+      }
+    }
     layer.append(group);
   }
-  layer.prepend(svgElement("circle", { cx: 104 + driveStart * 7.92, cy: 220,
-    r: 8, class: "drive-start" }));
   if (track.finalMarker) {
     layer.append(svgElement("circle", { cx: track.finalMarker.x, cy: track.finalMarker.y,
       r: 11, class: "drive-final", "aria-label": `Final offensive snap: ${finalSnap.type ?? "play"}` }));
@@ -226,7 +238,7 @@ function updateHighlights(payload) {
     const moved = activeHighlight.kind === "touchdown" && game.ball && (
       game.ball.percent !== activeHighlight.ballPercent || game.possessionTeamId !== activeHighlight.possessionTeamId);
     if (!stillValid || moved) hideHighlight();
-    else if (activeHighlight.kind === "touchdown") {
+    else if (["touchdown", "field-goal"].includes(activeHighlight.kind)) {
       document.querySelector("#highlight-detail").textContent = highlightDetail(activeHighlight, game);
     }
   }
@@ -374,6 +386,21 @@ function updateBallMarkers(game) {
   const isFourthDown = /^4th\b/i.test(game.ball?.downDistance ?? "");
   lineToGain.classList.toggle("is-fourth-down", isFourthDown);
   if (hasLineToGain) lineToGain.style.transform = `translateX(${104 + game.ball.firstDownPercent * 7.92}px)`;
+  const pin = document.querySelector("#possession-pin");
+  const team = game.state === "live" && game.ball
+    ? [home, away].find((candidate) => candidate.id === game.possessionTeamId) : null;
+  pin.setAttribute("visibility", team ? "visible" : "hidden");
+  const pinLogo = document.querySelector("#possession-pin-logo");
+  const pinFallback = document.querySelector("#possession-pin-fallback");
+  const logos = [...new Set([team?.logo, ...(team?.logos ?? [])].filter(Boolean))];
+  let pinLogoIndex = 0;
+  pinFallback.textContent = logos.length ? "" : team?.abbreviation ?? "";
+  pinLogo.onerror = () => {
+    if (++pinLogoIndex < logos.length) pinLogo.setAttribute("href", logos[pinLogoIndex]);
+    else { pinFallback.textContent = team?.abbreviation ?? ""; pinLogo.removeAttribute("href"); }
+  };
+  if (logos.length) pinLogo.setAttribute("href", logos[0]);
+  else pinLogo.removeAttribute("href");
   if (game.ball) {
     const possession = document.createElement("span");
     possession.className = "possession-team";
@@ -387,13 +414,15 @@ function updateBallMarkers(game) {
     const pause = game.ballHeld && /timeout/i.test(game.fieldContext?.lastPlayType ?? "") ? "TIMEOUT · " : "";
     document.querySelector("#ball-detail").replaceChildren(pause, possession, " · ", down, ` · ${position}`);
   } else {
-    document.querySelector("#ball-detail").textContent = ballPositionFallback(game);
+    document.querySelector("#ball-detail").textContent = game.state === "live" && game.period === 2 && /halftime/i.test(game.status)
+      ? "Halftime · awaiting second-half kickoff" : ballPositionFallback(game);
   }
 
 }
 
 function updateFootballMarker(game, { hidden = false } = {}) {
   const visibility = !hidden && game.ball ? "visible" : "hidden";
+  document.querySelector("#football-direction").setAttribute("transform", game.ball?.direction === "left" ? "scale(-1 1)" : "scale(1 1)");
   for (const selector of ["#football-marker", "#ball-marker"]) {
     const marker = document.querySelector(selector);
     // No hide/show cycle or transform reset when an incompletion keeps the spot.
@@ -418,7 +447,7 @@ function renderDrives(game) {
   }
   const animation = renderFieldDrive(game, selected);
   const playId = game.fieldContext?.lastPlayId ?? game.latestPlayOrder?.at(-1);
-  const startGame = { ...game, ball: animation ? { percent: animation.start } : null };
+  const startGame = { ...game, ball: animation ? { ...game.ball, percent: animation.start } : null };
   ballPlacement.update({
     key: `${game.league}:${game.id}:${game.homeAway}:${selected?.id}:${playId}`,
     game, startGame,
@@ -650,6 +679,7 @@ function updateGame(game, nextGame, demo = false) {
   lastGameState = game?.state ?? null;
   elements.gameClock.hidden = true;
   elements.gameClock.textContent = "";
+  elements.gameClock.ariaLabel = "Quarter and game clock";
   updatePossession(game);
   renderNextDetails(nextGame);
   renderLeaders(game, demo);
@@ -690,11 +720,19 @@ function updateGame(game, nextGame, demo = false) {
     period.className = "clock-period";
     period.textContent = quarter;
     elements.gameClock.replaceChildren(period);
-    if (quarter !== "HALFTIME" && game.clock) {
+    const breakTime = quarter === "HALFTIME" ? halftimeCountdown(game) : null;
+    if (quarter === "HALFTIME") elements.gameClock.ariaLabel = breakTime === null ? "Halftime" : "Estimated time until second half";
+    if (breakTime !== null || (quarter !== "HALFTIME" && game.clock)) {
       const clock = document.createElement("strong");
       clock.className = "clock-time";
-      clock.textContent = game.clock;
+      clock.textContent = breakTime ?? game.clock;
       elements.gameClock.append(clock);
+    }
+    if (breakTime !== null) {
+      const estimate = document.createElement("span");
+      estimate.className = "clock-estimate";
+      estimate.textContent = "EST. TO 2ND HALF";
+      elements.gameClock.append(estimate);
     }
     elements.gameClock.hidden = false;
     elements.gameDetail.textContent = "";
@@ -726,6 +764,11 @@ function updateCountdown() {
   document.querySelector(".score-readout").hidden = countdown !== null;
   // The surrounding score panel is a live region; do not announce every second.
   if (countdown !== null) document.querySelector("#kickoff-countdown-value").textContent = countdown;
+  if (displayedGame?.state === "live" && elements.gameClock.textContent.includes("HALFTIME")) {
+    const remaining = halftimeCountdown(displayedGame);
+    const clock = elements.gameClock.querySelector(".clock-time");
+    if (clock && remaining !== null && !elements.gameClock.hidden) clock.textContent = remaining;
+  }
 }
 
 function setFeedState(state, refreshedAt) {
@@ -936,11 +979,47 @@ async function startCountdownDemo() {
   }
 }
 
+async function startHalftimeDemo() {
+  const banner = document.querySelector("#countdown-demo");
+  banner.hidden = false;
+  banner.querySelector("strong").textContent = "SAMPLE GAME · HALFTIME PREVIEW";
+  banner.querySelector("span").textContent = "Halftime is simulated; this is not a live game.";
+  elements.refreshButton.hidden = true;
+  try {
+    const league = new URLSearchParams(location.search).get("league") === "college" ? "college" : "nfl";
+    const response = await fetch(`/api/demo?game=${league}`);
+    if (!response.ok) throw new Error("Sample game unavailable");
+    const frames = await response.json();
+    const frame = frames.find((item) => item.spotlight.period === 2 && /end (?:of )?(?:quarter )?2|end of half/i.test(item.caption))
+      ?? frames.findLast((item) => item.spotlight.period === 2);
+    if (!frame) throw new Error("Halftime sample unavailable");
+    const game = { ...frame.spotlight, state: "live", status: "Halftime", period: 2, clock: "0:00",
+      halftimeStartedAt: new Date(Date.now() - 2 * 60_000 - 17_000).toISOString(),
+      ball: null, possessionTeamId: null, fieldContext: null, drives: [], highlights: [] };
+    updateBrand(frame);
+    document.title = `Halftime Preview · ${frame.team.name} Football Scoreboard`;
+    document.querySelector("#season-year").textContent = frame.season;
+    updateGame(game, null);
+    elements.gameStatusText.textContent = "PREVIEW";
+    elements.gameStatus.classList.remove("is-live");
+    elements.feedLabel.textContent = "SIMULATED HALFTIME · NOT LIVE";
+    window.setInterval(updateCountdown, 1000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) updateCountdown(); });
+  } catch {
+    elements.feedLabel.textContent = "SAMPLE GAME UNAVAILABLE";
+    banner.querySelector("span").textContent = "Could not load the bundled sample game. Try reloading.";
+  } finally {
+    elements.panel.setAttribute("aria-busy", "false");
+  }
+}
+
 const demo = new URLSearchParams(location.search).get("demo");
 if (demo === "drive") {
   startDriveDemo();
 } else if (demo === "countdown") {
   startCountdownDemo();
+} else if (demo === "halftime") {
+  startHalftimeDemo();
 } else {
   activeTeamKey = await startTeamPicker();
   const polling = createRefreshLoop({ refresh: refreshScoreboard, getPayload: () => lastPayload });

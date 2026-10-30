@@ -157,8 +157,12 @@ or a confirmed change of possession on fourth down.
 
 During live games and the drive demo, the game clock is centered **between the
 scores**, with the quarter beneath it. Kickoff date/time, venue and the boxed
-broadcast listing share a single row at the top left. Halftime replaces the
-quarter and clock. Overtime uses `OT1`, `OT2`, and so on. The central clock is hidden for scheduled/final games
+broadcast listing share a single row at the top left. Halftime shows an estimated
+countdown from ESPN's timestamped end-of-half play (13 minutes for NFL, 20 for
+college), ticking locally every second. It is labeled as an estimate, stops at
+zero until ESPN confirms the third quarter, and shows only HALFTIME if that play
+has no valid timestamp. Preview it without a live game at `/?demo=halftime` or
+`/?demo=halftime&league=college`. Overtime uses `OT1`, `OT2`, and so on. The central clock is hidden for scheduled/final games
 and when the feed is stale or offline.
 
 See [branding sources](branding.md) for artwork, verified college overrides,
