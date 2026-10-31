@@ -36,6 +36,12 @@ test("server serves every startup module so the dashboard can leave its loading 
     }
   }
   await checkModule("/app.js");
+  await checkModule("/games.js");
+  const gamesPage = await fetch(`http://127.0.0.1:${port}/games`);
+  assert.equal(gamesPage.status, 200);
+  assert.match(await gamesPage.text(), /Back to favorites/);
+  assert.equal((await fetch(`http://127.0.0.1:${port}/api/games?league=nba`)).status, 400);
+  assert.equal((await fetch(`http://127.0.0.1:${port}/api/game?league=nfl&id=invalid`)).status, 400);
   const catalogResponse = await fetch(`http://127.0.0.1:${port}/api/teams`);
   assert.equal(catalogResponse.status, 200);
   const catalog = await catalogResponse.json();

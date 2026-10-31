@@ -161,6 +161,8 @@ for (const fixture of fixtures) {
         assert.equal(game.opponent.score, teamId === entry.homeTeamId ? source.awayScore : source.homeScore);
         assert.deepEqual(game.plays, plays.slice(Math.max(0, index - 4), index + 1).reverse().map((play) => ({
           id: String(play.id), text: play.text, period: play.period.number, clock: play.clock.displayValue, scoring: Boolean(play.scoringPlay),
+          scoringTeamId: play.scoringPlay
+            ? frame.scoringPlays.find((item) => String(item.id) === String(play.id))?.team?.id ?? null : null,
         })));
         assert.equal(game.currentDriveId, String(frame.drives.current.id));
         assert.deepEqual(game.drives.find((drive) => drive.id === game.currentDriveId).plays.map((item) => item.id),

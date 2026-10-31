@@ -9,9 +9,21 @@ const game = {
   opponent: { id: "phi", color: "#004C54", alternateColor: "#FFFFFF" },
 };
 
-test("possession badge follows either team's primary color, not its alternate", () => {
+test("possession badge follows the same matchup color as either team's end zone", () => {
   assert.deepEqual(possessionBranding(game), { color: "#004C54", ink: "#FFFFFF" });
   assert.deepEqual(possessionBranding({ ...game, possessionTeamId: "dal" }), { color: "#002244", ink: "#FFFFFF" });
+});
+
+test("away possession uses the contrasting alternate when its primary matches the home end zone", () => {
+  const matchup = { ...game, homeAway: "home", selectedTeam: { id: "dal", color: "#00205B" },
+    opponent: { id: "phi", color: "#0C2340", alternateColor: "#C99700" } };
+  assert.deepEqual(possessionBranding(matchup), { color: "#C99700", ink: "#000000" });
+  assert.deepEqual(possessionBranding({ ...matchup, possessionTeamId: "dal" }), {
+    color: "#00205B", ink: "#FFFFFF",
+  });
+  assert.deepEqual(possessionBranding({ ...matchup, homeAway: "away", possessionTeamId: "dal" }), {
+    color: "#00205B", ink: "#FFFFFF",
+  });
 });
 
 test("light primary colors get contrasting dark text", () => {

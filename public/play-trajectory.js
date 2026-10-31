@@ -141,13 +141,29 @@ export function playTrajectory(play, offenseId, home, away) {
         || play.isTurnover || play.isPenalty || play.penalty
         || /\b(?:penalty|no\s*play|nullified|overturned|reversed|blocked|muff|fumble|recovered by)\b/i.test(text)) return null;
     const touchback = /\btouchback\b/i.test(text);
-    const landing = !touchback && textSpot(text,
-      /\b(?:kickoff|kicks)\b.*?\bto\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i, home, away);
+    const fairCatch = /\bfair catch\b/i.test(text);
+    const landingMatch = !touchback && /\b(?:kickoff|kicks)\b.*?\bto\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i.exec(text);
+    const landing = landingMatch && textSpot(landingMatch[0],
+      /\bto\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i, home, away);
     if (!touchback && !landing) return null;
     const target = touchback ? receiver.id === home.id ? 100 : 0 : landing.percent;
     if (Math.abs(target - start) < 1 || (target - start) * (kicker.id === away.id ? 1 : -1) <= 0) return null;
+    const afterLanding = landingMatch ? text.slice(landingMatch.index + landingMatch[0].length)
+      .split(/\bInjury Update:/i)[0] : "";
+    const collegeReturn = /\breturn(?:ed|s)?\s+(-?\d{1,3})\s+yards?\s+to\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i.exec(afterLanding);
+    const nflReturn = !collegeReturn && /\b(?:to|pushed ob at)\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\s+for\s+(-?\d{1,3})\s+yards?\b/i.exec(afterLanding);
+    const returnSpot = collegeReturn ? textSpot(`to ${collegeReturn[2]}${collegeReturn[3]}`,
+      /\bto\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i, home, away)
+      : nflReturn && textSpot(`to ${nflReturn[1]}${nflReturn[2]}`,
+        /\bto\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i, home, away);
+    const reportedReturn = Number(collegeReturn?.[1] ?? nflReturn?.[3]);
+    const returnYards = !touchback && !fairCatch && returnSpot?.percent === end
+      && reportedReturn === play.statYardage
+      && (end - target) * (receiver.id === away.id ? 1 : -1) === reportedReturn
+      && reportedReturn !== 0 ? reportedReturn : null;
     return { kind: "kickoff", start, end, landingPercent: target,
       landingLabel: touchback ? "TOUCHBACK" : landing.label,
+      returnYards, ...(returnYards !== null ? { returnLabel: play.end.possessionText } : {}),
       yards: null, yac: null, label: "KICKOFF" };
   }
   if (startId !== offenseId || ![1, 2, 3, 4].includes(play.start?.down)) return null;

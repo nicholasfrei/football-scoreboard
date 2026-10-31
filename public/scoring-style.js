@@ -1,3 +1,15 @@
+import { fieldBranding } from "./field-branding.js";
+
+export function scoringPlayColor(game, play) {
+  if (!play.scoring || play.scoringTeamId == null) return null;
+  const home = game.homeAway === "home" ? game.selectedTeam : game.opponent;
+  const away = game.homeAway === "home" ? game.opponent : game.selectedTeam;
+  const teamId = String(play.scoringTeamId);
+  if (teamId === String(home.id)) return fieldBranding(home).color;
+  if (teamId === String(away.id)) return fieldBranding(away, home).color;
+  return null;
+}
+
 // Keep this panel color in sync with .play-panel in styles.css.
 const PANEL_COLOR = "#1c2128";
 

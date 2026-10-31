@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#22272e" />
+    <title>All scores · Football Scoreboard</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/games.js" type="module"></script>
+  </head>
+  <body class="games-page">
+    <main class="games-browser">
+      <header class="games-heading">
+        <div class="games-intro">
+          <h1 id="games-title">Football scores</h1>
+          <div class="games-actions">
+            <button id="games-refresh" type="button">Refresh</button>
+            <a class="scores-link" href="/">Back to favorites</a>
+          </div>
+        </div>
+        <div class="games-toolbar">
+          <nav class="games-leagues" aria-label="Scores league">
+            <a href="/games?league=college-football" data-league="college-football">NCAAF · Top 25</a>
+            <a href="/games?league=nfl" data-league="nfl">NFL</a>
+          </nav>
+          <span id="games-week"></span>
+        </div>
+        <div class="games-info"><p id="games-status" role="status">Loading scores…</p></div>
+      </header>
+      <div id="games-list" class="games-list" aria-label="Games by kickoff time" aria-busy="true"></div>
+    </main>
+  </body>
+</html>

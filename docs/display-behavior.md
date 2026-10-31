@@ -55,8 +55,10 @@ does not preserve the previous game data.
   including their scores.
 - The header follows your selected team. Midfield displays the designated home
   team's logo. The left end zone uses the away team's color and mascot; the right
-  uses the home team's color and mascot. End zones always use each team's primary
-  color, including green teams. White Graduate lettering leaves
+  uses the home team's color and mascot. End zones use each team's primary
+  color, including green teams. When the primaries are perceptually close, only
+  the away end zone uses its secondary color, and only if that color is farther
+  from the home primary. Other team branding is unchanged. White Graduate lettering leaves
   clear margins on all sides. Both end-zone
   names share a uniform scale without stretching the font, with a dark
   outline for bright backgrounds. Neutral-site
@@ -232,6 +234,8 @@ ambiguous picks do not get an invented return. A punt with confirmed landing
 and return spots arcs to the landing, then shows a solid return line to the
 next possession spot. Without a confirmed split, an ordinary punt arcs directly
 to ESPN's named receiving spot after the return, fair catch, or touchback.
+Kickoffs arc to the reported landing spot; a confirmed return adds a solid line
+to the receiving spot. Touchbacks have no return line.
 An ordinary made or missed field goal
 arcs to the back of the attacking end zone, not to the subsequent possession.
 Blocked, short, nullified and enforced-penalty kicks have no invented full
@@ -253,10 +257,12 @@ interception catch or kick endpoint never substitutes for that confirmed spot;
 incompletions stay at scrimmage. Missing positions remain unavailable afterward.
 Initial loads, history browsing and reduced-motion mode place the ball immediately.
 New plays, game changes and feed outages cancel pending placements.
-Penalty plays use gold text and a flag. Scoring play text uses the scorer's
-primary team color; when its contrast against the dark panel is below 4.5:1,
-the text gets a white background. Attribution comes from ESPN's scoring-play
-team rather than the drive's offense.
+Penalty plays use gold text and a flag. Scoring plays keep light text and a
+translucent white row background, with a thin left border matching the scorer's
+end-zone color. This is the team's primary color, except that the away team uses
+its more distinct secondary when the two primary colors are too similar.
+Attribution comes from ESPN's scoring-play team rather than the drive's offense;
+unconfirmed scorers keep a neutral border.
 
 Broadcast listings also appear beside the displayed game's date and venue.
 Unannounced networks show `TBD`. Listings may change and do not include local

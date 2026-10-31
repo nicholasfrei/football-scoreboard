@@ -45,6 +45,43 @@ body {
 
 .stage { width: 1920px; height: 1200px; }
 
+.scores-navigation { display: flex; flex: none; gap: 12px; }
+.scores-link, .games-leagues a {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 12px 18px; border: 1px solid var(--panel-border); border-radius: 6px;
+  color: var(--paper); background: var(--ink); font-size: 17px; font-weight: 700; text-decoration: none;
+}
+.scores-link:hover, .games-leagues a:hover { background: var(--panel); color: white; }
+.scores-link[hidden] { display: none; }
+.scores-link:focus-visible, .games-leagues a:focus-visible, .game-card:focus-visible { outline: 3px solid #e3b954; outline-offset: 4px; }
+.games-page { display: block; }
+.games-browser { width: min(1600px, 100%); margin: 0 auto; padding: 20px; }
+.games-heading { display: grid; gap: 12px; }
+.games-intro { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
+.games-intro h1 { margin: 0; font-size: 22px; color: #edf1ed; }
+.games-heading .scores-link, .games-leagues a { min-height: 44px; padding: 8px 12px; font-size: 14px; }
+.games-actions { display: flex; align-items: center; gap: 8px; }
+.games-actions button { min-height: 44px; padding: 8px 12px; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--paper); background: var(--panel); font: inherit; font-size: 14px; cursor: pointer; }
+.games-actions button:disabled { opacity: .6; cursor: wait; }
+.games-leagues { display: flex; flex-wrap: wrap; gap: 8px; }
+.games-leagues a[aria-current="page"] { background: #3c493d; border-color: #829a7d; color: #fff; }
+.games-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.games-note, #games-status, #games-week { color: #9aa8b3; font-size: 14px; line-height: 1.5; }
+.games-info { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; }
+.games-info p { margin: 0; }
+.games-date { margin: 18px 0 12px; font-size: 16px; color: var(--paper); }
+.games-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 285px), 1fr)); gap: 16px; }
+.game-card { display: block; min-width: 0; padding: 18px; border: 1px solid var(--panel-border); border-radius: 8px; color: #edf1ed; background: var(--ink); text-decoration: none; transition: background .15s, border-color .15s; }
+.game-card:hover { background: var(--panel); border-color: #829a7d; }
+.game-card.is-live { border-color: #7e936e; }
+.game-card-meta { display: flex; justify-content: space-between; gap: 12px; min-height: 30px; margin-bottom: 10px; color: #a6b4aa; font-size: 12px; line-height: 1.4; }
+.is-live .game-card-meta { color: #c4d5a0; }
+.game-card-team { display: flex; align-items: center; gap: 10px; min-height: 36px; }
+.game-card-team img { width: 26px; height: 26px; object-fit: contain; }
+.game-card-name { flex: 1; font-size: 16px; }
+.game-card-score { font-size: 22px; font-variant-numeric: tabular-nums; }
+.game-card-team.is-winner { color: #fff; font-weight: 700; }
+
 .mount {
   position: relative;
   width: 1920px;
@@ -280,7 +317,9 @@ body {
 .leader-cell .leader-yards { color: #f4f1e8; font-size: 20px; font-weight: 700; }
 .next-label { color: var(--gold); font-size: 9px; font-weight: 700; letter-spacing: .1em; }
 .next-game strong { color: #f4f1e8; font-size: 13px; font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
-#next-detail, #next-predictor { color: #adbac7; font-size: 11px; font-weight: 400; line-height: 1.4; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+#next-detail, #next-predictor, #leader-predictor { color: #adbac7; font-size: 11px; font-weight: 400; line-height: 1.4; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.win-chance-favorite { display: inline-block; padding: 3px 10px; border-radius: 5px; background: var(--win-chance-color); color: var(--win-chance-ink); font-weight: 700; }
+#leader-predictor[hidden] { display: none; }
 .feed-status { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; min-height: 29px; color: #768390; font-size: 9px; font-weight: 400; letter-spacing: .04em; text-align: right; }
 .feed-dot { flex: 0 0 6px; width: 6px; height: 6px; border-radius: 50%; background: #82b284; box-shadow: 0 0 8px rgba(130, 178, 132, .6); }
 .feed-dot.is-stale { background: var(--gold); box-shadow: 0 0 8px rgba(197, 203, 199, .35); }
@@ -372,7 +411,7 @@ body {
 .demo-buttons button:disabled { opacity: .5; cursor: default; }
 .demo-controls progress { grid-column: 1 / -1; width: 100%; height: 4px; accent-color: var(--gold); }
 .ball-detail { flex: none; margin: 0; padding: 10px 24px; min-height: 56px; border-top: 1px solid var(--panel-border); background: var(--panel); color: #cdd9e5; font-size: 22px; line-height: 1.5; text-align: center; }
-.possession-team { display: inline-block; margin-right: 6px; padding: 3px 12px; border-radius: 5px; background: var(--possession-color, #373e47); color: #f5f4eb; font-size: 20px; font-weight: 700; }
+.possession-team { display: inline-block; margin-right: 6px; padding: 3px 12px; border-radius: 5px; background: var(--possession-color, #373e47); color: var(--possession-ink, #cdd9e5); font-size: 20px; font-weight: 700; }
 .down-distance { font-weight: 700; color: var(--paper); }
 .clock-time.is-two-minute-warning, .down-distance.is-fourth-down { color: #f56367; }
 .down-distance.is-fourth-down { font-weight: 700; }
@@ -399,7 +438,7 @@ body {
   margin-top: 14px;
   padding: 16px;
   border: 0;
-  border-left: 3px solid rgba(255, 255, 255, .65);
+  border-left: 3px solid var(--scoring-team-color, rgba(255, 255, 255, .65));
   border-radius: 7px;
   background: rgba(255, 255, 255, .08);
   color: #f4f1e8;
@@ -490,12 +529,13 @@ body { font-size: 16pt; }
 .team-side, .team-seal, .countdown-label, .favorite-team,
 .leader-matchup, .leader-team, .leader-category, .leader-position,
 .leader-metric, .leader-extras, .next-label, .next-game strong,
-#next-detail, #next-predictor, .highlight-context,
+#next-detail, #next-predictor, #leader-predictor, .highlight-context,
 #highlight-detail, .demo-controls strong, .demo-controls p,
 .demo-buttons, .countdown-demo, .drive-heading button, .drive-title,
 #recent-plays li > span:first-child, .penalty-badge, .drive-history h3,
 .drive-item, .drive-item strong, .drive-item span { font-size: 16pt; }
 .feed-status { font-size: 12pt; }
+.brand-bar .season-chip, .brand-bar .scores-link { font-size: 28px; }
 
 /* Equal vertical gaps; keep the original two-to-one field/drive layout. */
 .score-panel { margin-top: 10px; }

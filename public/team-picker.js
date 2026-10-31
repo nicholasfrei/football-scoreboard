@@ -111,7 +111,7 @@ export function filterTeams(teams, query, league = "") {
     && words.every((word) => `${team.name} ${team.mascot} ${team.abbreviation ?? ""}`.toLowerCase().includes(word)));
 }
 
-export async function startTeamPicker() {
+export async function startTeamPicker({ temporary = false } = {}) {
   const requested = new URLSearchParams(location.search).get("team");
   const container = document.querySelector("#team-picker");
   try {
@@ -126,7 +126,7 @@ export async function startTeamPicker() {
     let teams = restoreFavorites(saved, catalog);
     const activeKey = selectedFavorite({ teams, defaultKey: teams[0]?.key ?? catalog.defaultKey }, requested, remembered);
     const remember = (key) => { try { localStorage.setItem("scoreboard-favorite", key); } catch { /* Still allow navigation. */ } };
-    remember(activeKey);
+    if (!temporary) remember(activeKey);
     const dialog = document.querySelector("#team-search");
     const input = document.querySelector("#team-search-input");
     const leagueButtons = dialog.querySelectorAll("[data-league]");
@@ -151,7 +151,7 @@ export async function startTeamPicker() {
     };
     const render = () => {
       done.hidden = !editing;
-      renderTeamPicker(container, { teams }, activeKey, { document, remember, editing, isEditing: () => editing,
+      renderTeamPicker(container, { teams }, temporary ? null : activeKey, { document, remember, editing, isEditing: () => editing,
         onEdit: () => setEditing(true),
         onRemove: (key) => {
           teams = teams.filter((team) => team.key !== key);

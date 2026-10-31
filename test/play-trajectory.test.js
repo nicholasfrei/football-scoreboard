@@ -480,7 +480,29 @@ test("kickoff touchbacks arc to the back of the receiving end zone without movin
   }
 });
 
-test("returned kickoffs arc only to their reported landing spot, not the end zone or receiving spot", () => {
+test("a college kickoff fair catch at Navy02 has no return leg or return label", () => {
+  const navy = { id: "2426", abbreviation: "NAVY" };
+  const nd = { id: "87", abbreviation: "ND" };
+  const kickoff = { type: { text: "Kickoff" },
+    text: "(00:55) #36 M.Drescher kickoff 63 yards to the Navy02 fair catch by #10 N.Bell at Navy02",
+    start: spot(nd.id, "ND 35", 65), end: spot(navy.id, "NAVY 25", 75) };
+  const motion = playTrajectory(kickoff, navy.id, nd, navy);
+  assert.deepEqual([motion.kind, motion.landingPercent, motion.end, motion.returnYards],
+    ["kickoff", 2, 25, null]);
+  const conflicting = playTrajectory({ ...kickoff, text: `${kickoff.text} return 23 yards to the Navy25`,
+    statYardage: 23 }, navy.id, nd, navy);
+  assert.equal(conflicting.returnYards, null, "fair catch takes precedence over conflicting return prose");
+  const legacyMotion = { ...motion };
+  delete legacyMotion.returnYards;
+  for (const trajectory of [motion, legacyMotion]) {
+    const { segment } = illustratedDrive({ plays: [{ id: "fair-catch", trajectory }] });
+    assert.equal(segment.finish, segment.to, "a fair catch has no runback to the succeeding 25");
+    assert.equal(segment.yacPath, null);
+    assert.equal(yardageLabel(segment), "KICKOFF · TO NAVY 2");
+  }
+});
+
+test("returned kickoffs arc to the landing spot and run back to the confirmed receiving spot", () => {
   const summary = JSON.parse(gunzipSync(readFileSync(new URL("./fixtures/games/nfl/401873009.json.gz", import.meta.url))));
   const sides = summary.header.competitions[0].competitors;
   const h = sides.find((side) => side.homeAway === "home").team;
@@ -492,11 +514,46 @@ test("returned kickoffs arc only to their reported landing spot, not the end zon
   assert.deepEqual([motion.kind, motion.start, motion.landingPercent, motion.end], ["kickoff", 65, 10, 35]);
   const graphic = illustratedDrive({ direction: "left", plays: [{ id: kickoff.id, trajectory: motion }] });
   assert.equal(graphic.segment.to, 104 + 10 * 7.92);
+  assert.equal(motion.returnYards, 25);
+  assert.equal(graphic.segment.finish, 104 + 35 * 7.92);
+  assert.equal(graphic.segment.yacPath, `M ${graphic.segment.to} 220 L ${graphic.segment.finish} 220`);
   assert.equal(graphic.start, 35);
-  assert.equal(yardageLabel(graphic.segment), "KICKOFF · TO DAL 10");
+  assert.equal(yardageLabel(graphic.segment), "KICKOFF · TO DAL 10 · 25 YD RETURN TO DAL 35");
   assert.equal(playTrajectory({ ...kickoff, text: "Kicker kicks to an unknown spot" }, String(drive.team.id), h, a), null);
   assert.equal(playTrajectory({ ...kickoff, text: `${kickoff.text} PENALTY enforced` }, String(drive.team.id), h, a), null);
   assert.equal(playTrajectory({ ...kickoff, start: { ...kickoff.start, team: { id: drive.team.id } } }, String(drive.team.id), h, a), null);
+});
+
+test("a college kickoff to SMU00 shows the 23-yard return to SMU23", () => {
+  const smu = { id: "2567", abbreviation: "SMU" };
+  const orange = { id: "183", abbreviation: "SYR" };
+  const kick = { type: { text: "Kickoff" },
+    text: "(06:35) #32 Q.Olcott kickoff 65 yards to the SMU00 #21 C.Rhodes return 23 yards to the SMU23 (#33 G.Sackie)",
+    statYardage: 23, start: spot(orange.id, "SYR 35", 65, 0),
+    end: spot(smu.id, "SMU 23", 77) };
+  const motion = playTrajectory(kick, smu.id, orange, smu);
+  assert.deepEqual([motion.kind, motion.start, motion.landingPercent, motion.end, motion.returnYards],
+    ["kickoff", 65, 0, 23, 23]);
+  const { segment } = illustratedDrive({ direction: "right", plays: [{ id: "kick", trajectory: motion }] });
+  assert.equal(segment.to, 104);
+  assert.equal(segment.finish, 104 + 23 * 7.92);
+  assert.equal(segment.yacPath, `M 104 220 L ${segment.finish} 220`);
+  assert.equal(yardageLabel(segment), "KICKOFF · TO SMU 0 · 23 YD RETURN TO SMU 23");
+  for (const variant of [
+    { statYardage: 22 }, { end: spot(smu.id, "SMU 24", 76) },
+    { text: kick.text.replace("23 yards", "22 yards") },
+    { text: kick.text.replace("to the SMU23", "to the SYR23") },
+  ]) {
+    const uncertain = playTrajectory({ ...kick, ...variant }, smu.id, orange, smu);
+    assert.equal(uncertain?.returnYards, null);
+    assert.equal(illustratedDrive({ plays: [{ id: "uncertain", trajectory: uncertain }] }).segment.yacPath, null);
+  }
+  const reverse = { ...kick, text: "Kicker kickoff 65 yards to the HME00 Returner return 23 yards to the HME23",
+    start: spot(away.id, "AWY 35", 65, 0), end: spot(home.id, "HME 23", 77) };
+  const reversed = playTrajectory(reverse, away.id, home, away);
+  assert.deepEqual([reversed.start, reversed.landingPercent, reversed.end, reversed.returnYards], [35, 100, 77, 23]);
+  const reverseSegment = illustratedDrive({ plays: [{ id: "reverse", trajectory: reversed }] }).segment;
+  assert.equal(reverseSegment.yacPath, `M ${104 + 100 * 7.92} 220 L ${104 + 77 * 7.92} 220`);
 });
 
 test("a kicker-attached touchback reaches the receiver's end zone in either field direction", () => {

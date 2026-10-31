@@ -1,6 +1,7 @@
 import { createHighlightTracker, highlightDetail, highlightDuration, HIGHLIGHT_LABELS } from "./highlights.js";
 import { endzoneTextLayout, fieldBranding } from "./field-branding.js";
 import { possessionBranding } from "./possession-branding.js";
+import { scoringPlayColor } from "./scoring-style.js";
 import { teamRecordLabel } from "./team-record.js";
 import { kickoffCountdown, halftimeCountdown, createRefreshLoop } from "./game-timing.js";
 import { ballPositionFallback, createBallPositionTracker } from "./ball-position.js";
@@ -10,6 +11,7 @@ import { illustratedDrive, lastDriveSnap } from "./drive-illustration.js";
 import { driveSummaryLabel, playDownDistance } from "./drive-summary.js";
 import { createBallPlacement, ROUTE_DURATION_MS, RETURN_DELAY_MS, RETURN_DURATION_MS } from "./field-animation.js";
 import { startTeamPicker } from "./team-picker.js";
+import { winChanceTeams } from "./win-chance.js";
 
 function fitDisplay() {
   const scale = displayScale(window.innerWidth, window.innerHeight);
@@ -138,7 +140,8 @@ function renderFieldDrive(game, drive) {
       }
       const label = svgElement("text", { x: (current.to + current.finish) / 2,
         y: current.y + 38, class: "drive-yac-label", "text-anchor": "middle" });
-      label.textContent = current.kind === "punt" ? `${current.returnYards} YD RETURN` : `${current.yac} YAC`;
+      label.textContent = current.kind === "punt" || current.kind === "kickoff"
+        ? `${current.returnYards} YD RETURN` : `${current.yac} YAC`;
       yacOverlay.append(label);
     }
     if (current.kind === "interception" || current.kind === "fumble-return") {
@@ -345,7 +348,7 @@ function updateField(game) {
   const away = game.homeAway === "home" ? game.opponent : game.selectedTeam;
   const field = document.querySelector(".field-wrap");
   const homeBranding = fieldBranding(home);
-  const awayBranding = fieldBranding(away);
+  const awayBranding = fieldBranding(away, home);
   field.style.setProperty("--home-color", homeBranding.color);
   field.style.setProperty("--away-color", awayBranding.color);
   field.style.setProperty("--home-ink", homeBranding.ink);
@@ -504,6 +507,8 @@ function renderDrives(game) {
       item.classList.add("penalty-play");
     }
     item.classList.toggle("scoring-play", play.scoring);
+    const scoringColor = scoringPlayColor(game, play);
+    if (scoringColor) item.style.setProperty("--scoring-team-color", scoringColor);
     item.append(time, text);
     list.append(item);
   }
@@ -581,14 +586,27 @@ function renderTeam(side, team, league) {
   setTeamLogo(document.querySelector(`#${side}-seal`), team);
 }
 
-function renderNextDetails(game) {
-  const predictor = document.querySelector("#next-predictor");
-  if (!game?.matchupPredictor) {
+function renderPredictor(predictor, game) {
+  const teams = winChanceTeams(game);
+  if (!teams) {
     predictor.textContent = game ? "Win chance: unavailable" : "Win chance: no game listed";
     return;
   }
-  const model = game.matchupPredictor;
-  predictor.textContent = `Win chance: ${game.selectedTeam.abbreviation} ${model.selectedTeam.toFixed(1)}% · ${game.opponent.abbreviation} ${model.opponent.toFixed(1)}% · ${model.source}`;
+  const labels = teams.map(({ text, color, ink }) => {
+    const label = document.createElement("span");
+    label.textContent = text;
+    if (color) {
+      label.className = "win-chance-favorite";
+      label.style.setProperty("--win-chance-color", color);
+      label.style.setProperty("--win-chance-ink", ink);
+    }
+    return label;
+  });
+  predictor.replaceChildren("Win chance: ", labels[0], " · ", labels[1], ` · ${game.matchupPredictor.source}`);
+}
+
+function renderNextDetails(game) {
+  renderPredictor(document.querySelector("#next-predictor"), game);
 }
 
 function renderLeaders(game, demo = false) {
@@ -596,6 +614,9 @@ function renderLeaders(game, demo = false) {
   document.querySelector(".next-game").hidden = visible;
   const section = document.querySelector("#game-leaders");
   section.hidden = !visible;
+  const leaderPredictor = document.querySelector("#leader-predictor");
+  leaderPredictor.hidden = !visible || !watchedGame;
+  if (!leaderPredictor.hidden) renderPredictor(leaderPredictor, game);
   const list = document.querySelector("#leader-list");
   list.replaceChildren();
   if (!visible) return;
@@ -675,7 +696,9 @@ function updateGame(game, nextGame, demo = false) {
   elements.gameClock.textContent = "";
   elements.gameClock.ariaLabel = "Quarter and game clock";
   updatePossession(game);
-  renderNextDetails(nextGame);
+  const featuredGame = watchedGame ? game : nextGame;
+  document.querySelector(".next-label").textContent = watchedGame ? "MATCHUP" : "NEXT UP";
+  renderNextDetails(featuredGame);
   renderLeaders(game, demo);
   if (!game) {
     ballPlacement.reset();
@@ -726,12 +749,6 @@ function updateGame(game, nextGame, demo = false) {
         && Number(remaining[1]) * 60 + Number(remaining[2]) <= 120);
       elements.gameClock.append(clock);
     }
-    if (breakTime !== null) {
-      const estimate = document.createElement("span");
-      estimate.className = "clock-estimate";
-      estimate.textContent = "EST. TO 2ND HALF";
-      elements.gameClock.append(estimate);
-    }
     elements.gameClock.hidden = false;
     elements.gameDetail.textContent = "";
   } else if (upcoming) {
@@ -742,10 +759,10 @@ function updateGame(game, nextGame, demo = false) {
 
   setStatus(game);
 
-  if (nextGame) {
-    const direction = nextGame.neutralSite ? "NEUTRAL" : nextGame.homeAway === "home" ? "HOME" : "AWAY";
-    elements.nextOpponent.textContent = `${direction} VS. ${rankedName(nextGame.opponent).toUpperCase()}`;
-    elements.nextDetail.textContent = `${kickoffText(nextGame)} · ${nextGame.broadcasts?.join(" / ") || "TBD"}`;
+  if (featuredGame) {
+    const direction = featuredGame.neutralSite ? "NEUTRAL" : featuredGame.homeAway === "home" ? "HOME" : "AWAY";
+    elements.nextOpponent.textContent = `${direction} VS. ${rankedName(featuredGame.opponent).toUpperCase()}`;
+    elements.nextDetail.textContent = `${kickoffText(featuredGame)} · ${featuredGame.broadcasts?.join(" / ") || "TBD"}`;
   } else if (upcoming) {
     elements.nextOpponent.textContent = "SCHEDULE LOADING";
     elements.nextDetail.textContent = "Check back for the next matchup";
@@ -785,13 +802,18 @@ function setFeedState(state, refreshedAt) {
 
 let refreshing = false;
 let activeTeamKey = null;
+const watchParams = new URLSearchParams(location.search);
+const watchedGame = watchParams.has("game") ? { id: watchParams.get("game"), league: watchParams.get("league") } : null;
 async function refreshScoreboard() {
   if (refreshing) return;
   refreshing = true;
   elements.refreshButton.classList.add("is-spinning");
   try {
     const query = activeTeamKey ? `?team=${encodeURIComponent(activeTeamKey)}` : "";
-    const response = await fetch(`/api/scoreboard${query}`, { cache: "no-store", signal: AbortSignal.timeout(35_000) });
+    const endpoint = watchedGame
+      ? `/api/game?league=${encodeURIComponent(watchedGame.league ?? "")}&id=${encodeURIComponent(watchedGame.id)}`
+      : `/api/scoreboard${query}`;
+    const response = await fetch(endpoint, { cache: "no-store", signal: AbortSignal.timeout(35_000) });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error ?? "Score feed request failed");
 
@@ -1019,7 +1041,9 @@ if (demo === "drive") {
 } else if (demo === "halftime") {
   startHalftimeDemo();
 } else {
-  activeTeamKey = await startTeamPicker();
+  activeTeamKey = await startTeamPicker({ temporary: Boolean(watchedGame) });
+  const browse = document.querySelector("#browse-games");
+  browse.href = `/games?league=${watchedGame?.league === "nfl" || (!watchedGame && activeTeamKey?.startsWith("nfl:")) ? "nfl" : "college-football"}`;
   const polling = createRefreshLoop({ refresh: refreshScoreboard, getPayload: () => lastPayload });
   elements.refreshButton.addEventListener("click", polling.refreshNow);
   polling.start();

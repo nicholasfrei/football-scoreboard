@@ -215,6 +215,11 @@ export function enrichGame(game, summary) {
   const endOfHalf = updated.state === "live" && updated.period === 2
     ? plays.findLast((play) => play.period?.number === 2 && /End of Half|End Period/i.test(play.type?.text ?? "")
       && /(?:end (?:of )?(?:quarter )?2|end of (?:the )?(?:2nd|second) quarter|end of half)/i.test(play.text ?? "")) : null;
+  // ESPN's schedule/header status can lag behind the summary play feed at halftime.
+  // A confirmed end-of-second-quarter event is authoritative while period 2 is active.
+  if (endOfHalf && !/halftime|end (?:of )?(?:quarter )?2|end of (?:the )?(?:2nd|second) quarter|end of half/i.test(updated.status)) {
+    updated.status = "Halftime";
+  }
   const currentDrive = summary.drives?.current;
   const currentIds = new Set((currentDrive?.plays ?? []).map((play) => String(play.id)));
   const currentPlays = plays.filter((play) => currentIds.has(String(play.id)));
@@ -375,6 +380,7 @@ export function enrichGame(game, summary) {
       period: play.period?.number ?? null,
       clock: play.clock?.displayValue ?? null,
       scoring: Boolean(play.scoringPlay),
+      scoringTeamId: play.scoringPlay ? scoringTeams.get(String(play.id)) ?? null : null,
     })),
   };
 }

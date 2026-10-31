@@ -34,7 +34,7 @@ function gameView() {
   const noop = () => {};
   const updateGameSource = source.slice(source.indexOf("function updateGame("), source.indexOf("function updateCountdown("));
   const updateGame = runInNewContext(`${updateGameSource}; updateGame`, {
-    document, elements, updateCountdown: noop, updatePossession: noop, renderNextDetails: noop,
+    document, elements, watchedGame: null, updateCountdown: noop, updatePossession: noop, renderNextDetails: noop,
     renderLeaders: noop, renderTeam: noop, updateField: noop, renderDrives: noop, setStatus: noop,
     kickoffText: () => "MON, OCT 26 · 7:15 PM CDT", formatDate: () => "MON, OCT 26", halftimeCountdown,
   });
@@ -99,12 +99,12 @@ test("clock uses the score color and shares the fourth-down warning red", async 
   assert.match(css, /\.clock-time\.is-two-minute-warning, \.down-distance\.is-fourth-down\s*\{ color: #f56367; \}/);
 });
 
-test("a reported halftime marker shows an estimated break timer below the score", () => {
+test("a reported halftime marker shows the break timer without an estimate label", () => {
   const { updateGame, elements } = gameView();
   updateGame({ ...game, period: 2, clock: "0:00", status: "Halftime",
     halftimeStartedAt: new Date(Date.now() - 17_000).toISOString() });
   assert.match(elements.gameClock.children[1].textContent, /^12:4[23]$/);
-  assert.equal(elements.gameClock.children[2].textContent, "EST. TO 2ND HALF");
+  assert.equal(elements.gameClock.children.length, 2);
   assert.equal(elements.gameClock.children[1].classList.contains("is-two-minute-warning"), false);
 });
 

@@ -9,7 +9,7 @@ test("green teams keep their primary colors with white end-zone text", () => {
   }
 });
 
-test("non-green teams keep their primary colors, regardless of alternates", () => {
+test("without a matchup comparison, teams keep their primary colors regardless of alternates", () => {
   for (const color of ["#A41F35", "#500000", "#002244", "#000000", "#808080", "#FFFFFF", "#F1B82D"]) {
     assert.equal(fieldBranding({ color, alternateColor: "#FFFFFF" }).color, color);
     assert.equal(fieldBranding({ color }).ink, "#FFFFFF");
@@ -21,6 +21,54 @@ test("Packers green end zones use white lettering", () => {
   assert.deepEqual(fieldBranding({ color: "#203731", alternateColor: "#FFB612" }), {
     color: "#203731", ink: "#FFFFFF",
   });
+});
+
+test("Auburn at Ole Miss uses Auburn orange only for the away end zone", () => {
+  const away = Object.freeze({ color: "#0C2340", alternateColor: "#F26522" });
+  const home = Object.freeze({ color: "#14213D", alternateColor: "#CE1126" });
+  assert.deepEqual(fieldBranding(away, home), { color: "#F26522", ink: "#FFFFFF" });
+  assert.deepEqual(fieldBranding(home), { color: "#14213D", ink: "#FFFFFF" });
+  assert.equal(fieldBranding(away).color, "#0C2340", "team branding remains unchanged");
+});
+
+test("Arizona at Texas Tech uses Arizona navy only for the away end zone", () => {
+  // Colors from the recorded ESPN summaries for teams 12 and 2641.
+  const away = Object.freeze({ color: "#CC0033", alternateColor: "#003366" });
+  const home = Object.freeze({ color: "#DA291C", alternateColor: "#000000" });
+  assert.deepEqual(fieldBranding(away, home), { color: "#003366", ink: "#FFFFFF" });
+  assert.deepEqual(fieldBranding(home), { color: "#DA291C", ink: "#FFFFFF" });
+  assert.equal(fieldBranding(away).color, "#CC0033", "team branding remains unchanged");
+});
+
+test("close green and red primaries also use a more distinct away secondary", () => {
+  for (const [away, home] of [["#154733", "#18453B"], ["#A41F35", "#9E1B32"]]) {
+    assert.equal(fieldBranding({ color: away, alternateColor: "#FEE123" }, { color: home }).color, "#FEE123");
+  }
+});
+
+test("distinct primaries stay primary even when the away secondary is farther away", () => {
+  assert.equal(fieldBranding({ color: "#F26522", alternateColor: "#FFFFFF" }, { color: "#14213D" }).color, "#F26522");
+});
+
+test("close primaries stay primary if the away secondary is closer or equally distant", () => {
+  for (const alternateColor of ["#14213D", "#13223E", "#0C2340"]) {
+    assert.equal(fieldBranding({ color: "#0C2340", alternateColor }, { color: "#14213D" }).color, "#0C2340");
+  }
+  assert.equal(fieldBranding({ color: "#14213D", alternateColor: "#14213D" }, { color: "#14213D" }).color, "#14213D");
+});
+
+test("identical primaries switch only the away end zone to a distinct secondary", () => {
+  assert.equal(fieldBranding({ color: "#14213D", alternateColor: "#CE1126" }, { color: "#14213D" }).color, "#CE1126");
+});
+
+test("missing or invalid colors safely preserve the primary", () => {
+  for (const alternateColor of [undefined, null, "", "invalid", "#12345G"]) {
+    assert.equal(fieldBranding({ color: "#0C2340", alternateColor }, { color: "#14213D" }).color, "#0C2340");
+  }
+  for (const color of [undefined, null, "", "invalid"]) {
+    assert.equal(fieldBranding({ color: "#0C2340", alternateColor: "#F26522" }, { color }).color, "#0C2340");
+    assert.equal(fieldBranding({ color, alternateColor: "#F26522" }, { color: "#14213D" }).color, color);
+  }
 });
 
 test("end-zone names share one scale without stretching shorter names to fill the length", () => {

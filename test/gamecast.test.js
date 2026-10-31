@@ -34,6 +34,17 @@ test("only a reported end-of-second-quarter play anchors the halftime estimate",
   assert.equal(enrichGame({ ...game, league: "college-football", selectedTeam: { id: "8" } }, frame).halftimeStartedAt, null);
 });
 
+test("an end-of-half play overrides a stale second-quarter status", () => {
+  const frame = summary({ current: { id: "half", team: { id: "8" }, plays: [{
+    id: "end", sequenceNumber: "22000", period: { number: 2 }, clock: { displayValue: "0:00" },
+    type: { text: "End Period" }, text: "End of 2nd quarter.", wallclock: "2026-10-31T17:38:17Z",
+  }] } });
+  frame.header.competitions[0].status = { period: 2, displayClock: "0:22", type: { state: "in", detail: "0:22 - 2nd Quarter" } };
+  const enriched = enrichGame({ ...game, league: "college-football", selectedTeam: { id: "8" } }, frame);
+  assert.equal(enriched.status, "Halftime");
+  assert.equal(enriched.halftimeStartedAt, "2026-10-31T17:38:17Z");
+});
+
 test("accepted penalty yardage reaches the drive illustration, but declined and bundled plays do not", () => {
   const spot = (label) => ({ team: { id: "8" }, possessionText: `ARK ${label}`, down: 1 });
   const foul = { id: "flag", sequenceNumber: "1", type: { text: "Penalty" },
@@ -375,8 +386,10 @@ test("drive scoring colors follow the scoring team, not a turnover's starting of
   }] } });
   frame.scoringPlays = [{ id: "pick-six", team: { id: "238" } }];
   assert.equal(enrichGame(game, frame).drives[0].plays[0].scoringTeamId, "238");
+  assert.equal(enrichGame(game, frame).plays[0].scoringTeamId, "238", "recent plays also identify the scorer");
   frame.scoringPlays = [];
   assert.equal(enrichGame(game, frame).drives[0].plays[0].scoringTeamId, null);
+  assert.equal(enrichGame(game, frame).plays[0].scoringTeamId, null);
 });
 
 test("receiving leaders can show provider-confirmed fumbles without inventing INTs", () => {

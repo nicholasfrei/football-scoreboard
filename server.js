@@ -6,6 +6,7 @@ import { gunzipSync } from "node:zlib";
 import { loadConfig } from "./src/config.js";
 import { createTeamSelection } from "./src/team-selection.js";
 import { createReplayFrames, REPLAY_GAMES } from "./src/replay.js";
+import { createGameBrowser, isFootballLeague } from "./src/game-browser.js";
 
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
 const PUBLIC_DIR = join(ROOT, "public");
@@ -21,6 +22,7 @@ const MIME_TYPES = {
 };
 
 const teamSelection = createTeamSelection(config);
+const gameBrowser = createGameBrowser({ timeZone: config.timeZone });
 const replayCache = new Map();
 
 async function loadReplay(key) {
@@ -45,8 +47,8 @@ function sendJson(response, statusCode, value) {
 }
 
 async function serveStatic(pathname, response) {
-  const asset = pathname === "/" ? "index.html" : pathname.slice(1);
-  if (!new Set(["index.html", "app.js", "team-picker.js", "display-size.js", "game-timing.js", "ball-position.js", "field-animation.js", "highlights.js", "field-branding.js", "possession-branding.js", "scoring-style.js", "leader-layout.js", "team-record.js", "play-trajectory.js", "fbs-yardline-aliases.js", "drive-illustration.js", "drive-summary.js", "styles.css", "assets/arkansas.png", "assets/vanderbilt.png", "assets/cowboys.png", "assets/eagles.png", "assets/fonts/Graduate-Regular.ttf"]).has(asset)) {
+  const asset = pathname === "/" ? "index.html" : pathname === "/games" ? "games.html" : pathname.slice(1);
+  if (!new Set(["games.html", "games.js", "index.html", "app.js", "team-picker.js", "display-size.js", "game-timing.js", "ball-position.js", "field-animation.js", "highlights.js", "field-branding.js", "win-chance.js", "possession-branding.js", "scoring-style.js", "leader-layout.js", "team-record.js", "play-trajectory.js", "fbs-yardline-aliases.js", "drive-illustration.js", "drive-summary.js", "styles.css", "assets/arkansas.png", "assets/vanderbilt.png", "assets/cowboys.png", "assets/eagles.png", "assets/fonts/Graduate-Regular.ttf"]).has(asset)) {
     response.writeHead(404);
     response.end("Not found");
     return;
@@ -92,6 +94,21 @@ const server = createServer(async (request, response) => {
 
   if (pathname === "/api/teams") {
     sendJson(response, 200, await teamSelection.getCatalog());
+    return;
+  }
+
+  if (pathname === "/api/games" || pathname === "/api/game") {
+    const league = url.searchParams.get("league");
+    const id = url.searchParams.get("id");
+    if (!isFootballLeague(league) || (pathname === "/api/game" && !/^\d{1,15}$/.test(id ?? ""))) {
+      sendJson(response, 400, { error: "Choose a valid NFL or NCAAF game." });
+      return;
+    }
+    try {
+      sendJson(response, 200, await (pathname === "/api/games" ? gameBrowser.list(league) : gameBrowser.watch(league, id)));
+    } catch {
+      sendJson(response, 503, { error: "The game feed is unavailable right now. Please try again." });
+    }
     return;
   }
 

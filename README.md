@@ -40,6 +40,11 @@ a small screen in a shadow box for an always-on game-day scoreboard.
   Hold a favorite for 1.5 seconds to reveal its remove button, then tap **Done**;
   **Edit favorites** in the search dialog also supports keyboard users.
   `config.json` sets the initial favorites for new browsers.
+- **Browse other games:** choose **All scores** for a full-page view of the current
+  NCAAF Top 25 slate or all NFL games, ordered by kickoff time. Scores refresh
+  every 20 seconds. Select a game to open its live scoreboard temporarily;
+  select a team in the favorites bar to restore your normal view without changing
+  saved favorites. The scores page also has a **Back to favorites** link.
 
 The app is a small Node.js server and a browser-based display, with no third-party
 packages or build step. It refreshes every 10 seconds from five minutes before

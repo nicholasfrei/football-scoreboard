@@ -28,7 +28,7 @@ export function illustratedDrive(drive) {
     : motion.kind === "kickoff" && motion.landingLabel === "TOUCHBACK"
       ? motion.landingPercent < motion.start ? 12 : 988
     : x(motion.kind === "kickoff" ? motion.landingPercent : target ?? schematic ?? motion.catchPercent ?? motion.end));
-  const finish = motion && (motion.kind === "field-goal" || motion.kind === "kickoff"
+  const finish = motion && (motion.kind === "field-goal" || motion.kind === "kickoff" && !Number.isFinite(motion.returnYards)
     || motion.kind === "interception" && motion.returnYards === null
     ? to : x(motion.end));
   const segment = motion && active ? { ...motion, loss, from, to, finish, y: CENTER, target,
@@ -39,7 +39,7 @@ export function illustratedDrive(drive) {
         : from === to ? `M ${from} ${CENTER} C ${from - 18} 120 ${from + 18} 120 ${to} ${CENTER}`
           : `M ${from} ${CENTER} Q ${(from + to) / 2} 70 ${to} ${CENTER}`,
     yacPath: !loss && (motion.kind === "pass" && motion.yac !== null
-      || motion.kind === "punt" && motion.returnYards !== null) && to !== finish
+      || ["punt", "kickoff"].includes(motion.kind) && Number.isFinite(motion.returnYards)) && to !== finish
       ? `M ${to} ${CENTER} L ${finish} ${CENTER}` : null,
     returnPath: motion.kind === "fumble-return" ? `M ${motion.catchPercent === null ? from : to} ${CENTER} L ${finish} ${CENTER}`
       : motion.kind === "interception" && motion.returnYards !== null && to !== finish
@@ -56,7 +56,8 @@ export function illustratedDrive(drive) {
 
 export function yardageLabel(segment) {
   if (!segment) return "";
-  if (segment.kind === "kickoff") return `${segment.label} · ${segment.landingLabel === "TOUCHBACK" ? "" : "TO "}${segment.landingLabel}`;
+  if (segment.kind === "kickoff") return `${segment.label} · ${segment.landingLabel === "TOUCHBACK" ? "" : "TO "}${segment.landingLabel}`
+    + (segment.returnYards == null ? "" : ` · ${segment.returnYards} YD RETURN TO ${segment.returnLabel}`);
   if (segment.kind === "punt" || segment.kind === "field-goal") return `${segment.label} · ${segment.kind === "punt" ? "TO " : ""}${segment.landingLabel}`
     + (segment.returnYards == null ? "" : ` · ${segment.returnYards} YD RETURN TO ${segment.returnLabel}`);
   if (segment.kind === "interception") return `${segment.label} · AT ${segment.interceptionLabel}`

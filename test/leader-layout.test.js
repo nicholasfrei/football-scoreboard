@@ -42,7 +42,7 @@ async function leaderView() {
   };
   const renderer = source.slice(source.indexOf("function renderLeaders("), source.indexOf("function updateGame("));
   const render = runInNewContext(`${renderer}; renderLeaders`, {
-    document: { querySelector, createElement: element }, leaderCardTeams, showGameLeaders,
+    document: { querySelector, createElement: element }, leaderCardTeams, showGameLeaders, watchedGame: null,
     setTeamLogo(node, team) { node.textContent = `${team.abbreviation} logo`; },
   });
   return { render, querySelector };

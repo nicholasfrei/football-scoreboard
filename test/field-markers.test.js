@@ -25,6 +25,8 @@ test("away end zone is left, home end zone is right, and midfield has the home l
   assert.match(html, /class="endzone home-endzone" x="896"/);
   assert.match(css, /\.away-endzone \{ fill: var\(--away-color/);
   assert.match(css, /\.home-endzone \{ fill: var\(--home-color/);
+  assert.match(app, /const homeBranding = fieldBranding\(home\)/);
+  assert.match(app, /const awayBranding = fieldBranding\(away, home\)/);
   assert.match(app, /\["#endzone-school", away\.mascot\]/);
   assert.match(app, /\["#endzone-mascot", home\.mascot\]/);
   assert.match(app, /if \(home\.logo\) logo\.setAttribute\("href", home\.logo\)/);

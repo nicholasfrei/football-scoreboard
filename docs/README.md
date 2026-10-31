@@ -44,8 +44,9 @@ There is no frontend build step or third-party runtime dependency.
 - `public/ball-position.js` holds confirmed spots through fresh-feed timeout/gaps,
   resetting at scores, drive/possession changes, and unavailable feeds.
 - `src/replay.js` builds offline frames from recorded games; `src/replay-leaders.js`
-  reconstructs the NFL replay's player totals. `public/field-branding.js` keeps
-  each team's primary end-zone color, including green teams.
+  reconstructs the NFL replay's player totals. `public/field-branding.js` uses
+  primary end-zone colors, switching only the away end zone to its secondary
+  when close primaries would be better distinguished by that secondary.
 - `test/` contains network-independent tests; run them with `npm test`.
 - `test/fixtures/games/` holds 100 complete compressed ESPN summaries and their
   provenance manifest; `scripts/capture-game-fixtures.js` explicitly appends them.
