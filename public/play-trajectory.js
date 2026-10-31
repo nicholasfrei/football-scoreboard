@@ -1,11 +1,14 @@
+import { fbsYardlineAliases, additionalFbsAliases } from "./fbs-yardline-aliases.js";
+
 // Field coordinates are always away goal line (0) to home goal line (100).
 // Prefer a named spot: ESPN occasionally flips yardsToEndzone on a no-gain play.
 export function fieldPercent(spot, home, away) {
   const named = /^(.*?)\s+(\d{1,2})$/.exec(spot?.possessionText ?? "");
   if (spot?.possessionText === "50") return 50;
   if (named && Number(named[2]) <= 50) {
-    if (named[1] === away.abbreviation) return Number(named[2]);
-    if (named[1] === home.abbreviation) return 100 - Number(named[2]);
+    const side = namedTeam(named[1], home, away);
+    if (side === away) return Number(named[2]);
+    if (side === home) return 100 - Number(named[2]);
   }
   const teamId = spot?.team?.id == null ? null : String(spot.team.id);
   if (Number.isFinite(spot?.yardsToEndzone) && spot.yardsToEndzone >= 0 && spot.yardsToEndzone <= 100) {
@@ -15,25 +18,28 @@ export function fieldPercent(spot, home, away) {
   return null;
 }
 
-// ESPN's college play prose sometimes uses different team names from its
-// structured possessionText. Accept only aliases observed for these team IDs,
-// and only when that team participates in the current matchup.
-const targetAliases = {
-  "251": ["TEXAS", "UT"], "130": ["U-M"], "245": ["TAM", "A&M"], "2633": ["UTK", "TEN"],
-  "2579": ["USC"], "238": ["VANDY"], "221": ["PIT"], "2390": ["CANES", "UM"],
-  "254": ["UTA"], "68": ["BSU"], "164": ["RU"], "242": ["RIC"],
-  "2649": ["TOLEDO"], "239": ["BU"], "2006": ["AKRON"], "193": ["MIAMI"],
-  "344": ["STATE"], "33": ["BLT"], "5": ["CLV"], "22": ["ARZ"],
-  "14": ["LA"], "34": ["HST"], "28": ["WAS"], "145": ["OM"],
-  "2655": ["TLN"], "2636": ["TSA"],
-  "84": ["IND"], "275": ["WISC"], "87": ["UND"], "194": ["OHIOST"],
-  "120": ["MARYLA"], "26": ["UCL"], "142": ["MIZZOU"],
-  "333": ["BAMA"], "344": ["STATE", "MSU"], "2305": ["KAN"],
+// Match game text by team ID AND ESPN header abbreviation: NFL and college
+// IDs overlap (e.g. NFL Kansas City and college Arizona are both ID 12).
+const collegeAliases = new Map(fbsYardlineAliases.map(([id, , abbreviation, alias]) =>
+  [id, { abbreviation, labels: [alias, ...(additionalFbsAliases[id] ?? [])] }]));
+const nflAliases = {
+  "33": { abbreviation: "BAL", labels: ["BLT"] },
+  "5": { abbreviation: "CLE", labels: ["CLV"] },
+  "22": { abbreviation: "ARI", labels: ["ARZ"] },
+  "14": { abbreviation: "LAR", labels: ["LA"] },
+  "34": { abbreviation: "HOU", labels: ["HST"] },
+  "28": { abbreviation: "WSH", labels: ["WAS"] },
 };
 
 function namedTeam(name, home, away) {
-  return [home, away].find((candidate) => [candidate.abbreviation?.toUpperCase(),
-    ...(targetAliases[candidate.id] ?? [])].includes(name.toUpperCase()));
+  const matches = [home, away].filter((candidate) => {
+    const abbreviation = candidate.abbreviation?.toUpperCase();
+    const record = [collegeAliases.get(String(candidate.id)), nflAliases[candidate.id]]
+      .find((entry) => entry?.abbreviation === abbreviation);
+    return [abbreviation, ...(record?.labels ?? [])].some((alias) => alias?.toUpperCase() === name.toUpperCase());
+  });
+  // A shared label cannot safely designate either side of a matchup.
+  return matches.length === 1 ? matches[0] : null;
 }
 
 function textSpot(text, pattern, home, away) {
@@ -51,7 +57,7 @@ function textSpot(text, pattern, home, away) {
 function interceptionTrajectory(play, start, offenseId, home, away, direction) {
   const text = play.text ?? "";
   const defense = offenseId === away.id ? home : away;
-  const match = /\bintercepted\b.*?\bat\s+(?:the\s+)?(?:(50)\b|([A-Za-z][A-Za-z&-]*)\s*(-?\d{1,2})\b)/i.exec(text);
+  const match = /\bintercepted\b.*?\bat\s+(?:the\s+)?(?:(50)\b|([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(-?\d{1,2})\b)/i.exec(text);
   if (!match) return null;
   const team = match[2] ? namedTeam(match[2], home, away) : null;
   const yard = match[3] == null ? null : Number(match[3]);
@@ -97,17 +103,17 @@ function defensiveFumbleReturn(play, start, offenseId, home, away, direction) {
   const end = touchdown ? direction === 1 ? 0 : 100
     : fieldPercent({ possessionText: play.end?.possessionText }, home, away);
   if (end === null) return null;
-  const recovered = /\brecovered by\b.*?\bat\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*)\s*(-?\d{1,2})\b/i.exec(text);
+  const recovered = /\brecovered by\b.*?\bat\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(-?\d{1,2})\b/i.exec(text);
   const recovery = recovered && Number(recovered[2]) >= 0
-    ? textSpot(`at ${recovered[1]}${recovered[2]}`, /\bat\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i, home, away)?.percent : null;
+    ? textSpot(`at ${recovered[1]}${recovered[2]}`, /\bat\s+([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\b/i, home, away)?.percent : null;
   if (!touchdown) {
-    const college = /\breturn\s+(\d+)\s+yards?\s+to\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i.exec(text);
-    const nfl = /\bto\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\s+for\s+(\d+)\s+yards?\b/i.exec(text.slice(recovered?.index ?? 0));
+    const college = /\breturn\s+(\d+)\s+yards?\s+to\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\b/i.exec(text);
+    const nfl = /\bto\s+([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\s+for\s+(\d+)\s+yards?\b/i.exec(text.slice(recovered?.index ?? 0));
     const reported = Number(college?.[1] ?? nfl?.[3]);
     const destination = college ? textSpot(`to ${college[2]}${college[3]}`,
-      /\bto\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i, home, away)
+      /\bto\s+([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\b/i, home, away)
       : nfl && textSpot(`to ${nfl[1]}${nfl[2]}`,
-        /\bto\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i, home, away);
+        /\bto\s+([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\b/i, home, away);
     if (recovery === null || destination?.percent !== end || reported !== play.statYardage
         || (recovery - end) * direction !== reported || reported <= 0) return null;
   }
@@ -124,6 +130,26 @@ export function playTrajectory(play, offenseId, home, away) {
   const type = play.type?.text ?? "";
   const text = play.text ?? "";
   const startId = play.start?.team?.id == null ? null : String(play.start.team.id);
+  if (/^Kickoff$/i.test(type)) {
+    // ESPN may initially attach the kick to the kicker's drive, then move it
+    // to the receiver's. The confirmed endpoint identifies the receiver.
+    const receiver = [home, away].find((team) => team.id === String(play.end?.team?.id));
+    const kicker = [home, away].find((team) => team.id === startId && team.id !== receiver?.id);
+    const start = fieldPercent(play.start, home, away);
+    const end = fieldPercent({ possessionText: play.end?.possessionText }, home, away);
+    if (!receiver || !kicker || ![receiver.id, kicker.id].includes(offenseId) || start === null || end === null
+        || play.isTurnover || play.isPenalty || play.penalty
+        || /\b(?:penalty|no\s*play|nullified|overturned|reversed|blocked|muff|fumble|recovered by)\b/i.test(text)) return null;
+    const touchback = /\btouchback\b/i.test(text);
+    const landing = !touchback && textSpot(text,
+      /\b(?:kickoff|kicks)\b.*?\bto\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i, home, away);
+    if (!touchback && !landing) return null;
+    const target = touchback ? receiver.id === home.id ? 100 : 0 : landing.percent;
+    if (Math.abs(target - start) < 1 || (target - start) * (kicker.id === away.id ? 1 : -1) <= 0) return null;
+    return { kind: "kickoff", start, end, landingPercent: target,
+      landingLabel: touchback ? "TOUCHBACK" : landing.label,
+      yards: null, yac: null, label: "KICKOFF" };
+  }
   if (startId !== offenseId || ![1, 2, 3, 4].includes(play.start?.down)) return null;
   // A voluntary clock-killing kneel is not a rushing lane to animate.
   if (/\b(?:kneel(?:s|ed|ing)?(?:[\s-]*down)?|knelt|(?:takes?|taking|took)\s+a\s+knee)\b/i.test(text)) return null;
@@ -149,6 +175,7 @@ export function playTrajectory(play, offenseId, home, away) {
   const kind = /^(?:Pass Reception|Passing Touchdown)$/i.test(type) ? "pass"
     : /^Pass Incompletion$/i.test(type) ? "incomplete"
     : /^(?:Rush|Rushing Touchdown)$/i.test(type) ? "run"
+    : /^Sack$/i.test(type) ? "sack"
     : /^(?:Punt|Punt Return)$/i.test(type) ? "punt"
     : /^Field Goal (?:Good|Missed)$/i.test(type) ? "field-goal"
     : /^(?:Pass Interception Return|Interception|Interception Return|Interception Return Touchdown)$/i.test(type) ? "interception" : null;
@@ -173,9 +200,9 @@ export function playTrajectory(play, offenseId, home, away) {
     const enforcement = kind === "punt" && !play.penalty && !play.isPenalty
       && (text.match(/\bPENALTY\b/gi)?.length ?? 0) === 1
       && !/\b(?:declined|offsetting|no play|nullified)\b/i.test(text)
-      ? /\bPENALTY\b[^]*?\b\d+\s+yards?\s+from\s+[A-Za-z][A-Za-z&-]*\s*\d{1,2}\s+to\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i.exec(text) : null;
+      ? /\bPENALTY\b[^]*?\b\d+\s+yards?\s+from\s+[A-Za-z][A-Za-z&-]*(?:\s+St)?\s*\d{1,2}\s+to\s+([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\b/i.exec(text) : null;
     const enforcedSpot = enforcement && textSpot(`to ${enforcement[1]}${enforcement[2]}`,
-      /\bto\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i, home, away);
+      /\bto\s+([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\b/i, home, away);
     const end = kind === "punt" ? enforcedSpot?.percent
       ?? fieldPercent({ possessionText: play.end?.possessionText }, home, away)
       : direction === 1 ? 100 : 0;
@@ -183,18 +210,18 @@ export function playTrajectory(play, offenseId, home, away) {
     // A confirmed punt return has two legs: the kick to the catch spot, then
     // the receiving team's return to the final possession spot. Keep the old
     // end-only arc when any reported spot or yardage disagrees.
-    const landingMatch = kind === "punt" ? /\bpunt(?:s|ed)?\b.*?\bto\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i.exec(text) : null;
+    const landingMatch = kind === "punt" ? /\bpunt(?:s|ed)?\b.*?\bto\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\b/i.exec(text) : null;
     const landing = landingMatch && textSpot(landingMatch[0],
-      /\bto\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i, home, away);
+      /\bto\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\b/i, home, away);
     const afterLanding = landingMatch ? text.slice(landingMatch.index + landingMatch[0].length).split(/\bInjury Update:/i)[0] : "";
-    const collegeReturn = /\breturn(?:ed|s)?\s+(?:for\s+loss\s+of\s+(-\d{1,3}|\d{1,3})|(-?\d{1,3}))\s+yards?\s+to\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i.exec(afterLanding);
+    const collegeReturn = /\breturn(?:ed|s)?\s+(?:for\s+loss\s+of\s+(-\d{1,3}|\d{1,3})|(-?\d{1,3}))\s+yards?\s+to\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\b/i.exec(afterLanding);
     // NFL prose instead says "Returner to NE 26 for 19 yards" or
     // "Returner pushed ob at NE 26 for 19 yards".
-    const nflReturn = !collegeReturn && /\b(?:to|pushed ob at)\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\s+for\s+(-?\d{1,3})\s+yards?\b/i.exec(afterLanding);
+    const nflReturn = !collegeReturn && /\b(?:to|pushed ob at)\s+([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\s+for\s+(-?\d{1,3})\s+yards?\b/i.exec(afterLanding);
     const returnSpot = collegeReturn ? textSpot(`to ${collegeReturn[3]}${collegeReturn[4]}`,
-      /\bto\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i, home, away)
+      /\bto\s+([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\b/i, home, away)
       : nflReturn && textSpot(`to ${nflReturn[1]}${nflReturn[2]}`,
-        /\bto\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i, home, away);
+        /\bto\s+([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\b/i, home, away);
     const reportedReturn = collegeReturn ? collegeReturn[1] ? -Math.abs(Number(collegeReturn[1]))
       : Number(collegeReturn[2]) : Number(nflReturn?.[3]);
     const returnYards = landing && returnSpot?.percent === end
@@ -213,11 +240,11 @@ export function playTrajectory(play, offenseId, home, away) {
   // numeric end even though both the play prose and gain confirm the end zone.
   const touchdown = kind === "pass" && play.scoringPlay && play.scoringType?.name === "touchdown"
     && /\bTOUCHDOWN\b/i.test(text) && String(play.end?.team?.id) === offenseId
-    && /\b(?:to the )?[A-Za-z][A-Za-z&-]*\s*00\b/i.test(text)
+    && /\b(?:to the )?[A-Za-z][A-Za-z&-]*(?:\s+St)?\s*00\b/i.test(text)
     && play.statYardage === (direction === 1 ? 100 - start : start);
-   const reportedLoss = kind === "pass" && /\bfor\s+(\d+)\s+yards?\s+loss\s+to\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i.exec(text);
+   const reportedLoss = kind === "pass" && /\bfor\s+(\d+)\s+yards?\s+loss\s+to\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\b/i.exec(text);
    const lossSpot = reportedLoss && textSpot(`to ${reportedLoss[2]}${reportedLoss[3]}`,
-     /\bto\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i, home, away);
+     /\bto\s+([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\b/i, home, away);
    const verifiedLoss = lossSpot && play.statYardage === -Number(reportedLoss[1])
      && (lossSpot.percent - start) * direction === play.statYardage;
    const end = kind === "incomplete" ? start : touchdown ? direction === 1 ? 100 : 0
@@ -237,10 +264,14 @@ export function playTrajectory(play, offenseId, home, away) {
    if (end === null || (kind !== "incomplete" && play.end?.team?.id != null
        && String(play.end.team.id) !== offenseId && !fourthDownPass)) return null;
   const yards = kind === "incomplete" ? 0 : (end - start) * direction;
+  // A sack is a loss of field position, not a pass flight or a rushing gain.
+  // Only draw it when the provider's signed yardage confirms the two spots.
+  if (kind === "sack" && (!Number.isFinite(play.statYardage) || play.statYardage >= 0
+      || yards !== play.statYardage)) return null;
   // NFL supplies structured YAC; college play text usually names the catch spot.
   // Only draw the split when the reported gain agrees with the field endpoints.
   const reportedCatch = kind === "pass" ? textSpot(text,
-    /\bcaught at\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i, home, away) : null;
+    /\bcaught at\s+([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\b/i, home, away) : null;
   const structuredYac = kind === "pass" && Number.isInteger(play.yardsAfterCatch)
     && play.statYardage === yards && end - play.yardsAfterCatch * direction >= 0
     && end - play.yardsAfterCatch * direction <= 100 ? play.yardsAfterCatch : null;
@@ -248,7 +279,7 @@ export function playTrajectory(play, offenseId, home, away) {
     : reportedCatch && play.statYardage === yards ? reportedCatch.percent : null;
   const yac = catchPercent === null ? null : (end - catchPercent) * direction || 0;
   const target = kind === "incomplete" ? textSpot(text,
-    /\bthrown to\s+([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i, home, away) : null;
+    /\bthrown to\s+([A-Za-z][A-Za-z&-]*(?:\s+St)?)\s*(\d{1,2})\b/i, home, away) : null;
   // NFL incompletions report depth but not a yard line. A depth-only flight is
   // schematic; keep it separate from a reported target and out of the caption.
   const depth = kind === "incomplete" && !target
@@ -257,7 +288,7 @@ export function playTrajectory(play, offenseId, home, away) {
     ...(kind === "incomplete" ? { targetPercent: target?.percent ?? null, targetLabel: target?.label ?? null,
       schematicYards: depth === "short" ? 10 : depth === "deep" ? 30 : null } : {}),
     catchPercent,
-    label: kind === "run" ? "RUN" : kind === "pass" ? "PASS" : "INCOMPLETE" };
+    label: kind === "run" ? "RUN" : kind === "sack" ? "SACK" : kind === "pass" ? "PASS" : "INCOMPLETE" };
 }
 
 export function driveTrack(drive) {
@@ -265,5 +296,6 @@ export function driveTrack(drive) {
   // A kickoff can begin the provider drive, but the offensive drive begins at
   // the receiving spot (the first scrimmage play's start), not at the kick spot.
   return { motions, start: drive?.plays?.find((play) => Number.isFinite(play.snapPercent))?.snapPercent
-    ?? motions[0]?.start ?? null, end: motions.at(-1)?.end ?? null };
+    ?? (motions[0]?.kind === "kickoff" ? motions[0].end : motions[0]?.start) ?? null,
+    end: motions.at(-1)?.end ?? null };
 }

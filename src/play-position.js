@@ -72,12 +72,34 @@ function incompletePassEnd(play, home, away) {
     downDistanceText: `${shortDownDistanceText}${start.possessionText ? ` at ${start.possessionText}` : ""}` };
 }
 
+/** A fresh zero-yard rush/sack can carry a goal-line placeholder in its end
+ * coordinates (or in the live situation). Restore the snap only when the play
+ * text independently confirms that exact named spot and possession. */
+export function confirmedNoGainEnd(play, home, away) {
+  if (!/^(?:Rush|Sack)$/i.test(play?.type?.text ?? "") || play.statYardage !== 0
+      || play.scoringPlay || play.isTurnover || play.isPenalty || play.penalty
+      || /\b(?:penalty|no\s*play|nullified|overturned|fumble|safety)\b/i.test(play.text ?? "")) return null;
+  const start = scrimmageSpot(play.start, home, away, true);
+  if (!start || ![1, 2, 3].includes(start.down) || !Number.isFinite(start.distance)
+      || start.distance <= 0 || String(play.end?.team?.id) !== String(start.team.id)) return null;
+  const spot = /\bfor\s+(?:(?:a\s+)?loss\s+of\s+)?0\s+yards?\s+(?:gain\s+)?to\s+(?:the\s+)?([A-Za-z][A-Za-z&-]*)\s*(\d{1,2})\b/i.exec(play.text ?? "");
+  const named = /^(.*?)\s+(\d{1,2})$/.exec(start.possessionText ?? "");
+  if (!spot || !named || spot[1].toUpperCase() !== named[1].toUpperCase()
+      || Number(spot[2]) !== Number(named[2])) return null;
+  const down = start.down + 1;
+  const shortDownDistanceText = `${["1st", "2nd", "3rd", "4th"][down - 1]} & ${start.distance}`;
+  return { ...start, down, shortDownDistanceText,
+    downDistanceText: `${shortDownDistanceText} at ${start.possessionText}` };
+}
+
 /** Validate special fallback outcomes without rewriting the saved provider data.
  * Accepted penalties may still establish a new scrimmage spot on a No Play.
  * Ordinary results and scores remain the caller's responsibility. */
 export function fallbackPlayEnd(play, plays, home, away) {
   const enforced = enforcedPlayEnd(play, home, away);
   if (enforced) return enforced;
+  const noGain = confirmedNoGainEnd(play, home, away);
+  if (noGain) return noGain;
   if (/^Pass Incompletion$/i.test(play?.type?.text ?? "") && !play.scoringPlay && !play.isTurnover
       && !play.isPenalty && !play.penalty
       && !/\b(?:penalty|no\s*play|nullified|overturned|intercept\w*|fumble\w*|safety)\b/i.test(play.text ?? "")) {

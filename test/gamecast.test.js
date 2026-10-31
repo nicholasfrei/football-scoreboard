@@ -44,12 +44,13 @@ test("accepted penalty yardage reaches the drive illustration, but declined and 
   assert.deepEqual(motion, { start: 25, end: 20 });
   const chart = illustratedDrive({ ...drive(foul), direction: "right" });
   assert.deepEqual(chart.penaltyPaths, [`M ${104 + 25 * 7.92} 220 L ${104 + 20 * 7.92} 220`]);
-  assert.equal(chart.finalMarker.x, 104 + 20 * 7.92);
+  assert.equal(chart.finalMarker, undefined, "penalties do not add a snap ring");
   const homeFoul = { ...foul, start: { team: { id: "238" }, possessionText: "VAN 25", down: 1 },
     end: { team: { id: "238" }, possessionText: "VAN 20", down: 1 } };
   const homeDrive = enrichGame(game, summary({ current: { id: "home-drive", team: { id: "238" }, plays: [homeFoul] } })).drives.at(-1);
   assert.deepEqual(homeDrive.plays[0].penaltyMotion, { start: 75, end: 80 });
-  assert.equal(illustratedDrive({ ...homeDrive, direction: "left" }).finalMarker.x, 104 + 80 * 7.92);
+  assert.deepEqual(illustratedDrive({ ...homeDrive, direction: "left" }).penaltyPaths,
+    [`M ${104 + 75 * 7.92} 220 L ${104 + 80 * 7.92} 220`]);
   const following = { id: "rush", sequenceNumber: "2", type: { text: "Rush" }, text: "Rush for 5",
     start: spot(20), end: spot(25) };
   const later = enrichGame(game, summary({ current: { id: "drive", team: { id: "8" }, plays: [foul, following] } })).drives.at(-1);
@@ -63,6 +64,37 @@ test("accepted penalty yardage reaches the drive illustration, but declined and 
   assert.equal(drive({ ...foul, penalty: { ...foul.penalty, status: { slug: "declined" } } }).plays[0].penaltyMotion, null);
   assert.equal(drive({ ...foul, type: { text: "Rush" }, text: "Rush for 5, penalty enforced" }).plays[0].penaltyMotion, null);
   assert.equal(drive({ ...foul, end: spot(25) }).plays[0].penaltyMotion, null);
+});
+
+test("a live kickoff still arcs while ESPN attaches it to the kicking team's drive", () => {
+  const frame = summary();
+  frame.header.id = "401856842";
+  frame.header.competitions[0].competitors = [
+    { homeAway: "home", score: "7", team: { id: "2641", location: "Texas Tech", name: "Red Raiders",
+      displayName: "Texas Tech Red Raiders", abbreviation: "TTU" } },
+    { homeAway: "away", score: "3", team: { id: "12", location: "Arizona", name: "Wildcats",
+      displayName: "Arizona Wildcats", abbreviation: "ARIZ" } },
+  ];
+  const kickoff = { id: "kick", sequenceNumber: "24", period: { number: 1 }, clock: { displayValue: "7:03" },
+    type: { text: "Kickoff" }, text: "(07:03) #48 S.Harrington kickoff 65 yards to the ARI00 fair catch by #20 C.Smith at ARI00",
+    start: { down: 1, distance: 10, yardLine: 35, yardsToEndzone: 65, team: { id: "2641" } },
+    end: { down: 1, distance: 10, possessionText: "ARIZ 25", team: { id: "12" } } };
+  const prior = { id: "prior", sequenceNumber: "23", period: { number: 1 }, clock: { displayValue: "7:03" },
+    type: { text: "Rush" }, text: "Rush to TTU 40", start: { down: 1, possessionText: "TTU 35", team: { id: "2641" } },
+    end: { down: 2, possessionText: "TTU 40", team: { id: "2641" } } };
+  const game = { id: frame.header.id, league: "college-football", selectedTeam: { id: "12" } };
+  for (const [teamId, plays] of [["2641", [kickoff]], ["2641", [prior, kickoff]], ["12", [kickoff]]]) {
+    frame.drives.current = { id: "drive", team: { id: teamId }, plays };
+    const drive = enrichGame(game, frame).drives.at(-1);
+    const kick = drive.plays.at(-1);
+    assert.equal(kick.snapPercent, null, "a kickoff is not a scrimmage snap, even on the kicker's drive");
+    assert.deepEqual([kick.trajectory?.kind, kick.trajectory?.start, kick.trajectory?.landingPercent, kick.trajectory?.end],
+      ["kickoff", 65, 0, 25]);
+    const chart = illustratedDrive({ ...drive, direction: teamId === "2641" ? "left" : "right" });
+    assert.equal(chart.segment?.kind, "kickoff", "the latest kick replaces an earlier snap route");
+    assert.equal(chart.segment.to, 104);
+    assert.equal(chart.start, plays.length > 1 ? 65 : 25);
+  }
 });
 
 test("an appended post-play NFL penalty draws from the play endpoint, not its snap", () => {
@@ -98,6 +130,50 @@ test("away possession attacks right across the field", () => {
   assert.equal(result.ball.direction, "right");
   assert.equal(result.ball.downDistance, "1st & 10");
   assert.equal(result.possessionTeamId, "8");
+});
+
+test("a provisional goal-line spot cannot move a confirmed zero-yard sack or rush from TTU 10", () => {
+  const frame = summary();
+  frame.header.id = "401856842";
+  frame.header.competitions[0].competitors = [
+    { homeAway: "home", score: "0", team: { id: "2641", location: "Texas Tech", name: "Red Raiders", displayName: "Texas Tech Red Raiders", abbreviation: "TTU" } },
+    { homeAway: "away", score: "0", team: { id: "12", location: "Arizona", name: "Wildcats", displayName: "Arizona Wildcats", abbreviation: "ARIZ" } },
+  ];
+  const start = { team: { id: "12" }, down: 3, distance: 7, possessionText: "TTU 10",
+    yardsToEndzone: 10, downDistanceText: "3rd & 7 at TTU 10" };
+  const play = { id: "sack", sequenceNumber: "1", type: { text: "Sack" }, statYardage: 0,
+    text: "(12:11) Shotgun #1 N.Fifita sacked for loss of 0 yards to the TTU10 (#2 T.White)",
+    start, end: { team: { id: "12" }, down: 4, distance: 7, yardsToEndzone: 0 } };
+  const base = { id: frame.header.id, league: "college-football", selectedTeam: { id: "12" } };
+  const result = (changes = {}, situation) => enrichGame(base, { ...frame, situation,
+    drives: { current: { id: "drive", team: { id: "12" }, plays: [{ ...play, ...changes }] }, previous: [] } });
+
+  for (const end of [play.end, { ...play.end, possessionText: "TTU 0" }]) {
+    const live = result({ end });
+    assert.equal(live.ball.percent, 90);
+    assert.equal(live.ball.label, "TTU 10");
+    assert.equal(live.ball.firstDownPercent, 97);
+    assert.equal(live.ball.downDistance, "4th & 7 at TTU 10");
+    assert.equal(live.drives[0].plays[0].snapPercent, 90);
+  }
+  const withSituation = result({}, { possession: "12", possessionText: "TTU 0", down: 4, distance: 7 });
+  assert.equal(withSituation.ball.percent, 90, "a matching provisional situation cannot override the confirmed spot");
+  assert.equal(withSituation.ball.label, "TTU 10");
+  assert.equal(result({}, { possession: "12", possessionText: "TTU 9" }).ball.label, "TTU 9",
+    "ordinary reported situations remain authoritative");
+
+  const rush = result({ type: { text: "Rush" }, text: "Shotgun #24 Q.Craig rush middle for 0 yards to the TTU10" });
+  assert.equal(rush.ball.percent, 90);
+  for (const changes of [
+    { text: play.text.replace("TTU10", "TTU09") },
+    { text: play.text + " PENALTY on ARIZ" },
+    { end: { ...play.end, team: { id: "2641" } } },
+    { start: { ...start, yardsToEndzone: 90 } },
+  ]) assert.notEqual(result(changes).ball?.label, "TTU 10", "unconfirmed plays must not restore the snap");
+
+  const corrected = result({ statYardage: -8, text: play.text.replace("loss of 0 yards to the TTU10", "loss of 8 yards to the TTU18"),
+    end: { ...play.end, yardsToEndzone: 18, possessionText: "TTU 18", distance: 15 } });
+  assert.equal(corrected.ball.percent, 82, "a real sack loss still moves the ball to TTU 18");
 });
 
 test("score possession follows confirmed live possession, even without a yard-line spot", () => {

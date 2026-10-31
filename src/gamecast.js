@@ -4,7 +4,7 @@ import { matchupPredictor } from "./game-details.js";
 import { acceptedPenalty, textIntentionalGrounding } from "./penalty.js";
 import { kickPosition } from "./kick-position.js";
 import { comparePlays } from "./play-order.js";
-import { fallbackPlayEnd } from "./play-position.js";
+import { confirmedNoGainEnd, fallbackPlayEnd } from "./play-position.js";
 import { blockedFieldGoalReturnPosition, uncertainBlockedFieldGoalSpot } from "./blocked-kick-position.js";
 import { driveStats } from "./drive-stats.js";
 import { fieldPercent, playTrajectory } from "../public/play-trajectory.js";
@@ -40,7 +40,8 @@ function driveSummary(drive, orderedPlays, scoringTeams, home, away, league) {
       scoring: Boolean(play.scoringPlay),
       scoringTeamId: play.scoringPlay ? scoringTeams.get(String(play.id)) ?? null : null,
       trajectory: amendment?.trajectory ?? playTrajectory(play, offenseId, home, away),
-      snapPercent: String(play.start?.team?.id) === offenseId && [1, 2, 3, 4].includes(play.start?.down)
+       snapPercent: !/^Kickoff$/i.test(play.type?.text ?? "") && String(play.start?.team?.id) === offenseId
+         && [1, 2, 3, 4].includes(play.start?.down)
         ? fieldPercent(play.start, home, away) : null,
       penaltyMotion: amendment?.motion ?? penaltyMotion(play, offenseId, home, away),
       type: play.type?.text ?? null,
@@ -257,6 +258,22 @@ export function enrichGame(game, summary) {
       distance = end.distance;
       positionLabel = end.possessionText ?? null;
     }
+    positionSource = "last reported play";
+  }
+
+  // A live situation can repeat the same provisional goal-line placeholder as
+  // the play end. Only contradict it when the latest no-gain play independently
+  // confirms its unchanged snap in both the start metadata and play text.
+  const noGain = lastCurrentPlay?.id === latestPlay?.id
+    ? confirmedNoGainEnd(lastCurrentPlay, home, away) : null;
+  if (situation && noGain && possessionId === String(noGain.team.id)
+      && (position === 0 || position === 100)
+      && position !== positionFromText(noGain.possessionText, home, away)) {
+    position = positionFromText(noGain.possessionText, home, away);
+    positionLabel = noGain.possessionText;
+    downDistance = noGain.downDistanceText;
+    down = noGain.down;
+    distance = noGain.distance;
     positionSource = "last reported play";
   }
 

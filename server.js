@@ -46,7 +46,7 @@ function sendJson(response, statusCode, value) {
 
 async function serveStatic(pathname, response) {
   const asset = pathname === "/" ? "index.html" : pathname.slice(1);
-  if (!new Set(["index.html", "app.js", "team-picker.js", "display-size.js", "game-timing.js", "ball-position.js", "field-animation.js", "highlights.js", "field-branding.js", "possession-branding.js", "scoring-style.js", "leader-layout.js", "team-record.js", "play-trajectory.js", "drive-illustration.js", "drive-summary.js", "styles.css", "assets/arkansas.png", "assets/vanderbilt.png", "assets/cowboys.png", "assets/eagles.png", "assets/fonts/Graduate-Regular.ttf"]).has(asset)) {
+  if (!new Set(["index.html", "app.js", "team-picker.js", "display-size.js", "game-timing.js", "ball-position.js", "field-animation.js", "highlights.js", "field-branding.js", "possession-branding.js", "scoring-style.js", "leader-layout.js", "team-record.js", "play-trajectory.js", "fbs-yardline-aliases.js", "drive-illustration.js", "drive-summary.js", "styles.css", "assets/arkansas.png", "assets/vanderbilt.png", "assets/cowboys.png", "assets/eagles.png", "assets/fonts/Graduate-Regular.ttf"]).has(asset)) {
     response.writeHead(404);
     response.end("Not found");
     return;

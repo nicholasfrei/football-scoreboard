@@ -7,3 +7,8 @@ export function driveSummaryLabel(drive) {
     drive.time ?? "—:—",
   ].join(", ");
 }
+
+export function playDownDistance(play) {
+  return !/^Kickoff/i.test(play.type ?? "") && [1, 2, 3, 4].includes(play.down) && Number.isFinite(play.distance)
+    ? ` · ${["", "1st", "2nd", "3rd", "4th"][play.down]} & ${play.distance}` : "";
+}

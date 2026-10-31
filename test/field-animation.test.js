@@ -145,7 +145,7 @@ test("football and blue line wait together without blinking; the yellow line and
       replaceChildren(...children) { this.children = children; }, removeAttribute(name) { delete this.attributes[name]; } };
   }
   const elements = Object.fromEntries(["#ball-marker", "#football-marker", "#first-down-marker", "#redzone-tint", "#ball-detail",
-    "#possession-pin", "#possession-pin-logo", "#possession-pin-fallback", "#football-direction"]
+    "#possession-pin", "#possession-pin-logo", "#possession-pin-fallback"]
     .map((selector) => [selector, node()]));
   const document = { querySelector: (selector) => {
     assert.ok(elements[selector], `unexpected selector: ${selector}`);
@@ -157,7 +157,7 @@ test("football and blue line wait together without blinking; the yellow line and
     ball: { percent: 82, direction: "right", firstDownPercent: 90, downDistance: "2nd & 8 at HME 18", possession: "AWY", label: "HME 18" } };
   lines(confirmed);
   const fieldState = () => JSON.stringify(Object.fromEntries(Object.entries(elements)
-    .filter(([key]) => !["#football-marker", "#ball-marker", "#football-direction"].includes(key))));
+    .filter(([key]) => !["#football-marker", "#ball-marker"].includes(key))));
   const originalFieldState = fieldState();
   const motion = animation();
   const placement = createBallPlacement({ render: football, schedule: () => 1, cancel() {} });

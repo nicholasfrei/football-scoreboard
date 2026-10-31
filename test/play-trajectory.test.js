@@ -165,6 +165,32 @@ test("reported incompletion targets resolve both sides, zero, midfield and provi
   assert.equal(yardageLabel(graphic.segment), "INCOMPLETE · 0 YDS · TARGET TEX 4");
 });
 
+test("NCAAF thrown-to yard lines override short and deep incomplete pass defaults", () => {
+  const texasTech = { id: "2641", abbreviation: "TTU" };
+  const arizona = { id: "12", abbreviation: "ARIZ" };
+  for (const [depth, targetYard] of [["deep", 2], ["short", 28]]) {
+    const candidate = { type: { text: "Pass Incompletion" },
+      text: `(08:31) No Huddle-Shotgun #4 T.Castellanos pass incomplete ${depth} left to #1 M.Hudson thrown to ARI${String(targetYard).padStart(2, "0")} broken up by #12 D.Bootle II`,
+      start: spot("2641", "ARI 42", 42, 3), end: {} };
+    const motion = playTrajectory(candidate, texasTech.id, texasTech, arizona);
+    assert.equal(motion.targetPercent, targetYard);
+    assert.equal(motion.schematicYards, null);
+    assert.equal(motion.targetLabel, `ARIZ ${targetYard}`);
+    const { segment } = illustratedDrive({ direction: "left", plays: [{ id: depth, trajectory: motion }] });
+    assert.equal(segment.to, 104 + targetYard * 7.92);
+    assert.equal(segment.path, `M ${segment.from} 220 Q ${(segment.from + segment.to) / 2} 70 ${segment.to} 220`);
+    assert.equal(yardageLabel(segment), `INCOMPLETE · 0 YDS · TARGET ARIZ ${targetYard}`);
+    const withDepth = illustratedDrive({ direction: "left", plays: [{ id: depth,
+      trajectory: { ...motion, schematicYards: depth === "short" ? 10 : 30 } }] }).segment;
+    assert.equal(withDepth.to, segment.to, "a known target wins even if a depth estimate is also present");
+  }
+  const fallback = playTrajectory({ type: { text: "Pass Incompletion" },
+    text: "QB pass incomplete deep left to Receiver thrown to UNKNOWN02",
+    start: spot("2641", "ARI 42", 42, 3), end: {} }, texasTech.id, texasTech, arizona);
+  assert.equal(fallback.targetPercent, null);
+  assert.equal(fallback.schematicYards, 30);
+});
+
 test("NFL YAC places the catch before the reported final spot; unknown splits stay unknown", () => {
   const completed = play("Pass Reception", "AWY 30", "HME 28", {
     statYardage: 42, yardsAfterCatch: 8,
@@ -203,6 +229,29 @@ test("college caught-at spot supplies the air route and YAC without NFL structur
   assert.equal(graphic.segment.finish, 104 + 56 * 7.92);
   assert.match(graphic.segment.path, / 220 Q .* 70 .* 220$/);
   assert.ok(graphic.segment.yacPath);
+});
+
+test("Arizona's ARI catch spot produces YAC across midfield against Texas Tech", () => {
+  const arizona = { id: "12", abbreviation: "ARIZ" };
+  const texasTech = { id: "2641", abbreviation: "TTU" };
+  const candidate = { type: { text: "Pass Reception" },
+    text: "(14:00) No Huddle-Shotgun #1 N.Fifita pass complete short right to #5 G.Richardson caught at ARI47, for 55 yards to the TTU13 (#3 P.Morgan), 1ST DOWN",
+    statYardage: 55, start: spot("12", "ARIZ 32", 68), end: spot("12", "TTU 13", 13) };
+  const motion = playTrajectory(candidate, "12", texasTech, arizona);
+  assert.deepEqual([motion.start, motion.catchPercent, motion.end, motion.yards, motion.yac],
+    [32, 47, 87, 55, 40]);
+  assert.equal(yardageLabel(motion), "PASS · +55 YDS · 40 YAC");
+  const graphic = illustratedDrive({ direction: "right", plays: [{ id: "arizona", trajectory: motion }] });
+  assert.equal(graphic.segment.to, 104 + 47 * 7.92);
+  assert.equal(graphic.segment.finish, 104 + 87 * 7.92);
+  assert.ok(graphic.segment.yacPath);
+
+  const unconfirmed = playTrajectory({ ...candidate, statYardage: 54 }, "12", texasTech, arizona);
+  assert.equal(unconfirmed, null, "a conflicting reported gain must not create a YAC split");
+  const otherTeam = { id: "66", abbreviation: "ISU" };
+  const otherMatchup = playTrajectory({ ...candidate, start: spot("66", "ISU 32", 68),
+    end: spot("66", "TTU 13", 13) }, "66", texasTech, otherTeam);
+  assert.equal(otherMatchup.catchPercent, null, "ARI must not resolve outside an Arizona matchup");
 });
 
 test("Texas–Ole Miss bundled touchdown reaches MISS 0 after the catch at MISS 8", () => {
@@ -402,6 +451,70 @@ test("field-goal arcs end at the back of the attacking end zone, not at a new po
   assert.equal(yardageLabel(left), "FIELD GOAL · MISSED");
 });
 
+test("kickoff touchbacks arc to the back of the receiving end zone without moving the offensive drive", () => {
+  for (const [file, league] of [["401856712", "college-football"], ["401873009", "nfl"]]) {
+    const summary = JSON.parse(gunzipSync(readFileSync(new URL(`./fixtures/games/${league}/${file}.json.gz`, import.meta.url))));
+    const sides = summary.header.competitions[0].competitors;
+    const h = sides.find((side) => side.homeAway === "home").team;
+    const a = sides.find((side) => side.homeAway === "away").team;
+    const drives = [...(summary.drives?.previous ?? []), summary.drives?.current].filter(Boolean);
+    const candidates = drives.flatMap((drive) => (drive.plays ?? [])
+      .filter((play) => play.type?.text === "Kickoff" && /touchback/i.test(play.text ?? ""))
+      .map((play) => ({ play, drive })));
+    assert.ok(candidates.length, `${league} has a saved touchback`);
+    for (const { play: kickoff, drive } of candidates) {
+      const motion = playTrajectory(kickoff, String(drive.team.id), h, a);
+      assert.equal(motion?.kind, "kickoff", kickoff.id);
+      const direction = String(drive.team.id) === h.id ? "left" : "right";
+      const graphic = illustratedDrive({ direction, plays: [{ id: kickoff.id, trajectory: motion }] });
+      const { segment } = graphic;
+      const target = direction === "left" ? 988 : 12;
+      assert.equal(segment.to, target);
+      assert.equal(segment.finish, target);
+      assert.equal(segment.path, `M ${segment.from} 220 Q ${(segment.from + target) / 2} 70 ${target} 220`);
+      assert.equal(segment.from, 104 + motion.start * 7.92);
+      assert.equal(graphic.start, motion.end, "drive starts at the receiving spot, not the kicker's 35");
+      assert.equal(graphic.progressPath, null);
+      assert.equal(yardageLabel(segment), "KICKOFF · TOUCHBACK");
+    }
+  }
+});
+
+test("returned kickoffs arc only to their reported landing spot, not the end zone or receiving spot", () => {
+  const summary = JSON.parse(gunzipSync(readFileSync(new URL("./fixtures/games/nfl/401873009.json.gz", import.meta.url))));
+  const sides = summary.header.competitions[0].competitors;
+  const h = sides.find((side) => side.homeAway === "home").team;
+  const a = sides.find((side) => side.homeAway === "away").team;
+  const drives = [...summary.drives.previous, summary.drives.current].filter(Boolean);
+  const drive = drives.find((item) => item.plays?.some((play) => /kicks 55 yards from PHI 35 to DAL 10/.test(play.text ?? "")));
+  const kickoff = drive.plays.find((play) => /kicks 55 yards from PHI 35 to DAL 10/.test(play.text ?? ""));
+  const motion = playTrajectory(kickoff, String(drive.team.id), h, a);
+  assert.deepEqual([motion.kind, motion.start, motion.landingPercent, motion.end], ["kickoff", 65, 10, 35]);
+  const graphic = illustratedDrive({ direction: "left", plays: [{ id: kickoff.id, trajectory: motion }] });
+  assert.equal(graphic.segment.to, 104 + 10 * 7.92);
+  assert.equal(graphic.start, 35);
+  assert.equal(yardageLabel(graphic.segment), "KICKOFF · TO DAL 10");
+  assert.equal(playTrajectory({ ...kickoff, text: "Kicker kicks to an unknown spot" }, String(drive.team.id), h, a), null);
+  assert.equal(playTrajectory({ ...kickoff, text: `${kickoff.text} PENALTY enforced` }, String(drive.team.id), h, a), null);
+  assert.equal(playTrajectory({ ...kickoff, start: { ...kickoff.start, team: { id: drive.team.id } } }, String(drive.team.id), h, a), null);
+});
+
+test("a kicker-attached touchback reaches the receiver's end zone in either field direction", () => {
+  for (const [kicker, receiver, start, end, target] of [
+    [home, away, "HME 35", "AWY 25", 12],
+    [away, home, "AWY 35", "HME 25", 988],
+  ]) {
+    const kick = { type: { text: "Kickoff" }, text: `Kicker kickoff to ${receiver.abbreviation}00, Touchback`,
+      start: spot(kicker.id, start, 65), end: spot(receiver.id, end, 75) };
+    const motion = playTrajectory(kick, kicker.id, home, away);
+    assert.equal(motion?.kind, "kickoff");
+    const chart = illustratedDrive({ direction: kicker.id === home.id ? "left" : "right",
+      plays: [{ id: "kick", trajectory: motion }] });
+    assert.equal(chart.segment.to, target);
+    assert.equal(playTrajectory({ ...kick, end: { ...kick.end, team: { id: kicker.id } } }, kicker.id, home, away), null);
+  }
+});
+
 test("the pictured Texas–Ole Miss interceptions arc to the pick, then return to the confirmed final spot", () => {
   const summary = JSON.parse(gunzipSync(readFileSync(new URL("./fixtures/games/college-football/401856732.json.gz", import.meta.url))));
   const sides = summary.header.competitions[0].competitors;
@@ -522,7 +635,7 @@ test("previous plays collapse to one static center line ending at the latest sna
   const kick = illustratedDrive({ direction: "right", plays: [...plays, { id: "d", snapPercent: 45, type: "Punt" }] });
   assert.equal(kick.segment, null, "a completed earlier pass is not replayed as a final kick");
   assert.equal(kick.progressPath, track.progressPath);
-  assert.deepEqual(kick.finalMarker, { x: 104 + 45 * 7.92, y: 220 });
+  assert.equal(kick.finalMarker, undefined, "an unillustrated punt does not add a ring at its snap");
   const rushing = illustratedDrive({ direction: "right", plays: plays.slice(0, 1) });
   assert.equal(rushing.segment.path, `M ${104 + 25 * 7.92} 220 L ${104 + 31 * 7.92} 220`);
   assert.equal(rushing.segment.y, 220);
@@ -534,7 +647,7 @@ test("unknown, penalized, nullified and change-of-possession results do not draw
     play("Pass Reception", "AWY 25", "AWY 30", { text: "No Play" }),
     play("Pass Reception", "AWY 25", "AWY 30", { end: {} }),
     play("Rush", "AWY 25", "AWY 30", { isTurnover: true }),
-    play("Kickoff", "AWY 25", "AWY 30"),
+    play("Kickoff", "AWY 25", "AWY 30"), // Kicker cannot also be the receiving drive.
     play("Punt", "AWY 25", "HME 30", { text: "Punt blocked and recovered" }),
     play("Punt Return Touchdown", "AWY 25", "HME 0"),
     play("Field Goal Missed", "AWY 25", "AWY 25", { text: "Field goal was blocked" }),
@@ -619,8 +732,14 @@ test("100-game pass audit separates college caught-at spots from NFL structured 
           }
           continue;
         }
-        assert.match(segment.path, / 220 (?:Q .* 70|C .* 120 .* 120) .* 220$/,
-          `${entry.id}:${candidate.id}`);
+        if (motion.yards < 0) {
+          assert.equal(segment.loss, true, `${entry.id}:${candidate.id}`);
+          assert.equal(segment.path, `M ${segment.from} 220 L ${segment.finish} 220`,
+            `${entry.id}:${candidate.id}`);
+        } else {
+          assert.match(segment.path, / 220 (?:Q .* 70|C .* 120 .* 120) .* 220$/,
+            `${entry.id}:${candidate.id}`);
+        }
         if (candidate.type.text === "Passing Touchdown") observed.scoring++;
         if (entry.league === "nfl") {
           if (Number.isInteger(candidate.yardsAfterCatch) && candidate.statYardage === motion.yards) {
@@ -803,7 +922,9 @@ test("adapter supplies trajectories for full-game replay drives without future p
   const option = REPLAY_GAMES.nfl;
   const summary = JSON.parse(gunzipSync(readFileSync(new URL(`./fixtures/games/${option.file}`, import.meta.url))));
   const frames = createReplayFrames(summary, option);
-  const first = frames.find((frame) => frame.spotlight.drives.at(-1)?.plays.some((entry) => entry.trajectory));
+  const kickoffFrame = frames.find((frame) => frame.spotlight.drives.at(-1)?.plays.at(-1)?.trajectory?.kind === "kickoff");
+  assert.ok(kickoffFrame, "a kickoff is illustrated on its own replay frame");
+  const first = frames.find((frame) => frame.spotlight.drives.at(-1)?.plays.some((entry) => entry.trajectory?.kind === "run"));
   const drive = first.spotlight.drives.at(-1);
   assert.ok(drive.plays.some((entry) => entry.trajectory?.kind === "run"));
   assert.ok(frames.some((frame) => frame.spotlight.drives.at(-1)?.plays.some((entry) => entry.trajectory?.kind === "incomplete")));

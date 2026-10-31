@@ -141,7 +141,6 @@
               <pattern id="hash-marks" x="111.92" width="7.92" height="440" patternUnits="userSpaceOnUse">
                 <path d="M0 171v6 M0 263v6" fill="none" stroke="#f4f1e6" stroke-opacity=".72" stroke-width="2.5" />
               </pattern>
-              <clipPath id="possession-pin-clip"><circle cx="0" cy="51" r="23" /></clipPath>
               <filter id="drive-outline" filterUnits="userSpaceOnUse" x="-40" y="-40" width="1080" height="520" color-interpolation-filters="sRGB">
                 <feMorphology in="SourceAlpha" operator="dilate" radius="1" result="outline" />
                 <feFlood flood-color="#16212a" />
@@ -180,15 +179,14 @@
               <line x1="0" y1="12" x2="0" y2="428" stroke="#70c9ff" stroke-width="4" />
               <g id="possession-pin" transform="translate(0 94)" visibility="hidden" aria-label="Team with possession">
                 <path d="M0 109 L-23 78 A32 32 0 1 1 23 78 Z" fill="#f5f7f8" stroke="#16212a" stroke-width="3" />
-                <image id="possession-pin-logo" x="-23" y="28" width="46" height="46" preserveAspectRatio="xMidYMid meet" clip-path="url(#possession-pin-clip)" />
+                <image id="possession-pin-logo" x="-21" y="35" width="42" height="42" preserveAspectRatio="xMidYMid meet" />
                 <text id="possession-pin-fallback" x="0" y="59" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="800" fill="#16212a"></text>
               </g>
             </g>
             <g id="drive-yac-overlay" aria-hidden="true"></g>
-            <g id="football-marker" visibility="hidden" aria-label="Direction of play">
-              <g transform="translate(0 220)">
-                <path id="football-direction" d="M-9 -4 H-2 V-9 L9 0 L-2 9 V4 H-9 Z" />
-              </g>
+            <g id="football-marker" visibility="hidden" aria-label="Football at reported ball position">
+              <ellipse cx="0" cy="220" rx="20" ry="12" fill="#6e331b" stroke="white" stroke-width="3" />
+              <path d="M-10 220h20 M-5 215v10 M0 215v10 M5 215v10" stroke="white" stroke-width="2" />
             </g>
           </svg>
           </div>

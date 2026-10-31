@@ -72,13 +72,13 @@ test("drive paths and marks share a light color with a thin dark border", async 
   const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
   assert.match(css, /--drive-line-color: #f5f4eb;/);
   const outlined = css.match(/([^{}]+)\{ filter: url\(#drive-outline\); \}/)?.[1];
-  for (const selector of ["#football-direction", ".drive-progress", ".drive-route", ".drive-yac-route", ".drive-return-route", ".drive-catch", ".drive-pick", ".drive-end", ".drive-final"]) {
+  for (const selector of [".drive-progress", ".drive-route", ".drive-yac-route", ".drive-return-route", ".drive-catch", ".drive-pick", ".drive-end"]) {
     assert.ok(outlined?.includes(selector), `${selector} has a thin outline`);
   }
   assert.match(html, /<filter id="drive-outline" filterUnits="userSpaceOnUse"/);
   assert.match(html, /<feMorphology in="SourceAlpha" operator="dilate" radius="1"/);
   assert.match(html, /<feFlood flood-color="#16212a"/);
-  for (const className of ["drive-progress", "drive-route", "drive-yac-route", "drive-return-route", "drive-final"]) {
+  for (const className of ["drive-progress", "drive-route", "drive-yac-route", "drive-return-route"]) {
     assert.match(css, new RegExp(`\\.${className} \\{[^}]*stroke: var\\(--drive-line-color\\)`), className);
   }
   for (const className of ["drive-end", "drive-catch", "drive-pick"]) {
@@ -88,6 +88,15 @@ test("drive paths and marks share a light color with a thin dark border", async 
     assert.match(css, new RegExp(`\\.${className} \\{ fill: #fff;`), `${className} stays legible over the dark route`);
   }
   assert.match(css, /\.drive-penalty \{ stroke: #efc744/);
+});
+
+test("the dotted snap ring is removed without replacing the football marker", async () => {
+  const app = await readFile(new URL("../public/app.js", import.meta.url), "utf8");
+  const css = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
+  const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
+  assert.doesNotMatch(app, /drive-final|track\.finalMarker|Final offensive snap/);
+  assert.doesNotMatch(css, /\.drive-final\b/);
+  assert.match(html, /<g id="football-marker"/);
 });
 
 test("incompletions and missed field goals end in a red X rather than a dot", async () => {

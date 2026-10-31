@@ -7,7 +7,7 @@ import { ballPositionFallback, createBallPositionTracker } from "./ball-position
 import { DISPLAY_WIDTH, DISPLAY_HEIGHT, displayScale } from "./display-size.js";
 import { leaderCardTeams, showGameLeaders } from "./leader-layout.js";
 import { illustratedDrive, lastDriveSnap } from "./drive-illustration.js";
-import { driveSummaryLabel } from "./drive-summary.js";
+import { driveSummaryLabel, playDownDistance } from "./drive-summary.js";
 import { createBallPlacement, ROUTE_DURATION_MS, RETURN_DELAY_MS, RETURN_DURATION_MS } from "./field-animation.js";
 import { startTeamPicker } from "./team-picker.js";
 
@@ -91,7 +91,7 @@ function renderFieldDrive(game, drive) {
   layer.style.setProperty("--return-duration", `${RETURN_DURATION_MS}ms`);
   const rememberAnimation = (element, durationMs, start = current?.start) => {
     // The final animated leg determines when the ball may be placed.
-    renderedRouteAnimation = { element, durationMs, start, playId: finalSnap.id };
+    renderedRouteAnimation = { element, durationMs, start, playId: current?.id ?? finalSnap?.id };
   };
   renderedIllustratedPlayId = current?.id ?? null;
   if (track.progressPath) layer.append(svgElement("path", { d: track.progressPath, class: "drive-progress", fill: "none" }));
@@ -110,7 +110,8 @@ function renderFieldDrive(game, drive) {
   }
   if (current) {
     const group = svgElement("g", { class: "drive-latest" });
-    const path = current.path && svgElement("path", { d: current.path, class: `drive-route is-${current.kind}`, fill: "none" });
+    const path = current.path && svgElement("path", { d: current.path,
+      class: `drive-route is-${current.kind}${current.loss ? " is-loss" : ""}`, fill: "none" });
     if (path && animate && current.id !== previousIllustratedPlayId) {
       // Reveal a solid or dotted route with the same mask, regardless of direction.
       // Use field coordinates: the default object-bounding-box mask has zero
@@ -176,10 +177,6 @@ function renderFieldDrive(game, drive) {
       }
     }
     layer.append(group);
-  }
-  if (track.finalMarker) {
-    layer.append(svgElement("circle", { cx: track.finalMarker.x, cy: track.finalMarker.y,
-      r: 11, class: "drive-final", "aria-label": `Final offensive snap: ${finalSnap.type ?? "play"}` }));
   }
   return renderedRouteAnimation;
 }
@@ -422,7 +419,6 @@ function updateBallMarkers(game) {
 
 function updateFootballMarker(game, { hidden = false } = {}) {
   const visibility = !hidden && game.ball ? "visible" : "hidden";
-  document.querySelector("#football-direction").setAttribute("transform", game.ball?.direction === "left" ? "scale(-1 1)" : "scale(1 1)");
   for (const selector of ["#football-marker", "#ball-marker"]) {
     const marker = document.querySelector(selector);
     // No hide/show cycle or transform reset when an incompletion keeps the spot.
@@ -494,9 +490,7 @@ function renderDrives(game) {
     const item = document.createElement("li");
     item.dataset.playId = play.id;
     const time = document.createElement("span");
-     const downDistance = [1, 2, 3, 4].includes(play.down) && Number.isFinite(play.distance)
-       ? ` · ${["", "1st", "2nd", "3rd", "4th"][play.down]} & ${play.distance}` : "";
-     time.textContent = `${play.period > 4 ? `OT${play.period - 4}` : `Q${play.period ?? "—"}`} · ${play.clock ?? "—"}${downDistance}`;
+    time.textContent = `${play.period > 4 ? `OT${play.period - 4}` : `Q${play.period ?? "—"}`} · ${play.clock ?? "—"}${playDownDistance(play)}`;
     const text = document.createElement("span");
     const description = document.createElement("span");
     description.className = "play-description";

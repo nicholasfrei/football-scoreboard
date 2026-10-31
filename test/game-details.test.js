@@ -4,6 +4,7 @@ import { broadcastNetworks, matchupPredictor } from "../src/game-details.js";
 import { getScoreboard } from "../src/espn.js";
 
 const game = { selectedTeam: { id: "8" }, opponent: { id: "142" } };
+const beforeNextGame = new Date("2026-10-26T17:00:00Z");
 const prediction = (arkansas, opponent, away = false) => ({
   homeTeam: { id: away ? "142" : "8", gameProjection: away ? opponent : arkansas },
   awayTeam: { id: away ? "8" : "142", gameProjection: away ? arkansas : opponent },
@@ -60,7 +61,7 @@ test("next-game summary supplies predictor separately from the displayed complet
   const previous = event("previous", "post");
   const next = event("next", "pre");
   const calls = [];
-  const result = await getScoreboard({ fetchImpl: async (url) => {
+  const result = await getScoreboard({ now: beforeNextGame, fetchImpl: async (url) => {
     calls.push(url);
     if (url.includes("/schedule?")) return { ok: true, json: async () => ({ events: [previous, next] }) };
     if (url.includes("summary?event=previous")) return { ok: true, json: async () => ({ header: previous }) };
@@ -75,7 +76,7 @@ test("next-game summary supplies predictor separately from the displayed complet
 });
 
 test("next-summary failure preserves the schedule network and available scoreboard", async () => {
-  const result = await getScoreboard({ fetchImpl: async (url) => {
+  const result = await getScoreboard({ now: beforeNextGame, fetchImpl: async (url) => {
     if (url.includes("/schedule?")) return { ok: true, json: async () => ({ events: [event("previous", "post"), event("next", "pre")] }) };
     return { ok: false, status: 503 };
   } });

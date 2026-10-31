@@ -22,6 +22,18 @@ guarantee, or verified live-latency guarantee for this project. The app's
 10-second pregame/live (five-minute otherwise) browser polling interval is not a
 provider freshness or access guarantee.
 
+### FBS yard-line aliases
+
+`public/fbs-yardline-aliases.js` records a 2026 ESPN game ID, header
+abbreviation, and *observed play-text yard-line label* for each of 138 FBS
+teams. Labels are not always the header abbreviation: Arizona has `ARIZ` in
+event `401856838` and `ARI` in event `401856842`; other feeds use names such
+as `Jax St` or `State`. `public/play-trajectory.js` resolves these only for
+participants in the current matchup, and rejects labels shared by both teams.
+To check the 138 representative observations against ESPN's live summaries,
+run `node scripts/audit-fbs-yardline-aliases.js` (90 event requests). The
+ordinary test suite uses the recorded evidence and does not make API requests.
+
 ## Access and reuse limitations
 
 **A publicly reachable endpoint is not an open-data license.** The original
