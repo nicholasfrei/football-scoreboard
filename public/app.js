@@ -720,6 +720,10 @@ function updateGame(game, nextGame, demo = false) {
       const clock = document.createElement("strong");
       clock.className = "clock-time";
       clock.textContent = breakTime ?? game.clock;
+      const remaining = /^(\d{1,2}):([0-5]\d)$/.exec(game.clock ?? "");
+      clock.classList.toggle("is-two-minute-warning", quarter !== "HALFTIME"
+        && (game.period === 2 || game.period === 4) && remaining !== null
+        && Number(remaining[1]) * 60 + Number(remaining[2]) <= 120);
       elements.gameClock.append(clock);
     }
     if (breakTime !== null) {

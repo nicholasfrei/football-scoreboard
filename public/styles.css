@@ -156,11 +156,12 @@ body {
 .score-center { display: grid; grid-template-areas: "readout"; align-items: center; min-width: 0; }
 .game-clock { grid-area: readout; z-index: 1; display: flex; flex-direction: column; justify-self: center; align-items: center; justify-content: center; gap: 8px; width: 156px; min-height: 82px; margin: 0; border-inline: 1px solid var(--panel-border); color: #adbac7; text-align: center; font-variant-numeric: tabular-nums; }
 .clock-period { order: 2; font-size: 18px; font-weight: 700; letter-spacing: .05em; }
-.clock-time { font-size: 36px; line-height: 1; color: var(--paper); }
+.clock-time { font-size: 36px; line-height: 1; color: #f5f4eb; }
 .clock-estimate { order: 3; font-size: 9px; font-weight: 700; letter-spacing: .08em; color: var(--gold); }
 .clock-period:only-child { font-size: 23px; }
 .game-clock[hidden] { display: none; }
-.score-readout { grid-area: readout; display: grid; grid-template-columns: 33px minmax(0, 1fr) 156px minmax(0, 1fr) 33px; align-items: center; gap: 8px; font-variant-numeric: tabular-nums lining-nums; }
+/* Match the football's rendered size on the field at the 1920px design width. */
+.score-readout { grid-area: readout; display: grid; grid-template-columns: 54px minmax(0, 1fr) 156px minmax(0, 1fr) 54px; align-items: center; gap: 8px; font-variant-numeric: tabular-nums lining-nums; }
 .possession-ball { display: block; width: 100%; height: auto; }
 .possession-ball[hidden] { visibility: hidden; }
 .score-number { min-width: 0; color: #f5f4eb; font-size: 96px; font-weight: 700; line-height: 1.1; letter-spacing: -.04em; text-align: center; }
@@ -373,7 +374,8 @@ body {
 .ball-detail { flex: none; margin: 0; padding: 10px 24px; min-height: 56px; border-top: 1px solid var(--panel-border); background: var(--panel); color: #cdd9e5; font-size: 22px; line-height: 1.5; text-align: center; }
 .possession-team { display: inline-block; margin-right: 6px; padding: 3px 12px; border-radius: 5px; background: var(--possession-color, #373e47); color: #f5f4eb; font-size: 20px; font-weight: 700; }
 .down-distance { font-weight: 700; color: var(--paper); }
-.down-distance.is-fourth-down { color: #f56367; font-weight: 700; }
+.clock-time.is-two-minute-warning, .down-distance.is-fourth-down { color: #f56367; }
+.down-distance.is-fourth-down { font-weight: 700; }
 .play-panel { padding: 22px; background: var(--ink); border: 1px solid var(--panel-border); border-radius: 10px; }
 .play-panel h2 { margin: 0 0 8px; color: var(--gold); font-size: 17px; font-weight: 700; letter-spacing: .08em; }
 .drive-heading { display: flex; align-items: center; gap: 12px; }

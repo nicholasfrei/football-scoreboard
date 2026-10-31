@@ -9,8 +9,12 @@ const source = await readFile(new URL("../public/app.js", import.meta.url), "utf
 
 function element() {
   let text = "";
+  const classes = new Set();
   return {
-    children: [], hidden: false, dataset: {}, classList: { toggle() {} },
+    children: [], hidden: false, dataset: {}, classList: {
+      toggle(name, force) { if (force) classes.add(name); else classes.delete(name); },
+      contains(name) { return classes.has(name); },
+    },
     get textContent() { return text + this.children.map((child) => child.textContent).join(""); },
     set textContent(value) { text = value; this.children = []; },
     replaceChildren(...children) { text = ""; this.children = children; },
@@ -66,12 +70,42 @@ test("broadcast clock keeps regulation, halftime, and overtime readable without 
   }
 });
 
+test("clock turns red only in the final two minutes of Q2 and Q4", () => {
+  const { updateGame, elements } = gameView();
+  for (const [period, clock, status, expected] of [
+    [2, "2:01", "2nd Quarter", false],
+    [2, "2:00", "2nd Quarter", true],
+    [2, "0:32", "2nd Quarter", true],
+    [4, "2:00", "4th Quarter", true],
+    [4, "0:00", "4th Quarter", true],
+    [4, "2:01", "4th Quarter", false],
+    [1, "0:32", "1st Quarter", false],
+    [3, "0:32", "3rd Quarter", false],
+    [5, "0:32", "Overtime", false],
+    [2, "0:00", "Halftime", false],
+    [2, "invalid", "2nd Quarter", false],
+    [4, null, "4th Quarter", false],
+  ]) {
+    updateGame({ ...game, period, clock, status });
+    assert.equal(elements.gameClock.children[1]?.classList.contains("is-two-minute-warning") ?? false,
+      expected, `${period}: ${clock} (${status})`);
+  }
+});
+
+test("clock uses the score color and shares the fourth-down warning red", async () => {
+  const css = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
+  assert.match(css, /\.clock-time\s*\{[^}]*color: #f5f4eb;/);
+  assert.match(css, /\.score-number\s*\{[^}]*color: #f5f4eb;/);
+  assert.match(css, /\.clock-time\.is-two-minute-warning, \.down-distance\.is-fourth-down\s*\{ color: #f56367; \}/);
+});
+
 test("a reported halftime marker shows an estimated break timer below the score", () => {
   const { updateGame, elements } = gameView();
   updateGame({ ...game, period: 2, clock: "0:00", status: "Halftime",
     halftimeStartedAt: new Date(Date.now() - 17_000).toISOString() });
   assert.match(elements.gameClock.children[1].textContent, /^12:4[23]$/);
   assert.equal(elements.gameClock.children[2].textContent, "EST. TO 2ND HALF");
+  assert.equal(elements.gameClock.children[1].classList.contains("is-two-minute-warning"), false);
 });
 
 test("neutral-site team labels identify designated sides rather than claiming a home stadium", () => {
@@ -100,6 +134,12 @@ test("team headings use full NFL names while retaining college event rankings an
   assert.equal(querySelector("#home-name").textContent, "#19 Texas");
   assert.equal(querySelector("#home-name").title, "ESPN event ranking");
   assert.equal(querySelector("#home-record").textContent, "5-2 (2-2 SEC)");
+});
+
+test("score possession footballs match the field football's displayed size", async () => {
+  const css = await readFile(new URL("../public/styles.css", import.meta.url), "utf8");
+  assert.match(css, /\.score-readout\s*\{[^}]*grid-template-columns: 54px minmax\(0, 1fr\) 156px minmax\(0, 1fr\) 54px;/);
+  assert.match(css, /\.possession-ball\s*\{[^}]*width: 100%;[^}]*height: auto;/);
 });
 
 test("the broadcast layout preserves the boxed channel, full drive list, and complete leaders footer", async () => {
