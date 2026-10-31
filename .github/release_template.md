@@ -1,16 +1,14 @@
 ## What's new
 
-- Refreshed the dark theme and field graphics, including clearer drive paths, a team-logo possession pin, and down-and-distance in the play list.
-- Added an estimated halftime countdown: 13 minutes for NFL and 20 minutes for college, based on ESPN's end-of-half timestamp. It stops at zero until play resumes and falls back to HALFTIME when the timestamp is unavailable.
-- Increased live and near-kickoff refresh frequency from 15 to 10 seconds; idle polling remains every five minutes.
+- Added an **All scores** dashboard for the current NCAAF Top 25 slate and all NFL games, ordered by kickoff, with selectable matchups that open temporarily in the scoreboard.
+- Improved play-by-play and field visualization, including clearer run/pass/punt trajectories, defensive returns and sacks, confirmed field positions, team-color possession/scoring markers, and win-chance display.
+- Added broader support for FBS yard-line aliases and polished the team picker and dashboard navigation.
 
 ## Fixes and coverage
 
-- Improved punt/return trajectories, penalty enforcement, missed and blocked kick positioning, and fourth-down pass handling.
-- Fixed highlight handling when ESPN amends an existing play with an extra point or penalty, and refined scoring, turnover, and tackle-credit behavior.
-- Expanded regression coverage and added live-play capture/review scripts, plus Raspberry Pi touchscreen-keyboard guidance.
+- Refined handling of game data and play positions across NFL and college football, with regression coverage for the dashboard and field updates.
 
-**Validation:** all 646 tests passed (`npm test`).
+**Validation:** all 696 tests passed (`npm test`).
 
 ## Updating
 
@@ -24,4 +22,4 @@ Reload the kiosk browser afterward to load the new UI. See the [Raspberry Pi set
 
 Requires Node.js 20 or newer. No npm dependencies to install.
 
-**Full changelog:** https://github.com/nicholasfrei/football-scoreboard/compare/v0.1.1...v0.1.2
+**Full changelog:** https://github.com/nicholasfrei/football-scoreboard/compare/v0.1.2...v0.1.3
